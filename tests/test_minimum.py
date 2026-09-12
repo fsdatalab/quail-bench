@@ -70,10 +70,7 @@ def test_minimum_input_tokens_counts_each_distinct_prefix_once():
         spec, pieces, filter_answers, join_answers,
         DocumentTokens(corpus, _encode))
 
-    # the three documents share the preamble, and the first two share
-    # "same start " (11 tokens) beyond it; every document gets the
-    # question once, the two anchors get the frame once, and each
-    # anchor's pairs share the label and the partners' first token
+    # the first two documents share "same start " (11 tokens)
     pre = len(PRE)
     documents = 3 * pre + 14 + 14 + 5 - (pre + pre + 11)
     anchored = len(QUESTION) + len(FRAME) - _lcp(QUESTION, FRAME)
@@ -97,8 +94,6 @@ def test_minimum_input_tokens_counts_a_document_once_across_uses():
         "joins": [{"position": 0, "anchor": "d1", "frame": FRAME,
                    "label": LABEL, "tail": TAIL}],
     })
-    # both rows pass the first stage, only "alpha" reaches the second;
-    # the join anchors on d1, the same two documents
     filter_answers = {
         ("d2", 0): pa.table({"d2": ["a", "b"], "answer": [True, True]}),
         ("d2", 1): pa.table({"d2": ["a"], "answer": [True]}),

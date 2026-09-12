@@ -142,9 +142,7 @@ def test_prompt_pieces_give_the_minimum_and_the_regret(tmp_path, monkeypatch):
     record = quail_b.run(execute, queries=["IMDB-4"], output_dir=destination,
                          root=tmp_path)
     metrics = record["queries"][0]["metrics"]
-    # the preamble once, then "good" and "bad" (4 and 3 tokens, sharing
-    # nothing); per review the two filter tails and the frame, which
-    # share nothing; per anchor the label, "acting", and the tail
+    # "good" and "bad" are 4 and 3 tokens; "acting" is 6
     stages = len(spec.aliases[0].filters)
     assert stages == 2
     minimum = (2 + 4 + 3) + 2 * (2 * 2 + 2) + 2 * (1 + 6 + 3)
