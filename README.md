@@ -357,21 +357,21 @@ Parquet and manifest files to `~/.cache/quail-b`, or
 `$XDG_CACHE_HOME/quail-b`. Later runs reuse those files. The small pointer
 to the active reference collection is refreshed from S3.
 
-Before it calls your adapter, the current loader puts the selected Arrow
-input tables and the full reference-label collection in host memory. The
-full label collection is loaded even when `queries` selects one query.
-Budget:
+Before it calls your adapter, the loader puts the selected Arrow input
+tables and the reference labels of the selected queries' predicates in
+host memory. Labels are Arrow tables of about 25 bytes per answer, and
+scoring joins them instead of looking answers up one at a time. Budget:
 
-| Scale factor | Reference answers | Loader peak RAM | Host RAM to use |
+| Scale factor | Reference answers, all 21 predicates | Loader peak RAM | Host RAM to use |
 | ---: | ---: | ---: | ---: |
-| 0.1 | 1.21 million | 0.84 GiB measured | 2 GiB or more |
-| 0.5 | 17.62 million | 10–12 GiB estimated | 16 GiB or more |
-| 1.0 | 51.80 million | 30–35 GiB estimated | 48 GiB or more |
+| 0.1 | 1.21 million | 0.62 GiB measured, 1.9 s from cached files | 2 GiB or more |
+| 0.5 | 17.62 million | 1.5 GiB estimated | 4 GiB or more |
+| 1.0 | 51.80 million | 3 GiB estimated | 8 GiB or more |
 
-The 0.5 and 1.0 estimates scale the measured 0.1 label-memory cost by the
-published answer counts. They are planning values, not measured peaks.
-They exclude your engine, model, and returned result tables. Use 64 GiB
-for a full-scale run when the engine shares the same host.
+The 0.1 peak covers the corpus tables and the Parquet files being read
+as well as the labels. The 0.5 and 1.0 estimates scale the label bytes
+by the published answer counts; they are planning values, not measured
+peaks. They exclude your engine, model, and returned result tables.
 
 - Override the download cache with `cache_dir=` or `QUAIL_B_CACHE_DIR`.
 - Pass `data_dir=` to use local input Parquet files. Reference labels still
