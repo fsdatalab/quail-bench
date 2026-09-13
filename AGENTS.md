@@ -41,10 +41,6 @@ engineers talking to each other at a whiteboard. No jargon.
 - Never say "arm" or "arms" for the runs of an experiment. Say
   "run", "configuration", or name the method being run.
 
-For Claude Code users: install the `plain-writing` skill from
-`docwriter-org/plain-writing-skill` for automated enforcement of
-these rules.
-
 # Style checks
 
 CI runs these on every pull request. Run them before pushing:
