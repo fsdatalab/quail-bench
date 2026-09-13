@@ -105,16 +105,18 @@ import quail_b
 
 quail_b.run(
     run_query,
-    queries=["IMDB-4"],
+    queries=["IMDB-4"],  # Omit to run all 33 queries
     scale_factor=0.1,
-    output_dir="results/my-run",
+    output_dir="results/my-run",  # Set your desired output directory path
     metadata={"engine": "my-engine", "model": "Qwen/Qwen3-4B-FP8"},
     gpu_count=1,
     gpu_hourly_rate_usd=3.9492,
 )
 ```
 
-Omit `queries=` to run all 33 queries. Benchmark data is downloaded from `s3://quail-bench` and cached locally in `~/.cache/quail-b`.
+- `output_dir`: Path to the directory where QUAIL-B writes run results (e.g. `"results/vllm-qwen3-4b"` or any custom path). Must be a new directory.
+- `queries`: List of query IDs to run. Omit `queries=` (or pass `None`) to run all 33 benchmark queries.
+- Data is downloaded from `s3://quail-bench` and cached locally in `~/.cache/quail-b`.
 
 ### Inspecting Data and Queries Directly
 
@@ -211,13 +213,16 @@ Reference labels are generated using `Qwen/Qwen3-32B-FP8`. FEVER and LePaRD also
 
 ## Results and CLI
 
-Each benchmark run writes results to a structured directory:
+Each benchmark run writes results to your configured `output_dir` (one subdirectory per evaluated query):
 
 ```text
 results/my-run/
 ├── run.json
 ├── report.md
 ├── measurements.parquet
+├── IMDB-1/
+├── IMDB-2/
+├── ...
 └── IMDB-4/
     ├── plan.substrait
     ├── rows.parquet
