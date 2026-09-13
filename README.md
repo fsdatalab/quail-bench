@@ -6,30 +6,14 @@ This repository publishes the query plans, input relations, reference labels, an
 
 ## Contents
 
-- [Installation](#installation)
 - [Scale Factors](#scale-factors)
 - [Queries](#queries)
+- [How to Adapt an Engine](#how-to-adapt-an-engine)
+- [Installation](#installation)
 - [Running the Benchmark](#running-the-benchmark)
 - [Metrics](#metrics)
 - [Results and CLI](#results-and-cli)
 - [Source Files](#source-files)
-- [How to Adapt an Engine](#how-to-adapt-an-engine)
-
-## Installation
-
-QUAIL-B requires Python 3.12.
-
-```sh
-uv add "quail-b @ git+https://github.com/fsdatalab/quail-bench.git"
-```
-
-For development:
-
-```sh
-git clone https://github.com/fsdatalab/quail-bench.git
-cd quail-bench
-uv sync
-```
 
 ## Scale Factors
 
@@ -94,6 +78,83 @@ Project [r.id, a.id]
 ```
 
 In the Substrait plan, `F1`, `F4`, and `J1` are string prompt literals. Exact prompt texts and rendering logic are defined in [`quail_b/prompts.py`](quail_b/prompts.py) and [`quail_b/rendering.py`](quail_b/rendering.py).
+
+## How to Adapt an Engine
+
+An engine connects through an adapter function:
+
+```python
+run_query(query: quail_b.QuerySpec, tables: dict[str, pyarrow.Table]) -> quail_b.RunOutput
+```
+
+The adapter receives:
+- `query`: A `QuerySpec` instance. Its `query.plan` property provides the parsed Substrait `Plan`.
+- `tables`: A dictionary mapping relation names to input PyArrow tables.
+
+The adapter translates the Substrait plan into the target engine's AI SQL dialect (for example BigQuery AI SQL, Lotus, Palimpzest, or DuckDB), executes it, and returns a `RunOutput`.
+
+### The `RunOutput` Contract
+
+Required fields:
+- `rows`: A `pyarrow.Table` containing final output tuples, with one ID column per selected alias (such as `r` and `a`).
+- `runtime_s`: Query execution time in seconds as a float. This excludes engine startup and model loading.
+
+Optional fields (used for predicate accuracy and token accounting):
+- `filter_answers`: A dictionary mapping filter operator ID (such as `"filter-1"`) to a `pyarrow.Table` of evaluated document IDs and boolean `answer` values.
+- `join_answers`: A dictionary mapping join operator ID (such as `"join-1"`) to a `pyarrow.Table` of evaluated left/right ID pairs and boolean `answer` values.
+- `measurements`: A dictionary for engine telemetry. Reporting `measurements["fresh_tokens"]` records the count of input tokens processed in model forward passes.
+- `prompt_pieces`: Tokenized prompt IDs for prefix KV accounting.
+
+If an engine does not record individual predicate answers, pass `filter_answers=None` and `join_answers=None`.
+
+### Concrete Adapter Example
+
+```python
+import pyarrow as pa
+import quail_b
+
+
+def run_query(query: quail_b.QuerySpec, tables: dict[str, pa.Table]) -> quail_b.RunOutput:
+    sql = to_engine_sql(query.plan)
+    result = execute(sql, tables)
+
+    return quail_b.RunOutput(
+        rows=pa.table({
+            "r": result.output_review_ids,
+            "a": result.output_aspect_ids,
+        }),
+        runtime_s=result.query_seconds,
+        filter_answers={
+            "filter-1": pa.table({"r": result.f1_ids, "answer": result.f1_answers}),
+            "filter-2": pa.table({"r": result.f4_ids, "answer": result.f4_answers}),
+        },
+        join_answers={
+            "join-1": pa.table({
+                "r": result.join_review_ids,
+                "a": result.join_aspect_ids,
+                "answer": result.join_answers,
+            }),
+        },
+        measurements={"fresh_tokens": result.fresh_tokens},
+        prompt_pieces=result.prompt_pieces,
+    )
+```
+
+## Installation
+
+QUAIL-B requires Python 3.12.
+
+```sh
+uv add "quail-b @ git+https://github.com/fsdatalab/quail-bench.git"
+```
+
+For development:
+
+```sh
+git clone https://github.com/fsdatalab/quail-bench.git
+cd quail-bench
+uv sync
+```
 
 ## Running the Benchmark
 
@@ -189,64 +250,3 @@ quail-b report results/my-run
 | [`quail_b/scoring.py`](quail_b/scoring.py) | Accuracy, precision, recall, and cost scoring |
 | [`quail_b/minimum.py`](quail_b/minimum.py) | Prefix trie and minimum token accounting |
 | [`quail_b/reporting.py`](quail_b/reporting.py) | Markdown reports and Parquet measurement export |
-
-## How to Adapt an Engine
-
-An engine connects through an adapter function:
-
-```python
-run_query(query: quail_b.QuerySpec, tables: dict[str, pyarrow.Table]) -> quail_b.RunOutput
-```
-
-The adapter receives:
-- `query`: A `QuerySpec` instance. Its `query.plan` property provides the parsed Substrait `Plan`.
-- `tables`: A dictionary mapping relation names to input PyArrow tables.
-
-The adapter translates the Substrait plan into the target engine's AI SQL dialect (for example, [BigQuery AI SQL](https://cloud.google.com/bigquery/docs/generative-ai-overview)), executes it, and returns a `RunOutput`.
-
-### The `RunOutput` Contract
-
-Required fields:
-- `rows`: A `pyarrow.Table` containing final output tuples, with one ID column per selected alias (such as `r` and `a`).
-- `runtime_s`: Query execution time in seconds as a float. This excludes engine startup and model loading.
-
-Optional fields (used for predicate accuracy and token accounting):
-- `filter_answers`: A dictionary mapping filter operator ID (such as `"filter-1"`) to a `pyarrow.Table` of evaluated document IDs and boolean `answer` values.
-- `join_answers`: A dictionary mapping join operator ID (such as `"join-1"`) to a `pyarrow.Table` of evaluated left/right ID pairs and boolean `answer` values.
-- `measurements`: A dictionary for engine telemetry. Reporting `measurements["fresh_tokens"]` records the count of input tokens processed in model forward passes.
-- `prompt_pieces`: Tokenized prompt IDs for prefix KV accounting.
-
-If an engine does not record individual predicate answers, pass `filter_answers=None` and `join_answers=None`.
-
-### Concrete Adapter Example
-
-```python
-import pyarrow as pa
-import quail_b
-
-
-def run_query(query: quail_b.QuerySpec, tables: dict[str, pa.Table]) -> quail_b.RunOutput:
-    sql = to_engine_sql(query.plan)
-    result = execute(sql, tables)
-
-    return quail_b.RunOutput(
-        rows=pa.table({
-            "r": result.output_review_ids,
-            "a": result.output_aspect_ids,
-        }),
-        runtime_s=result.query_seconds,
-        filter_answers={
-            "filter-1": pa.table({"r": result.f1_ids, "answer": result.f1_answers}),
-            "filter-2": pa.table({"r": result.f4_ids, "answer": result.f4_answers}),
-        },
-        join_answers={
-            "join-1": pa.table({
-                "r": result.join_review_ids,
-                "a": result.join_aspect_ids,
-                "answer": result.join_answers,
-            }),
-        },
-        measurements={"fresh_tokens": result.fresh_tokens},
-        prompt_pieces=result.prompt_pieces,
-    )
-```
