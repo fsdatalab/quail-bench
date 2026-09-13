@@ -205,9 +205,10 @@ The model-based reference labels use:
 At the token position after `ANSWER:`, the labeling pass compares the token
 IDs returned by `quail_b.rendering.true_false_ids(tokenizer)`. These are the
 first tokens of `TRUE`, ` TRUE`, `True`, and ` True`, and the corresponding
-`FALSE` forms, with special tokens disabled. The labeling pass and its tie
-handling live in the Quail repository, not this repository. Published labels
-are the reference values used for scoring.
+`FALSE` forms, with special tokens disabled. Candidate aggregation and tie
+handling are implemented in Quail's `quail/bench/labeling.py`, not this
+repository. This repository therefore cannot regenerate the model labels
+independently. Published labels are the reference values used for scoring.
 
 The exact text sent for each predicate is produced by
 [`quail_b/rendering.py`](quail_b/rendering.py). Filter prompts place the
@@ -220,13 +221,13 @@ its `evidence_wiki_url`: `SUPPORTS` maps to `TRUE` and `REFUTES` maps to
 `FALSE`. The LePaRD citation rule is `TRUE` when the context's
 `cited_passage_ids` intersects the candidate's `passage_ids`. The labeling
 pass combines these source rules with model judgments according to the
-predicate source policy. That combining code lives in the Quail repository.
-The policy and sources used for each published label set are recorded in its
-manifest.
+predicate source policy. That combining code also lives in
+`quail/bench/labeling.py`. The sources used for each published label set are
+recorded in its manifest.
 
 Reference labels are fixed benchmark data. Their identities hash the corpus,
-predicate text and rendering, model revision, decoding settings, and source
-policy.
+predicate text and rendering, model revision, decoding settings, and derived
+source identities. They do not hash Quail's label-combination implementation.
 
 ### Loading data
 
@@ -266,10 +267,11 @@ By default, data is read anonymously from `s3://quail-bench`. Immutable
 Parquet files and manifests are cached in `~/.cache/quail-b`, or in
 `$XDG_CACHE_HOME/quail-b` when that variable is set.
 
-Use `cache_dir=` or `QUAIL_B_CACHE_DIR` to change the cache. Use `data_dir=`
-to supply local input Parquet files. Local tables are checked against the
-published corpus manifest before a run starts. Use `root=` to select a local
-mirror of both inputs and reference labels.
+For direct `load_table` and `load_benchmark` calls, set
+`QUAIL_B_CACHE_DIR` to change the cache. `quail_b.run` also accepts
+`cache_dir=`. Use `data_dir=` to supply local input Parquet files. Local
+tables are checked against the published corpus manifest before a run starts.
+Use `root=` to select a local mirror of both inputs and reference labels.
 
 ### Memory requirements
 
@@ -414,24 +416,37 @@ construction, submission, queueing, model execution, and relational
 processing. Stop after all operators have completed, the asynchronous backend
 has synchronized, and final ID rows are materialized in the engine's result
 object. Exclude model loading, warmup, corpus loading performed before the
-callback, conversion of the completed result to `RunOutput`, QUAIL-B
-validation, scoring, and file writes.
+callback, and conversion or transfer of the completed engine result into
+`RunOutput`. The generated report calls this last step “result collection.”
+Also exclude QUAIL-B validation, scoring, and file writes.
 
 ### Run protocol
 
 Pass the adapter to `quail_b.run`:
 
 ```python
+run_metadata = {
+    "engine": "my-engine",
+    "engine_version": "version or commit",
+    "model": "Qwen/Qwen3-4B-FP8",
+    "model_revision": "immutable model revision",
+    "tokenizer": "Qwen/Qwen3-4B-FP8",
+    "tokenizer_revision": "immutable tokenizer revision",
+    "quantization": "fp8",
+    "inference_dtype": "engine dtype",
+    "gpu": "H100",
+    "warmup": "procedure used",
+    "initial_cache": "cleared or retained state",
+    "price_provider": "Modal",
+    "price_retrieved": "2026-09-13",
+}
+
 quail_b.run(
     run_query,
     queries=["IMDB-4"],
     scale_factor=0.1,
     output_dir="results/my-run",
-    metadata={
-        "engine": "my-engine",
-        "model": "Qwen3-4B-FP8",
-        "configuration": "description of engine settings",
-    },
+    metadata=run_metadata,
     gpu_count=1,
     gpu_hourly_rate_usd=3.9492,
 )
@@ -456,7 +471,7 @@ quail_b.run(
     run_query,
     scale_factor=0.1,
     output_dir="results/full-0.1",
-    metadata={"engine": "my-engine", "model": "Qwen3-4B-FP8"},
+    metadata=run_metadata,
 )
 ```
 
@@ -480,7 +495,7 @@ reported predicate-accuracy and token metrics require them.
 
 | Metric | Definition |
 | --- | --- |
-| Query time | adapter-reported execution time; excludes model startup, result collection, scoring, and saving |
+| Query time | adapter-reported execution time; excludes model startup, warmup, conversion to `RunOutput`, scoring, and saving |
 | Filter throughput | input document rows divided by query time |
 | Join throughput | evaluated document pairs across all join stages divided by query time |
 | GPU cost | query time in hours × GPU count × price per GPU-hour |
@@ -567,8 +582,11 @@ cache, scheduler constraints, or model computation after the boolean answer.
 `regret_tokens`, reported as recomputed KV tokens, is the difference between
 the engine's fresh-token count and this minimum.
 
-Both metrics require complete predicate-answer tables, `prompt_pieces`, and a
-nonnegative integer `fresh_tokens` measurement. They are unavailable when
+For a comparable complete result, both metrics require complete
+predicate-answer tables, `prompt_pieces`, and a nonnegative integer
+`fresh_tokens` measurement. The current runner does not detect omitted
+evaluations and can compute a value from a partial trace; such a value is not
+a complete benchmark result. The metrics are unavailable when
 `prompt_pieces` is absent. The runner rejects a reported fresh-token count
 below the computed minimum.
 
@@ -611,9 +629,9 @@ the IDs stored in the run.
 
 When complete predicate traces are supplied, final-row validation computes
 the implied row count. For results of at most 100,000 rows it validates every
-row against the trace. For larger results it checks 100,000 evenly spaced
-rows. This bounds validation memory and time, but it is not an exhaustive
-membership check for a larger result.
+row against the trace. For larger results it checks a sample of at most
+100,000 rows selected at a fixed step by the current implementation. This is
+not an exhaustive membership check for a larger result.
 
 ## Reproducibility
 
