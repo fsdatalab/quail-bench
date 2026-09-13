@@ -54,10 +54,12 @@ The default workload has 33 queries:
 Two PrivacyPolicies queries are defined separately and are not part of the
 default workload.
 
-The benchmark configurations use Qwen3 4B fp8 or Qwen3 32B fp8. Each model
-copy runs on one H100; tensor-parallel weight sharding is outside the
-benchmark scope. The runner can record other configurations, but results from
-different models or hardware are not the same benchmark configuration.
+Official evaluated-model configurations use `Qwen/Qwen3-4B-FP8` or
+`Qwen/Qwen3-32B-FP8`. Each model copy runs on one H100; tensor-parallel weight
+sharding is outside the benchmark scope. Every reported run must identify the
+model and tokenizer repositories and revisions, quantization format, inference
+dtype, engine version, and GPU type. Results that differ in any of these
+values are different benchmark configurations.
 
 ## Workload
 
@@ -198,7 +200,14 @@ The model-based reference labels use:
 | Output length | one token |
 | Random seed | `20260818` |
 | Maximum model length | 32,768 tokens |
-| Answer | argmax over the `TRUE` and `FALSE` token logits |
+| Answer | one-token choice between `TRUE` and `FALSE` |
+
+At the token position after `ANSWER:`, the labeling pass compares the token
+IDs returned by `quail_b.rendering.true_false_ids(tokenizer)`. These are the
+first tokens of `TRUE`, ` TRUE`, `True`, and ` True`, and the corresponding
+`FALSE` forms, with special tokens disabled. The labeling pass and its tie
+handling live in the Quail repository, not this repository. Published labels
+are the reference values used for scoring.
 
 The exact text sent for each predicate is produced by
 [`quail_b/rendering.py`](quail_b/rendering.py). Filter prompts place the
@@ -206,10 +215,14 @@ document before the question. Join prompts place the anchor document first,
 then the question and partner document. Both end with `ANSWER:`. An engine
 must evaluate this rendered text and the same `TRUE`/`FALSE` decision.
 
-FEVER support labels and LePaRD citation labels also use their pinned source
-annotations. The source policy for each predicate is defined in
-[`quail_b/predicates.py`](quail_b/predicates.py) and recorded in each
-label-set manifest.
+FEVER's source rule applies to a claim paired with the Wikipedia page named by
+its `evidence_wiki_url`: `SUPPORTS` maps to `TRUE` and `REFUTES` maps to
+`FALSE`. The LePaRD citation rule is `TRUE` when the context's
+`cited_passage_ids` intersects the candidate's `passage_ids`. The labeling
+pass combines these source rules with model judgments according to the
+predicate source policy. That combining code lives in the Quail repository.
+The policy and sources used for each published label set are recorded in its
+manifest.
 
 Reference labels are fixed benchmark data. Their identities hash the corpus,
 predicate text and rendering, model revision, decoding settings, and source
@@ -311,6 +324,11 @@ QUAIL-B calls this function once for each selected query.
 input table has an `id` column. Text and auxiliary columns are named by the
 `ReadRel` schema.
 
+Every field referenced by a benchmark plan is declared
+`NULLABILITY_REQUIRED`, and published tables contain non-null values for those
+fields. The workload does not exercise SQL three-valued logic. The ordinary
+equality condition in FEV-10 compares two non-null strings.
+
 An adapter resolves function anchors from the plan's extension declarations,
 walks the relation tree, and translates it to the engine's query
 representation. Filters are `FilterRel` nodes over their inputs; they are not
@@ -320,21 +338,27 @@ properties of a table or alias.
 
 The adapter returns `quail_b.RunOutput`:
 
-| Field | Required | Contents |
+| Field | Runner requirement | Contents |
 | --- | --- | --- |
-| `rows` | yes | final result, with one ID column per selected alias |
-| `runtime_s` | yes | query execution time in seconds |
-| `filter_answers` | no | filter operator ID to evaluated documents and answers |
-| `join_answers` | no | join operator ID to evaluated pairs and answers |
-| `measurements` | no | engine measurements, including `fresh_tokens` |
-| `prompt_pieces` | no | tokenized prompt structure used for token accounting |
+| `filter_answers` | argument required; value may be `None` | filter operator ID to evaluated documents and answers |
+| `join_answers` | argument required; value may be `None` | join operator ID to evaluated pairs and answers |
+| `rows` | required | final result, with one ID column per selected alias |
+| `runtime_s` | required | query execution time in seconds |
+| `measurements` | optional | engine measurements, including `fresh_tokens` |
+| `prompt_pieces` | optional | tokenized prompt structure used for token accounting |
 
-A filter answer table has the relation alias column and a non-null boolean
-`answer` column. A join answer table has both relation alias columns and a
-non-null boolean `answer` column. The tables contain every document or pair
-evaluated by that operator, including answers of `FALSE`. Document IDs must
-be non-null, must occur in the input corpus, and must not be duplicated within
-an answer table.
+A filter answer table contains one relation-alias column and one non-null
+boolean `answer` column. Each document ID occurs at most once. A join answer
+table contains two relation-alias columns and `answer`. Each pair occurs at
+most once, although one document ID may occur in many pairs. All IDs must be
+non-null and present in the corresponding input table.
+
+A complete trace has dictionary keys for every filter and join operator in the
+plan. Use an empty dictionary when a query has no operator of that kind. Each
+table contains every document or pair for which that operator produced an
+answer, including `FALSE`. The runner validates supplied rows but cannot
+detect an omitted evaluation; a trace with omissions is not a complete
+benchmark result.
 
 Final rows have set semantics. Row order does not matter. Every row must
 contain one non-null corpus ID for each selected relation alias. Duplicate
@@ -384,12 +408,13 @@ supplied answer table may not be null. When either dictionary is absent,
 QUAIL-B still scores final output precision and recall, but predicate
 accuracy and some token metrics are unavailable.
 
-`runtime_s` covers query execution from submission of the first
-query-specific engine work until every model answer needed for the final rows
-has completed. It includes engine scheduling, queueing, model forward passes,
-and relational processing during the query. The adapter must synchronize an
-asynchronous backend before reading the stop time. It excludes model loading,
-warmup, corpus loading, conversion of completed results to `RunOutput`, QUAIL-B
+Start `runtime_s` immediately before the first query-specific call into the
+engine. The interval includes plan compilation, tokenization, request
+construction, submission, queueing, model execution, and relational
+processing. Stop after all operators have completed, the asynchronous backend
+has synchronized, and final ID rows are materialized in the engine's result
+object. Exclude model loading, warmup, corpus loading performed before the
+callback, conversion of the completed result to `RunOutput`, QUAIL-B
 validation, scoring, and file writes.
 
 ### Run protocol
@@ -435,10 +460,21 @@ quail_b.run(
 )
 ```
 
-The runner accepts a minimal result containing `rows` and `runtime_s`. A
-complete benchmark result also supplies all filter and join answer tables,
-`measurements["fresh_tokens"]`, and `prompt_pieces`, because the reported
-predicate-accuracy and token metrics require them.
+The current `RunOutput` constructor requires both answer-dictionary
+arguments. A minimal runner-valid result is:
+
+```python
+quail_b.RunOutput(
+    filter_answers=None,
+    join_answers=None,
+    rows=rows,
+    runtime_s=runtime_s,
+)
+```
+
+A complete benchmark result instead supplies all filter and join answer
+tables, `measurements["fresh_tokens"]`, and `prompt_pieces`, because the
+reported predicate-accuracy and token metrics require them.
 
 ## Metrics
 
@@ -462,11 +498,24 @@ rows and expose false positive and false negative results. These accuracy
 metrics measure agreement with the published reference collection; they are
 not estimates of agreement with independent human judgments.
 
+Let \(R\) be the distinct returned rows, \(G\) the distinct reference rows,
+and \(M = R \cap G\). Output precision is \(|M| / |R|\), and recall is
+\(|M| / |G|\). A zero denominator produces `0.0`, except that precision and
+recall are both `1.0` when both sets are empty. Predicate accuracy is the
+number of correct evaluated answers divided by the number evaluated. It is
+unavailable when the adapter supplies no predicate answers. Saved accuracy
+values are rounded to six decimal places.
+
 When all join answer tables are supplied, the evaluated-pair count is the sum
 of their row counts. This value takes precedence over
 `measurements["evaluated_document_pairs"]`. If the answer tables are absent or
 incomplete, the runner uses that measurement instead. It counts pairs for
 which the AI join produced an answer, including `FALSE` answers.
+
+`gpu_hourly_rate_usd` is supplied by the caller; the package has no default
+price. The example rate of `$3.9492` per H100-hour is from
+[Modal's pricing page](https://modal.com/pricing), accessed 2026-09-13. A
+reported cost must state its provider, retrieval date, and hourly rate.
 
 ### Token accounting
 
@@ -499,6 +548,12 @@ prompt_pieces = {
 All values shown as `[...]` are lists of token IDs. A filter request is
 `preamble + document + tail`. A join request is
 `preamble + anchor document + frame + label + partner document + tail`.
+
+The current saved format passes `prompt_pieces["tokenizer"]` to
+`AutoTokenizer.from_pretrained` and does not store a tokenizer revision in
+that field. Record the tokenizer repository and immutable revision in run
+metadata. Rescoring token metrics is reproducible only when it resolves the
+same tokenizer files.
 
 To reconstruct the requests, QUAIL-B combines `prompt_pieces` with the
 document IDs in the filter and join answer tables, reads those documents from
@@ -554,6 +609,12 @@ quail-b report results/my-run
 Rescoring checks that the current query definition and published corpus match
 the IDs stored in the run.
 
+When complete predicate traces are supplied, final-row validation computes
+the implied row count. For results of at most 100,000 rows it validates every
+row against the trace. For larger results it checks 100,000 evenly spaced
+rows. This bounds validation memory and time, but it is not an exhaustive
+membership check for a larger result.
+
 ## Reproducibility
 
 Report these values with benchmark results:
@@ -568,10 +629,19 @@ Report these values with benchmark results:
 - GPU hourly price when reporting cost; and
 - whether model startup and caches were warmed before measurement.
 
-Compare two runs only when their query definitions, corpus IDs, and reference
-collections match. The runner stores a semantic hash of every query
-definition. The hash covers Substrait version, functions, tables, aliases,
-prompts, operator order, equality conditions, and projection.
+Correctness comparisons require matching query definitions, corpus IDs, and
+reference collections. Performance and token comparisons additionally
+require the same model and tokenizer revisions, quantization, inference dtype,
+GPU type and count, query order, warmup procedure, and initial cache state.
+
+`quail_b.run` invokes each query once and does not reset or warm engine state.
+For isolated query measurements, clear query-derived KV before each query. If
+state is retained between queries, report the order and retained state and
+compare only with runs using the same protocol.
+
+The runner stores a semantic hash of every query definition. The hash covers
+Substrait version, functions, tables, aliases, prompts, operator order,
+equality conditions, and projection.
 
 Run the repository checks before changing the benchmark:
 
