@@ -82,9 +82,9 @@ QUAIL-B calls `run_query(query, tables)` once per query.
 - `query.plan` is the Substrait plan.
 - `tables` is a dictionary of Arrow tables for the named relations.
 
-The adapter translates the plan into the engine's AI SQL, for example
-BigQuery AI SQL, Lotus, or Palimpzest, executes it, and returns a
-`RunOutput`.
+The adapter translates the plan into the engine's AI SQL (for example,
+[BigQuery AI SQL](https://cloud.google.com/bigquery/docs/generative-ai-overview)),
+executes it, and returns a `RunOutput`.
 
 Required:
 
