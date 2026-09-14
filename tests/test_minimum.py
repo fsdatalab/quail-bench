@@ -27,6 +27,13 @@ def _ids(text):
     return _encode([text])[0]
 
 
+def _lcp(left, right):
+    n = 0
+    while n < min(len(left), len(right)) and left[n] == right[n]:
+        n += 1
+    return n
+
+
 PRE = _ids("DOCUMENT:\n")
 QUESTION = _ids("\n\nuseful?\nANSWER:")
 FRAME = _ids("\n\nDoes it mention the aspect?")
@@ -74,11 +81,12 @@ def test_minimum_input_tokens_counts_each_document_prefix_once_and_pairs_apart()
 
     # the three documents share the preamble, and the first two share
     # "same start " (11 tokens) beyond it; every document gets the
-    # question once and the two anchors get the frame once, sharing
-    # nothing between them; each pair gets its label, partner, and tail
+    # question once, the two anchors get the frame once, sharing the
+    # lead it has in common with the question; each pair gets its own
+    # label, partner, and tail
     pre = len(PRE)
     documents = 3 * pre + 14 + 14 + 5 - (pre + pre + 11)
-    anchored = len(QUESTION) + len(FRAME)
+    anchored = len(QUESTION) + len(FRAME) - _lcp(QUESTION, FRAME)
     pairs = 2 * len(LABEL) + 4 + 2 * len(TAIL)
     assert minimum == documents + len(QUESTION) + 2 * anchored + 2 * pairs
 
@@ -114,8 +122,9 @@ def test_minimum_input_tokens_counts_a_document_once_across_uses():
         DocumentTokens(corpus, _encode))
 
     documents = 2 * len(PRE) + 5 + 4 - len(PRE)
-    alpha = len(first) + len(second) + len(FRAME)
-    beta = len(first) + len(FRAME)
+    alpha = len(first) + len(second) + len(FRAME) - sum((
+        _lcp(first, second), max(_lcp(FRAME, first), _lcp(FRAME, second))))
+    beta = len(first) + len(FRAME) - _lcp(first, FRAME)
     pairs = 2 * len(LABEL) + 9 + 2 * len(TAIL)
     assert minimum == documents + alpha + beta + 2 * pairs
 

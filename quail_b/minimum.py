@@ -3,16 +3,17 @@
 Every request an engine made is a token sequence: a document prefix
 followed by a filter question, or an anchor prefix and its frame
 followed by a partner label, the partner document, and the answer cue.
-With unlimited KV every distinct document prefix across those
-sequences is computed once, each distinct suffix after a document
-(a question, or a frame) once, and each pair's suffix after its anchor
-(label, partner document, answer cue) once per pair. Nothing is shared
-between the suffixes of one document or between the pair suffixes of
-one anchor: those tokens must be computed once per request, so they
-are never regret. What an engine computed beyond the minimum is its
-regret, whatever the cause: an evicted anchor computed again, a set
-scanned twice under two aliases, or a prompt prefix the documents
-share computed once per document.
+With unlimited KV every distinct prefix across the document
+sequences is computed once: each document's text once, and the
+questions and frames after one document once each, sharing the lead
+they have in common (an engine that rewinds KV to where two questions
+diverge computes that lead once). A pair's suffix after its anchor
+(label, partner document, answer cue) is computed once per pair, with
+nothing shared between the pairs of one anchor: those tokens are one
+request's own, so they are never regret. What an engine computed
+beyond the minimum is its regret, whatever the cause: an evicted
+anchor computed again, a set scanned twice under two aliases, or a
+prompt prefix the documents share computed once per document.
 
 The engine reports the prompt pieces it used as token ids (see
 `validate_prompt_pieces`); the documents are tokenized here with the
@@ -271,9 +272,13 @@ def minimum_input_tokens(spec, pieces, filter_answers, join_answers,
     total = prefix_trie_size(
         np.concatenate((pre, documents[(*table_set, row_id)]))
         for table_set, row_id in records)
+    suffix_sizes: dict = {}
     partner_sizes: dict = {}
     for document in records.values():
-        total += sum(len(suffix) for suffix in document.suffixes)
+        suffixes = frozenset(document.suffixes)
+        if suffixes not in suffix_sizes:
+            suffix_sizes[suffixes] = prefix_trie_size(suffixes)
+        total += suffix_sizes[suffixes]
         for (_, label, tail), keys in document.groups.items():
             keys = frozenset(keys)
             if keys not in partner_sizes:
