@@ -3,12 +3,16 @@
 Every request an engine made is a token sequence: a document prefix
 followed by a filter question, or an anchor prefix and its frame
 followed by a partner label, the partner document, and the answer cue.
-With unlimited KV every distinct prefix across those sequences is
-computed once, so the run needs one forward pass position per node of
-their prefix trie. What an engine computed beyond that is its regret,
-whatever the cause: an evicted anchor computed again, a set scanned
-twice under two aliases, or a prompt prefix the documents share
-computed once per document.
+With unlimited KV every distinct document prefix across those
+sequences is computed once, each distinct suffix after a document
+(a question, or a frame) once, and each pair's suffix after its anchor
+(label, partner document, answer cue) once per pair. Nothing is shared
+between the suffixes of one document or between the pair suffixes of
+one anchor: those tokens must be computed once per request, so they
+are never regret. What an engine computed beyond the minimum is its
+regret, whatever the cause: an evicted anchor computed again, a set
+scanned twice under two aliases, or a prompt prefix the documents
+share computed once per document.
 
 The engine reports the prompt pieces it used as token ids (see
 `validate_prompt_pieces`); the documents are tokenized here with the
@@ -267,22 +271,18 @@ def minimum_input_tokens(spec, pieces, filter_answers, join_answers,
     total = prefix_trie_size(
         np.concatenate((pre, documents[(*table_set, row_id)]))
         for table_set, row_id in records)
-    suffix_sizes: dict = {}
     partner_sizes: dict = {}
     for document in records.values():
-        suffixes = frozenset(document.suffixes)
-        if suffixes not in suffix_sizes:
-            suffix_sizes[suffixes] = prefix_trie_size(suffixes)
-        total += suffix_sizes[suffixes]
+        total += sum(len(suffix) for suffix in document.suffixes)
         for (_, label, tail), keys in document.groups.items():
             keys = frozenset(keys)
             if keys not in partner_sizes:
                 members = frozenset().union(*(members_of[key] for key in keys))
-                partner_sizes[keys] = (len(members), prefix_trie_size(
-                    documents[(*member_set, row_id)]
+                partner_sizes[keys] = (len(members), sum(
+                    len(documents[(*member_set, row_id)])
                     for member_set, row_id in members))
             count, size = partner_sizes[keys]
-            total += len(label) + size + len(tail) * count
+            total += (len(label) + len(tail)) * count + size
     return total
 
 
