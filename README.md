@@ -185,8 +185,7 @@ In the Substrait plan, `F1`, `F4`, and `J1` are string prompt literals. Exact pr
 Every filter and join instruction starts with "You are performing a data
 processing task." The instruction follows the document, so the document's
 KV can be reused across questions. The predicate version includes this
-instruction. Reference labels generated before this change belong to the
-earlier prompt version and must be regenerated for the new wording.
+instruction.
 
 ## Scale Factors
 
