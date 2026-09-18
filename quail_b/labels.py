@@ -62,12 +62,13 @@ class PredicateLabels:
     """
 
     def __init__(self, key: str, label_set_id: str, predicate: dict,
-                 answers, source_rows: dict[str, int]):
+                 answers, source_rows: dict[str, int], predicate_payload=None):
         self.key = key
         self.label_set_id = label_set_id
         self.predicate = predicate
         self.table = _answer_table(answers)
         self.source_rows = source_rows
+        self.predicate_payload = predicate_payload
 
     @cached_property
     def answers(self) -> dict[tuple[str, str | None], bool]:
@@ -395,6 +396,7 @@ def _load_ground_truth_collection(root, collection: dict, templates=None
                 [data_bytes[path] for path in data_paths[key]],
                 key, label_set_id, manifest["rows"]),
             source_rows=manifest["source_rows"],
+            predicate_payload=manifest.get("predicate_payload"),
         )
     summary = collection.get("summary", {})
     return GroundTruthCollection(

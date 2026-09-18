@@ -16,6 +16,7 @@ from quail_b.data import (
     load_table,
 )
 from quail_b.labels import GroundTruthCollection, _read_json, load_ground_truth
+from quail_b.predicates import PREDICATE_BY_KEY, predicate_payload
 from quail_b.queries import QuerySpec, queries
 
 
@@ -94,4 +95,11 @@ def load_benchmark(only=None, *, scale_factor=0.1, data_dir=None,
             raise ValueError("ground truth has the wrong collection ID")
         if truth.corpus_id != corpus_id or truth.scale_factor != scale_factor:
             raise ValueError("ground truth does not match the input corpus")
+        for key, labels in truth.predicates.items():
+            predicate = PREDICATE_BY_KEY.get(key)
+            if (predicate is not None and "qwen3_32b" in predicate.source_policy
+                    and labels.predicate_payload != predicate_payload(predicate)):
+                raise ValueError(
+                    f"reference labels for {key} use a different prompt format; "
+                    "regenerate labels for the current benchmark")
     return Benchmark(specs, tables, scale_factor, corpus_id, truth)

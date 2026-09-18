@@ -113,3 +113,33 @@ def test_load_benchmark_validates_selected_inputs(tmp_path):
             benchmark.select_queries(ids)
     with pytest.raises(ValueError, match="scale factor"):
         benchmark.select_queries(scale_factor=0.2)
+
+
+def test_current_benchmark_rejects_labels_from_an_old_prompt_format(
+        monkeypatch, tmp_path):
+    from quail_b import benchmark as loading
+    from quail_b.data import DATA_SEED, SOURCE_REVISIONS, corpus_identity
+    from quail_b.labels import GroundTruthCollection, PredicateLabels
+    from quail_b.predicates import PREDICATES, predicate_payload
+
+    spec = PREDICATES[0]
+    tables = {"reviews": pa.table({"id": ["r0"], "body": ["a good movie"]})}
+    corpus_id = PUBLISHED_CORPORA[0.1]
+    directory = tmp_path / GROUND_TRUTH_ROOT / "corpora" / corpus_id
+    directory.mkdir(parents=True)
+    manifest = corpus_identity(tables, 0.1, DATA_SEED, SOURCE_REVISIONS)
+    manifest["corpus_id"] = corpus_id
+    (directory / "manifest.json").write_text(json.dumps(manifest))
+    pq.write_table(tables["reviews"], directory / "reviews.parquet")
+    payload = predicate_payload(spec)
+    labels = PredicateLabels(
+        spec.key, "ls_old", {"template": spec.template},
+        {("r0", None): True}, {},
+        predicate_payload={**payload, "answer_cue": "\nANSWER:"})
+    truth = GroundTruthCollection(
+        "gt_test", corpus_id, 0.1, "qwen3-32b-fp8", {spec.key: labels})
+    monkeypatch.setattr(loading, "load_ground_truth", lambda *a, **kw: truth)
+    with pytest.raises(ValueError, match="different prompt format"):
+        loading.load_benchmark("IMDB-1", root=tmp_path)
+    labels.predicate_payload = payload
+    assert loading.load_benchmark("IMDB-1", root=tmp_path).ground_truth is truth
