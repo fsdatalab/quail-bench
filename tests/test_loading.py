@@ -70,11 +70,12 @@ def test_public_s3_and_local_reads(monkeypatch, tmp_path):
                 _files._read_bytes(root, "missing.json")
         (directory / "a.json").write_text(json.dumps({"answer": False}))
         assert json.loads(_files._read_bytes(None, "labels/a.json"))["answer"] is True
-        pointer = directory / "active_collection.json"
-        for collection in ("old", "new"):
-            pointer.write_text(json.dumps({"collection": collection}))
-            assert json.loads(_files._read_bytes(
-                None, "labels/active_collection.json"))["collection"] == collection
+        for name in ("active_collection.json", "active_collection.chat.json"):
+            pointer = directory / name
+            for collection in ("old", "new"):
+                pointer.write_text(json.dumps({"collection": collection}))
+                assert json.loads(_files._read_bytes(
+                    None, f"labels/{name}"))["collection"] == collection
     assert anonymous and all(options == {"anonymous": True} for options in anonymous)
 
 
@@ -143,3 +144,26 @@ def test_current_benchmark_rejects_labels_from_an_old_prompt_format(
         loading.load_benchmark("IMDB-1", root=tmp_path)
     labels.predicate_payload = payload
     assert loading.load_benchmark("IMDB-1", root=tmp_path).ground_truth is truth
+
+
+def test_prompt_format_selects_its_own_active_collection(tmp_path):
+    from quail_b.labels import _choose_collection
+
+    root = tmp_path / GROUND_TRUTH_ROOT
+    corpus = root / "corpora" / "c_test"
+    corpus.mkdir(parents=True)
+    for name, collection_id in (
+            ("active_collection.json", "gt_raw"),
+            ("active_collection.chat.json", "gt_chat")):
+        (corpus / name).write_text(json.dumps({"collection_id": collection_id}))
+        directory = root / "collections" / collection_id
+        directory.mkdir(parents=True)
+        (directory / "manifest.json").write_text(json.dumps({
+            "collection_id": collection_id, "corpus_id": "c_test",
+            "scale_factor": 0.1, "status": "complete"}))
+    for explicit, prompt_format, expected in (
+            (None, None, "gt_raw"), (None, "chat", "gt_chat"),
+            (None, "unpublished", "gt_raw"), ("gt_raw", "chat", "gt_raw")):
+        _, manifest = _choose_collection(
+            tmp_path, 0.1, "c_test", explicit, prompt_format)
+        assert manifest["collection_id"] == expected

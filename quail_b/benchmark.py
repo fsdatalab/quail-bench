@@ -18,6 +18,7 @@ from quail_b.data import (
 from quail_b.labels import GroundTruthCollection, _read_json, load_ground_truth
 from quail_b.predicates import PREDICATE_BY_KEY, predicate_payload
 from quail_b.queries import QuerySpec, queries
+from quail_b.rendering import PROMPT_FORMAT
 
 
 def select_queries(only=None, *, scale_factor=0.1) -> tuple[QuerySpec, ...]:
@@ -88,7 +89,7 @@ def load_benchmark(only=None, *, scale_factor=0.1, data_dir=None,
         # only the label sets the selected queries score against
         truth = load_ground_truth(
             root, scale_factor=scale_factor, corpus_id=corpus_id,
-            collection_id=collection_id, templates={
+            collection_id=collection_id, prompt_format=PROMPT_FORMAT, templates={
                 operator.prompt for spec in specs
                 for operator in spec._info.operators})
         if collection_id is not None and truth.collection_id != collection_id:
