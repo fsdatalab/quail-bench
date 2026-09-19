@@ -217,6 +217,8 @@ Each scale factor deterministically samples upstream snapshots defined in [`quai
 | Filter throughput | Input documents processed per second (`documents/second`). |
 | Join throughput | Evaluated document pairs per second (`document pairs/second`). |
 | GPU cost | Query cost in dollars (`$/query`), calculated as execution hours × GPU count × hourly price. |
+| Cost per million input tokens | Query GPU cost divided by full input tokens, times 1,000,000 (`cost_usd_per_million_input_tokens`). Includes input tokens served from KV. |
+| KV regret percentage | Recomputed tokens divided by fresh tokens, times 100 (`kv_regret_percent`). |
 | Predicate accuracy | Agreement with reference labels on evaluated filter and join answers. |
 | Output precision & recall | Precision and recall of final output rows compared to reference result rows. |
 | Fresh tokens | Input token positions processed by model forward passes. |
@@ -229,7 +231,10 @@ Input token throughput counts the prompts each method evaluated. Different filte
 answers or plans can change those prompts and their total input length. It does not
 measure how many token positions the GPU computed. If prompt pieces or an answer
 table are missing, the input token count is unknown. If query time is zero,
-input token throughput is unknown.
+input token throughput is unknown. Cost per million input tokens is unknown when
+cost or the input count is missing, or the input count is zero. KV regret percentage
+is unknown when regret or the fresh count is missing, or the fresh count is zero.
+Both derived metrics appear in `run.json`, `measurements.parquet`, and `report.md`.
 
 Reference labels are generated using `Qwen/Qwen3-32B-FP8`. FEVER and LePaRD also evaluate against published dataset ground truth.
 
