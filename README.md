@@ -1,6 +1,6 @@
 # QUAIL-B
 
-QUAIL-B is an academic benchmark of 33 AI SQL queries over document tables. AI SQL is SQL with LLM-powered operators.
+QUAIL-B is an academic benchmark of 30 AI SQL queries over document tables. AI SQL is SQL with LLM-powered operators.
 
 This repository publishes the query plans, input tables, reference labels, and scoring harness. It does not include an execution engine. To benchmark your engine, you write an adapter function that translates each Substrait query plan into your engine's AI SQL dialect, executes it, and returns the execution results to QUAIL-B for scoring.
 
@@ -105,7 +105,7 @@ import quail_b
 
 quail_b.run(
     run_query,
-    queries=["IMDB-4"],  # Omit to run all 33 queries
+    queries=["IMDB-4"],  # Omit to run all 30 queries
     scale_factor=0.1,
     output_dir="results/my-run",  # Set your desired output directory path
     metadata={"engine": "my-engine", "model": "Qwen/Qwen3-4B-FP8"},
@@ -115,7 +115,7 @@ quail_b.run(
 ```
 
 - `output_dir`: Path to the directory where QUAIL-B writes run results (e.g. `"results/vllm-qwen3-4b"` or any custom path). Must be a new directory.
-- `queries`: List of query IDs to run. Omit `queries=` (or pass `None`) to run all 33 benchmark queries.
+- `queries`: List of query IDs to run. Omit `queries=` (or pass `None`) to run all 30 benchmark queries.
 - Data is downloaded from `s3://quail-bench` and cached locally in `~/.cache/quail-b`.
 - Only the reference labels of the selected queries' predicates are loaded, as Arrow tables of about 25 bytes per answer. Loading the full published collection of 21 label sets at scale 0.1 (1.21 million answers) takes 1.9 s from cached files with a peak of 0.62 GiB, corpus tables included; at scale 1.0 (51.8 million answers) budget about 3 GiB.
 
@@ -134,17 +134,19 @@ reviews = quail_b.load_table("reviews", scale_factor=0.1)
 
 ## Queries
 
-The benchmark evaluates 33 queries across 5 datasets:
+The benchmark evaluates 30 queries across 5 datasets:
 
 | Dataset | Queries | Relations | Description |
 | --- | ---: | --- | --- |
 | IMDB | 10 | `reviews`, `aspects` | Movie review aspect extraction and sentiment analysis |
 | BioDEX | 3 | `reports`, `terms` | Adverse drug reaction reporting from medical papers |
 | FEVER | 10 | `claims`, `evidence` | Fact verification with two-sided selections and join chains |
-| LePaRD | 8 | `citation_contexts`, `citation_passages` | Legal precedent retrieval and citation matching |
+| LePaRD | 5 | `citation_contexts`, `citation_passages` | Legal precedent retrieval and citation matching |
 | SWE-Next | 2 | `agent_traces` | Software engineering agent trajectory evaluation |
 
-LePaRD uses its original eight queries and IDs, LEP-1 through LEP-8.
+The original LEP-5, LEP-6, and LEP-8 have empty reference outputs at sf=0.1
+with raw prompts as well as chat prompts. They are excluded. The original LEP-7
+is now LEP-5; its plan and prompt text are unchanged.
 Filter and join prompts use the raw document/question format ending in `ANSWER:`.
 The benchmark uses the existing raw-prompt reference collections. Saved chat
 results remain historical and must not be presented as raw-prompt results.
@@ -157,7 +159,7 @@ Queries use two LLM-powered relational operators:
 - `ai_filter(prompt, document) -> boolean` (selection)
 - `ai_join(prompt, left, right) -> boolean` (join)
 
-All 33 queries are stored as standard Substrait 0.103 ProtoJSON plans in [`quail_b/plans/`](quail_b/plans/). Custom AI functions are declared in [`quail_b/substrait_extensions.yaml`](quail_b/substrait_extensions.yaml). [All 33 plans](figures/quailb_anatomy.pdf) are diagrammed in one figure.
+All 30 queries are stored as standard Substrait 0.103 ProtoJSON plans in [`quail_b/plans/`](quail_b/plans/). Custom AI functions are declared in [`quail_b/substrait_extensions.yaml`](quail_b/substrait_extensions.yaml). [All 30 plans](figures/quailb_anatomy.pdf) are diagrammed in one figure.
 
 ### Example Query: IMDB-4
 
@@ -192,7 +194,7 @@ across questions.
 
 QUAIL-B defines three scale factors: `0.1`, `0.5`, and `1.0`. They correspond to 10%, 50%, and 100% of each dataset's sampling target.
 
-A scale factor changes the input table cardinalities and reference labels. It does not change the 33 query definitions.
+A scale factor changes the input table cardinalities and reference labels. It does not change the 30 query definitions.
 
 | Dataset | Relation | 0.1 | 0.5 | 1.0 |
 | --- | --- | ---: | ---: | ---: |
