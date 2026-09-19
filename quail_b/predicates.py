@@ -178,9 +178,7 @@ def predicate_payload(spec: PredicateSpec) -> dict:
         "shared_preamble": SHARED_PRE,
     }
     # Published raw label hashes omit these fields for the original layout.
-    raw_instruction = (
-        "You are performing a data processing task. "
-        "Evaluate TRUE or FALSE for the following question: ")
+    raw_instruction = "Evaluate TRUE or FALSE for the following question: "
     if rendering.TASK_INSTRUCTION != raw_instruction:
         payload["task_instruction"] = rendering.TASK_INSTRUCTION
     if rendering.ANSWER_CUE != "\nANSWER:":

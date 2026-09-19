@@ -184,10 +184,9 @@ Project [r.id, a.id]
 
 In the Substrait plan, `F1`, `F4`, and `J1` are string prompt literals. Exact prompt texts and rendering logic are defined in [`quail_b/prompts.py`](quail_b/prompts.py) and [`quail_b/rendering.py`](quail_b/rendering.py).
 
-Every filter and join instruction starts with "You are performing a data
-processing task." The instruction follows the document, so the document's
-KV can be reused across questions. The predicate version includes this
-instruction.
+Every filter and join instruction starts with "Evaluate TRUE or FALSE for the
+following question:". It follows the document, so the document's KV can be reused
+across questions.
 
 ## Scale Factors
 

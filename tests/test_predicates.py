@@ -75,6 +75,7 @@ def test_task_instruction_changes_label_identity(monkeypatch):
     current = label_set_identity(spec, "c_one", "1" * 64)
     monkeypatch.setattr(
         rendering, "TASK_INSTRUCTION",
+        "You are performing a data processing task. "
         "Evaluate TRUE or FALSE for the following question: ",
     )
     previous = label_set_identity(spec, "c_one", "1" * 64)
