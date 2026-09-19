@@ -15,6 +15,7 @@ from quail_b.queries import (
     QUERY_FAMILY_WORKLOADS,
     QUERY_ORDER,
     QuerySpec,
+    get_query,
     queries,
     query_family_name,
     split_query_families,
@@ -30,13 +31,13 @@ from quail_b.substrait import (
 from tools.make_substrait_plans import write_plans
 
 
-def test_catalog_has_the_30_default_queries_and_two_privacy_queries():
-    assert len(QUERIES) == 30
+def test_catalog_has_the_33_default_queries_and_two_privacy_queries():
+    assert len(QUERIES) == 33
     assert QUERY_ORDER == (
         *(f"IMDB-{i}" for i in range(1, 11)),
         *(f"BIO-{i}" for i in range(1, 4)),
         *(f"FEV-{i}" for i in range(1, 11)),
-        *(f"LEP-{i}" for i in range(1, 6)),
+        *(f"LEP-{i}" for i in range(1, 9)),
         "AGENT-1", "AGENT-2",
     )
     assert [spec.id for spec in PRIVACY_QUERIES] == ["PRIV-1", "PRIV-2"]
@@ -207,7 +208,7 @@ def test_substrait_plans_are_packaged():
     catalog = package.joinpath("plans", "catalog.json")
     entries = json.loads(catalog.read_text())
 
-    assert len(entries) == 32
+    assert len(entries) == 35
     assert all(
         package.joinpath("plans", f"{entry['id']}.json").is_file()
         for entry in entries
@@ -228,10 +229,10 @@ def test_checked_in_plans_equal_the_generator_output(tmp_path):
 
 def test_parallel_query_split_matches_stock_vllm():
     assert split_query_ids(QUERY_ORDER, 4) == (
-        QUERY_ORDER[0:8],
-        QUERY_ORDER[8:16],
-        QUERY_ORDER[16:23],
-        QUERY_ORDER[23:30],
+        QUERY_ORDER[0:9],
+        QUERY_ORDER[9:17],
+        QUERY_ORDER[17:25],
+        QUERY_ORDER[25:33],
     )
 
 
@@ -247,8 +248,8 @@ def test_query_family_split_matches_benchmark_catalog():
         QUERY_ORDER[0:10],
         QUERY_ORDER[10:13],
         QUERY_ORDER[13:23],
-        QUERY_ORDER[23:28],
-        QUERY_ORDER[28:30],
+        QUERY_ORDER[23:31],
+        QUERY_ORDER[31:33],
     )
     assert query_family_name(QUERY_ORDER[0:10]) == "imdb"
 
@@ -258,3 +259,19 @@ def test_query_family_rejects_mixed_or_unknown_queries():
         query_family_name(("IMDB-1", "BIO-1"))
     with pytest.raises(ValueError, match="unknown query family"):
         split_query_families(("OTHER-1",))
+
+
+@pytest.mark.parametrize("query_id, expected", [
+    ("IMDB-2", "f3b93b898b0d631fb451046b072920cb81f12d5aabb8dc1b853f913030b4f45e"),
+    ("LEP-5", "6fda587b273d9a7b028d2be8cb5373964a51c1bcd988f23248187fd98a92ac3a"),
+    ("LEP-7", "6ca4bd71ae0304b98448d295d35213853c2d52242f8cc5bf23a817b0b9889a88"),
+    ("LEP-8", "cfc2639244e9a5cafdec413140941168470460213682b2e854a3ff548692b5ea"),
+])
+def test_raw_query_hash_matches_before_chat(query_id, expected, monkeypatch):
+    import importlib
+
+    run_module = importlib.import_module("quail_b.run")
+    spec = get_query(query_id)
+    assert run_module._query_hash(spec) == expected
+    monkeypatch.setattr(run_module, "PROMPT_FORMAT", "qwen3-chat-nonthinking-v1")
+    assert run_module._query_hash(spec) != expected
