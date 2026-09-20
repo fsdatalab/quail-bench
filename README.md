@@ -158,11 +158,19 @@ It filters the reports and two aliases of the reaction terms, then joins each
 term alias to the same report. Its output is `(r.id, n.id, c.id)`, with one row
 per matching reaction pair. A term may belong to both categories.
 
-BIO-4 requires new reference labels for the neurological and cardiovascular
-term filters. Existing report and reaction-join labels can be reused when their
-corpus and prompt identities match. The new filters have no measured selectivity
-estimates yet. Until a reference collection includes both filters, run BIO-4
-with accuracy scoring disabled or select the other queries explicitly.
+BIO-4 has Qwen3 32B fp8 reference labels for both term filters at all three
+scale factors. The labels reuse the existing report and reaction-join answers
+after checking their corpus and prompt identities. At sf=0.1, 505 of 1,127
+terms pass the neurological filter and 394 pass the cardiovascular filter.
+Those fractions are fixed planner estimates at every scale factor.
+The public collections below include both filters. BIO-4 loads the matching
+collection automatically when accuracy scoring is enabled.
+
+| Scale factor | Reference collection |
+|---|---|
+| 0.1 | `gt_cd3ebdb784f64b9e028e50ea73cdedd0` |
+| 0.5 | `gt_68f9ce9439bd7615de92b33d576dff9e` |
+| 1.0 | `gt_e87691add604b02c4e43f0ff5bf0cc4f` |
 
 Queries use two LLM-powered relational operators:
 

@@ -51,8 +51,6 @@ def test_catalog_has_the_31_default_queries_and_two_privacy_queries():
         info = _inspect_plan(spec.plan)
         assert all(
             filter_spec.prompt in FILTER_SELECTIVITY_ESTIMATES
-            or filter_spec.prompt in {
-                NEUROLOGICAL_REACTION, CARDIOVASCULAR_REACTION}
             for filter_spec in info.filters
         ), spec.id
         assert all(
@@ -100,8 +98,8 @@ def test_bio_4_filters_each_input_and_reuses_the_report_in_both_joins():
         ("r", "reports"), ("n", "terms"), ("c", "terms"),
     ]
     assert info.select == ("r.id", "n.id", "c.id")
-    assert NEUROLOGICAL_REACTION not in FILTER_SELECTIVITY_ESTIMATES
-    assert CARDIOVASCULAR_REACTION not in FILTER_SELECTIVITY_ESTIMATES
+    assert FILTER_SELECTIVITY_ESTIMATES[NEUROLOGICAL_REACTION] == 505 / 1127
+    assert FILTER_SELECTIVITY_ESTIMATES[CARDIOVASCULAR_REACTION] == 394 / 1127
 
 
 def test_filters_are_substrait_relations_over_their_input():
