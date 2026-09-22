@@ -35,9 +35,11 @@ class RunOutput:
         measurements: Engine-reported numbers. `fresh_tokens` is the
             count of input token positions a model forward pass processed
             instead of reading from existing KV; it is required when
-            `prompt_pieces` is set. `input_tokens` may report the full
-            requested input count when prompt pieces are unavailable.
-            Other values such as startup duration stay optional.
+            `prompt_pieces` is set. Without prompt pieces, `input_tokens`
+            may report the sum of the complete input length of every
+            evaluated prompt, including positions read from KV. Scoring
+            uses that value for throughput but cannot derive minimum or
+            recomputed token counts. Other values stay optional.
         prompt_pieces: The prompt token ids around each document, as
             `quail_b.minimum.validate_prompt_pieces` describes, or None.
             With the answers and `fresh_tokens`, scoring fills
