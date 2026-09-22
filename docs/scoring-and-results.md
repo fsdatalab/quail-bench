@@ -14,13 +14,15 @@ Predicate and token metrics require additional instrumentation.
 | Join pair throughput | Complete join traces or a reported pair count |
 | Predicate accuracy | Predicate traces |
 | Fresh tokens | A reported fresh token count |
-| Input tokens and input token throughput | Complete traces and prompt pieces |
+| Input tokens and their throughput | Prompt pieces, or reported input tokens |
 | Minimum and KV metrics | Complete traces, prompt pieces, and fresh tokens |
 | GPU cost | GPU count and hourly price |
 | Cost per million input tokens | Input tokens, GPU count, and hourly price |
 
 See the [adapter contract](adapter-contract.md) for the fields that enable each
-level.
+level. A metric that lacks its data appears as `unavailable` in `report.md` and as
+null in `run.json` and `measurements.parquet`. QUAIL-B never reports a missing
+count as zero.
 
 ## Output quality
 
@@ -57,8 +59,14 @@ traces can report `measurements["evaluated_document_pairs"]`.
 
 ## Token and KV metrics
 
-Full token accounting requires complete predicate traces, `prompt_pieces`, and
-`measurements["fresh_tokens"]`.
+Token accounting follows one of two paths:
+
+- With `prompt_pieces`, complete predicate traces, and
+  `measurements["fresh_tokens"]`, QUAIL-B computes input, minimum, and
+  recomputed tokens itself.
+- With only `measurements["input_tokens"]`, QUAIL-B reports input tokens and
+  input token throughput. Minimum tokens and KV regret stay unavailable,
+  because computing them requires the prompt layout.
 
 | Metric | Definition |
 | --- | --- |
@@ -79,19 +87,8 @@ input token count and different fresh token counts.
 
 ## GPU cost
 
-Pass GPU count and hourly price to `quail_b.run`:
-
-```python
-quail_b.run(
-    run_query,
-    scale_factor=0.1,
-    output_dir="results/costed_run",
-    gpu_count=1,
-    gpu_hourly_rate_usd=3.95,
-)
-```
-
-Query cost is:
+Pass `gpu_count` and `gpu_hourly_rate_usd` to `quail_b.run`, as shown in
+[running the benchmark](running-the-benchmark.md). Query cost is:
 
 ```text
 runtime_s / 3600 * gpu_count * gpu_hourly_rate_usd

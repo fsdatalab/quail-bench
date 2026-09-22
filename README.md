@@ -59,12 +59,16 @@ quail_b.run(
     queries=["IMDB-4"],
     scale_factor=0.1,
     output_dir="results/imdb_4",
+    metadata={"engine": "my_engine", "model": "Qwen/Qwen3-4B-FP8"},
 )
 ```
 
-`my_engine.execute` stands for your engine. It returns the result rows and the
-query execution time, measured once all model and GPU work has finished. Engine
-startup and model loading stay outside the timer.
+`my_engine.execute` stands for your engine. Typically it translates the
+Substrait plan into your engine's AI SQL dialect, such as
+[BigQuery AI SQL](https://cloud.google.com/bigquery/docs/generative-ai-overview),
+and runs it. It returns the result rows and the query execution time, measured
+once all model and GPU work has finished. Engine startup and model loading
+stay outside the timer.
 
 `rows` holds document IDs, with one column for each alias in the `SELECT` list.
 IMDB-4 selects `r.id` and `a.id`, so its rows look like:
@@ -77,16 +81,21 @@ When the run finishes, `results/imdb_4/report.md` lists the query's runtime and
 the precision and recall of its rows against the reference result. Omit
 `queries` to run all 31 queries. The first run downloads the tables and
 reference answers and caches them in `~/.cache/quail-b`; each run writes to a
-new `output_dir`.
+new `output_dir`. [Running the benchmark](docs/running-the-benchmark.md)
+covers every `quail_b.run` option, including GPU cost, and how to inspect
+queries and tables before you run them.
 
 A good order for bringing up a new engine is IMDB-1 (one filter), then IMDB-2
 (one join), then IMDB-4, then the full workload.
 
 ## Learn more
 
+- [Running the benchmark](docs/running-the-benchmark.md): run options, run
+  metadata, GPU cost, data downloads and memory use, reference collections,
+  and inspecting queries and tables.
 - [Adapter contract](docs/adapter-contract.md): the exact inputs and outputs,
-  prompt rendering, and the optional traces that enable accuracy and token
-  metrics.
+  prompt rendering, and the optional traces and token counts that enable
+  accuracy and token metrics.
 - [Workload](docs/workload.md): the query families, their plans, and table
   sizes at each scale factor.
 - [Scoring and results](docs/scoring-and-results.md): how each metric is
@@ -95,3 +104,14 @@ A good order for bringing up a new engine is IMDB-1 (one filter), then IMDB-2
 The query plans are in [`quail_b/plans/`](quail_b/plans/), and the AI functions
 are declared in
 [`quail_b/substrait_extensions.yaml`](quail_b/substrait_extensions.yaml).
+
+## Development
+
+To work on QUAIL-B itself:
+
+```sh
+git clone https://github.com/fsdatalab/quail-bench.git
+cd quail-bench
+uv sync
+uv run pytest -q
+```

@@ -86,6 +86,11 @@ filter_text = render_filter_prompt(template, document)
 join_text = render_join_prompt(template, documents, anchor=0)
 ```
 
+Every prompt starts with a document. The question follows it and begins
+"Evaluate TRUE or FALSE for the following question:". Because the document
+comes first, an engine can compute a document's KV once and reuse it across
+every question asked of that document.
+
 For joins, `documents` follows template placeholder order. `anchor` selects the
 document placed first for prefix reuse. Both renderers end with `ANSWER:`. The
 model answer must be interpreted as `TRUE` or `FALSE`.
@@ -188,15 +193,22 @@ an omitted trace kind.
 
 ## Measurements
 
-The harness recognizes two engine measurements:
+The harness recognizes three engine measurements:
 
 | Key | Type | Meaning |
 | --- | --- | --- |
 | `evaluated_document_pairs` | nonnegative `int` | Pairs across all joins |
 | `fresh_tokens` | nonnegative `int` | Positions processed by model forward passes |
+| `input_tokens` | nonnegative `int` | Full length of every evaluated prompt |
 
 Complete join traces override `evaluated_document_pairs` with the sum of their
 row counts.
+
+`input_tokens` counts every position of every evaluated prompt, including
+positions read from KV. Report it when prompt pieces are unavailable. It
+enables input token throughput and cost per million input tokens. Minimum
+tokens and KV regret require `prompt_pieces`; with pieces present, QUAIL-B
+computes input tokens itself and ignores the reported total.
 
 QUAIL-B preserves other JSON serializable measurements as engine metadata.
 

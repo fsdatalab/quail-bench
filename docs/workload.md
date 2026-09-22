@@ -50,6 +50,13 @@ These queries introduce the main execution shapes in increasing complexity:
 | IMDB-8 | Two joins with one anchor | Validate aliases of one table |
 | FEV-8 | Chain of three joins | Validate execution with multiple joins |
 | FEV-10 | Filtered join with equality | Validate ordinary and AI conditions |
+| BIO-4 | Three filters, two joins | Validate filters on two aliases of one table |
+
+BIO-4 finds serious adverse event reports with both a neurological and a
+cardiovascular reaction. It filters the reports, filters two aliases of the
+reaction terms (`n` and `c`), and joins each alias to the same report. Its rows
+have three columns, `r`, `n`, and `c`, with one row for each matching pair of
+reactions. A term can pass both filters.
 
 These queries provide short checkpoints while implementing an adapter. Run the
 full workload after these checkpoints pass.
@@ -88,9 +95,13 @@ predicate traces.
 
 ## Scale factors
 
-QUAIL-B publishes scale factors 0.1, 0.5, and 1.0. A scale factor selects a
-fixed input corpus and its matching reference labels. The query plans remain
-fixed across scale factors.
+QUAIL-B publishes scale factors 0.1, 0.5, and 1.0: 10%, 50%, and 100% of each
+dataset's sampling target. A scale factor selects a fixed input corpus and its
+matching reference labels. The query plans stay the same at every scale factor.
+
+Each corpus is sampled with a fixed seed from pinned upstream dataset
+revisions, listed in [`quail_b/data.py`](../quail_b/data.py), so a scale
+factor always names the same documents.
 
 | Dataset | Table | 0.1 | 0.5 | 1.0 |
 | --- | --- | ---: | ---: | ---: |

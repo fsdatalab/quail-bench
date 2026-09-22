@@ -32,11 +32,14 @@ class RunOutput:
         rows: The final rows, one ID column per selected alias. None
             when a saved run is rescored from its answers alone.
         runtime_s: Completed query execution time, excluding result collection.
-        measurements: Engine-reported numbers. `fresh_tokens` is the
-            count of input token positions a model forward pass processed
-            instead of reading from existing KV; it is required when
-            `prompt_pieces` is set. Other values such as startup duration
-            stay optional.
+        measurements: Engine-reported numbers:
+
+            - `fresh_tokens` counts positions processed by model forward
+              passes. It is required with `prompt_pieces`.
+            - `input_tokens` counts the complete inputs of all evaluated
+              prompts, including positions read from KV. Report it when
+              `prompt_pieces` is unavailable.
+            - Other values are optional.
         prompt_pieces: The prompt token ids around each document, as
             `quail_b.minimum.validate_prompt_pieces` describes, or None.
             With the answers and `fresh_tokens`, scoring fills

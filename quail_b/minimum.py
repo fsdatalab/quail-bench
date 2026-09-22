@@ -300,6 +300,15 @@ def _fresh_tokens(measurements) -> int | None:
     return fresh
 
 
+def _reported_input_tokens(measurements) -> int | None:
+    if "input_tokens" not in measurements:
+        return None
+    total = measurements["input_tokens"]
+    if isinstance(total, bool) or not isinstance(total, int) or total < 0:
+        raise ValueError("input_tokens must be a nonnegative integer")
+    return total
+
+
 def input_tokens(spec, pieces, filter_answers, join_answers,
                  documents: DocumentTokens) -> int | None:
     """Count full prompt inputs, or return None for missing answer tables."""
@@ -339,12 +348,14 @@ def input_tokens(spec, pieces, filter_answers, join_answers,
 
 
 def token_metrics(spec, output, corpus_rows, stores=None) -> dict:
-    """Return the run's input, fresh, minimum, and regret token counts.
+    """Compute token metrics from the most detailed data the engine provides.
 
-    `fresh_tokens` is engine-reported and is required when the output
-    includes `prompt_pieces`. `input_tokens`, `minimum_tokens`, and
-    `regret_tokens` are None without prompt pieces. `input_tokens` is also
-    None if a stage has no answer table; an empty table counts as zero.
+    - With prompt pieces, derive input and minimum tokens from the answer
+      tables. Fresh tokens are required. Regret is fresh minus minimum.
+    - Without prompt pieces, use the engine's input-token total. Minimum
+      and regret are unavailable because a total does not describe prefixes.
+    - A missing answer table makes input tokens unavailable. An empty answer
+      table contributes zero input tokens.
 
     Args:
         spec: The query.
@@ -354,8 +365,9 @@ def token_metrics(spec, output, corpus_rows, stores=None) -> dict:
             queries of one run so each document is tokenized once.
     """
     fresh = _fresh_tokens(output.measurements)
+    reported_input = _reported_input_tokens(output.measurements)
     if output.prompt_pieces is None:
-        return {"input_tokens": None, "fresh_tokens": fresh,
+        return {"input_tokens": reported_input, "fresh_tokens": fresh,
                 "minimum_tokens": None, "regret_tokens": None}
     if fresh is None:
         raise ValueError("prompt pieces need a fresh_tokens measurement")
