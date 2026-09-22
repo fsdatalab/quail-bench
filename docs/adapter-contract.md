@@ -70,11 +70,11 @@ filter_text = render_filter_prompt(template, document)
 join_text = render_join_prompt(template, documents, anchor=0)
 ```
 
-For joins, `documents` follows template-placeholder order. `anchor` selects the
+For joins, `documents` follows template placeholder order. `anchor` selects the
 document placed first for prefix reuse. Both renderers end with `ANSWER:`. The
 model answer must be interpreted as `TRUE` or `FALSE`.
 
-Do not replace the plan's templates or use a chat wrapper. A prompt-format
+Do not replace the plan's templates or use a chat wrapper. A prompt format
 change defines a different predicate from the one represented by the published
 labels.
 
@@ -91,7 +91,7 @@ labels.
 | `measurements` | `dict` | Optional engine measurements |
 | `prompt_pieces` | `dict \| None` | Token and KV metrics |
 
-A result-only adapter returns:
+An adapter that returns only final results uses:
 
 ```python
 quail_b.RunOutput(
@@ -136,7 +136,7 @@ Use the same timing boundary for every system being compared.
 ## Predicate traces
 
 Predicate traces are optional. A partial trace enables accuracy scoring for
-the evaluations it contains. A complete trace enables result-consistency
+the evaluations it contains. A complete trace enables result consistency
 checks and is a prerequisite for token metrics.
 
 Dictionary keys are operator IDs from the plan, such as `filter-1` and
@@ -191,13 +191,13 @@ The harness recognizes two engine measurements:
 Complete join traces override `evaluated_document_pairs` with the sum of their
 row counts.
 
-Other JSON-serializable measurements may be stored for engine-specific use,
-but QUAIL-B does not score them.
+Other JSON serializable measurements may be stored for use by the engine, but
+QUAIL-B does not score them.
 
 ## Prompt pieces
 
 `prompt_pieces` describes the token IDs around each document. It is required
-only for input-token and KV metrics.
+only for input token and KV metrics.
 
 | Entry | Type | Meaning |
 | --- | --- | --- |

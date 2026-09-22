@@ -27,7 +27,7 @@ boolean conjunction, and projection. Prompts are string literals in the plans.
 | BioDEX | BIO-1 to BIO-4 | `reports`, `terms` | Adverse drug reactions |
 | FEVER | FEV-1 to FEV-10 | `claims`, `evidence` | Fact verification |
 | LePaRD | LEP-1 to LEP-5 | `citation_contexts`, `citation_passages` | Legal citations |
-| SWE-Next | AGENT-1 to AGENT-2 | `agent_traces` | Software-agent trajectories |
+| SWE-Next | AGENT-1 to AGENT-2 | `agent_traces` | Software agent trajectories |
 
 The workload includes:
 
@@ -35,26 +35,26 @@ The workload includes:
 - chains of filters on one relation;
 - filters pushed to both sides of a join;
 - multiple joins against aliases of the same table;
-- three-join chains;
+- chains of three joins;
 - joins constrained by ordinary equality conditions.
 
 The exact query order and descriptions are in
 [`quail_b/plans/catalog.json`](../quail_b/plans/catalog.json). Each query plan
 is stored beside it as Substrait ProtoJSON.
 
-## Adapter bring-up sequence
+## Adapter implementation sequence
 
 These queries introduce the main execution shapes in increasing complexity:
 
 | Query | Shape | Purpose |
 | --- | --- | --- |
 | IMDB-1 | One filter | Validate scans, prompt rendering, and final IDs |
-| IMDB-2 | One join | Validate pair evaluation and two-column output |
+| IMDB-2 | One join | Validate pair evaluation and output with two columns |
 | IMDB-4 | Two filters, then one join | Validate operator order and pushdown |
-| FEV-5 | Filters on both join inputs | Validate two-sided pushdown |
+| FEV-5 | Filters on both join inputs | Validate pushdown on both sides |
 | IMDB-8 | Two joins with one anchor | Validate aliases of one table |
-| FEV-8 | Three-join chain | Validate multi-join execution |
-| FEV-10 | Filtered equality-constrained join | Validate ordinary and AI conditions |
+| FEV-8 | Chain of three joins | Validate execution with multiple joins |
+| FEV-10 | Filtered join with equality | Validate ordinary and AI conditions |
 
 Passing these queries does not replace running the full workload. It provides
 shorter checkpoints while implementing an adapter.

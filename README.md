@@ -80,8 +80,8 @@ quail_b.run(
     run_query,
     queries=["IMDB-1"],
     scale_factor=0.1,
-    output_dir="results/imdb-1",
-    metadata={"engine": "my-engine", "model": "my-model"},
+    output_dir="results/imdb_1",
+    metadata={"engine": "my_engine", "model": "my_model"},
 )
 ```
 
@@ -90,7 +90,7 @@ The harness downloads and caches the required inputs and labels in
 
 ### 4. Check the result
 
-A successful run creates `results/imdb-1/report.md`. Confirm that:
+A successful run creates `results/imdb_1/report.md`. Confirm that:
 
 - the run status is `complete`;
 - IMDB-1 has an execution time;
@@ -116,8 +116,8 @@ Omit `queries` to run all 31 queries:
 quail_b.run(
     run_query,
     scale_factor=0.1,
-    output_dir="results/full-0.1",
-    metadata={"engine": "my-engine", "model": "my-model"},
+    output_dir="results/full_0.1",
+    metadata={"engine": "my_engine", "model": "my_model"},
 )
 ```
 

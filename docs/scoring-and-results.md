@@ -1,6 +1,6 @@
 # Scoring and results
 
-QUAIL-B separates final-output quality from the behavior of individual AI
+QUAIL-B separates final output quality from the behavior of individual AI
 operators. Every adapter can report output quality and execution time.
 Predicate and token metrics require additional instrumentation.
 
@@ -10,11 +10,11 @@ Predicate and token metrics require additional instrumentation.
 | --- | :---: | :---: | :---: |
 | Query time | Yes | Yes | Yes |
 | Output precision, recall, F1, exact match | Yes | Yes | Yes |
-| Filter-only document throughput | Yes | Yes | Yes |
+| Document throughput for queries without joins | Yes | Yes | Yes |
 | Join pair throughput | With pair count | With all joins traced | Yes |
 | Predicate accuracy | No | Yes | Yes |
 | Fresh tokens | With a reported count | With a reported count | Yes |
-| Input tokens and input-token throughput | No | No | Yes |
+| Input tokens and input token throughput | No | No | Yes |
 | Minimum tokens, recomputed tokens, KV regret | No | No | Yes |
 | GPU cost | With GPU data | With GPU data | With GPU data |
 | Cost per million input tokens | No | No | With GPU count and price |
@@ -51,10 +51,10 @@ execution strategy did not evaluate a necessary document or pair.
 
 `runtime_s` is the denominator for throughput metrics.
 
-- Filter-only throughput is the sum of input documents divided by query time.
+- For a query without joins, throughput is input documents divided by time.
 - Join throughput is evaluated document pairs divided by query time.
 
-For a multi-join query, evaluated pairs are summed across join operators.
+For a query with multiple joins, evaluated pairs are summed across operators.
 QUAIL-B derives the sum from complete join traces. Without complete traces,
 the adapter can report `measurements["evaluated_document_pairs"]`.
 
@@ -69,7 +69,7 @@ Full token accounting requires complete predicate traces, `prompt_pieces`, and
 | Fresh tokens | Input positions processed instead of read from KV |
 | Minimum tokens | Input positions required with an unlimited prefix KV cache |
 | Recomputed tokens | Fresh tokens minus minimum tokens |
-| Input-token throughput | Input tokens divided by query time |
+| Input token throughput | Input tokens divided by query time |
 | KV regret | Recomputed tokens divided by fresh tokens, as a percentage |
 
 The minimum counts each distinct document prefix once. It also counts the
@@ -78,7 +78,7 @@ that must occur once for each pair is part of the minimum, not regret.
 
 Input tokens measure the requests selected by an execution strategy. Fresh
 tokens measure model computation. Two engines can therefore have the same
-input-token count and different fresh-token counts.
+input token count and different fresh token counts.
 
 ## GPU cost
 
@@ -88,7 +88,7 @@ Pass GPU count and hourly price to `quail_b.run`:
 quail_b.run(
     run_query,
     scale_factor=0.1,
-    output_dir="results/costed-run",
+    output_dir="results/costed_run",
     gpu_count=1,
     gpu_hourly_rate_usd=3.95,
 )
@@ -101,14 +101,14 @@ runtime_s / 3600 * gpu_count * gpu_hourly_rate_usd
 ```
 
 Cost per million input tokens is available when the run also has a positive
-input-token count.
+input token count.
 
 ## Output files
 
 A run writes:
 
 ```text
-results/my-run/
+results/my_run/
 ├── run.json
 ├── report.md
 ├── measurements.parquet
@@ -124,14 +124,14 @@ Only files supplied by the adapter are present in a query directory.
 
 | Path | Contents |
 | --- | --- |
-| `report.md` | Human-readable run summary |
+| `report.md` | Run summary for people |
 | `measurements.parquet` | One flat metrics row per completed query |
 | `run.json` | Configuration, identities, status, files, and nested metrics |
-| `<QUERY-ID>/plan.substrait` | Exact serialized plan used for the query |
-| `<QUERY-ID>/rows.parquet` | Final rows returned by the adapter |
-| `<QUERY-ID>/filters-*.parquet` | Optional filter traces |
-| `<QUERY-ID>/joins-*.parquet` | Optional join traces |
-| `<QUERY-ID>/prompt_pieces.json` | Optional token layout |
+| `<query_id>/plan.substrait` | Exact serialized plan used for the query |
+| `<query_id>/rows.parquet` | Final rows returned by the adapter |
+| `<query_id>/filters-*.parquet` | Optional filter traces |
+| `<query_id>/joins-*.parquet` | Optional join traces |
+| `<query_id>/prompt_pieces.json` | Optional token layout |
 
 The run record includes the QUAIL-B version, corpus ID, reference collection
 ID, and a hash of each query definition.
@@ -150,9 +150,9 @@ inspection or correction.
 Rescore the saved files against the recorded corpus and label collection:
 
 ```sh
-quail-b report results/my-run
+quail-b report results/my_run
 ```
 
-Rescoring rejects a run if its corpus or query-definition hashes do not match
+Rescoring rejects a run if its corpus or query definition hashes do not match
 the installed benchmark. It updates `run.json`, `report.md`, and
 `measurements.parquet` without executing the engine again.
