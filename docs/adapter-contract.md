@@ -115,8 +115,8 @@ IMDB-4 selects `r.id` and `a.id`, so a valid shape is:
 
 ```python
 pa.table({
-    "r": ["review-17", "review-42"],
-    "a": ["acting", "plot"],
+    "r": ["rv17", "rv42"],
+    "a": ["as0", "as1"],
 })
 ```
 
@@ -156,7 +156,7 @@ A filter table contains the filtered relation alias and a boolean `answer`:
 ```python
 {
     "filter-1": pa.table({
-        "r": ["review-17", "review-42"],
+        "r": ["rv17", "rv42"],
         "answer": [True, False],
     }),
 }
@@ -169,8 +169,8 @@ A join table contains both relation aliases and a boolean `answer`:
 ```python
 {
     "join-1": pa.table({
-        "r": ["review-17", "review-17"],
-        "a": ["acting", "plot"],
+        "r": ["rv17", "rv17"],
+        "a": ["as0", "as1"],
         "answer": [True, False],
     }),
 }

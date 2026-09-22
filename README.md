@@ -1,92 +1,97 @@
 # QUAIL-B
 
-QUAIL-B measures AI filters and joins over document tables. It provides 31
-Substrait queries, their input data, reference answers, and a scoring harness.
+QUAIL-B is a benchmark for AI query engines: systems that run SQL queries whose
+filters and joins are answered by an LLM. For example, query IMDB-4 finds the
+movie aspects that each review discusses, for reviews that praise the movie and
+discuss its ending:
 
-The whole engine integration is one Python function. QUAIL-B passes it a query
-plan and the required PyArrow tables. The function runs the plan and returns
-the selected document IDs.
+```sql
+SELECT r.id, a.id
+FROM reviews AS r
+AI JOIN aspects AS a ON J1(r.body, a.aspect)  -- does the review discuss the aspect?
+WHERE AI_FILTER(F1, r.body)                   -- does it mention a positive aspect?
+  AND AI_FILTER(F4, r.body);                  -- does it discuss the ending?
+```
 
-## Install QUAIL-B
+The benchmark contains 31 such queries over five document collections: movie
+reviews, adverse drug reaction reports, claims and evidence for fact
+verification, legal citations, and software agent trajectories. Each collection
+comes at three scale factors, with reference answers for every filter and join.
 
-QUAIL-B requires Python 3.12. Add it to the project that contains your engine
-adapter:
+To benchmark your engine, you write an adapter: a Python function that receives
+one query and its input tables, runs the query on your engine, and returns the
+result rows. QUAIL-B
+
+- supplies each query as a Substrait plan, with its prompts and PyArrow input
+  tables,
+- validates your results and scores them against the reference answers, and
+- writes a report of runtime, accuracy, and, if your adapter records them,
+  token and KV metrics.
+
+## Getting started
+
+QUAIL-B requires Python 3.12:
 
 ```sh
 uv add "quail-b @ git+https://github.com/fsdatalab/quail-bench.git"
 ```
 
-## Connect your engine
-
-A benchmark runner has this shape:
+Write an adapter and run IMDB-4 at the smallest scale factor:
 
 ```python
 import pyarrow as pa
 import quail_b
 
 
-def run_query(
-    query: quail_b.QuerySpec,
-    tables: dict[str, pa.Table],
-) -> quail_b.RunOutput:
-    rows, runtime_s = execute_with_my_engine(query.plan, tables)
-
+def run_query(query: quail_b.QuerySpec, tables: dict[str, pa.Table]):
+    # query.plan is the Substrait plan; tables maps table names to data
+    rows, runtime_s = my_engine.execute(query.plan, tables)
     return quail_b.RunOutput(
-        filter_answers=None,
-        join_answers=None,
+        filter_answers=None,  # optional: the answer for each document
+        join_answers=None,    # optional: the answer for each pair
         rows=rows,
         runtime_s=runtime_s,
     )
 
+
 quail_b.run(
     run_query,
-    queries=["IMDB-1"],
+    queries=["IMDB-4"],
     scale_factor=0.1,
-    output_dir="results/imdb_1",
-    metadata={"engine": "my_engine", "model": "my_model"},
+    output_dir="results/imdb_4",
 )
 ```
 
-Replace `execute_with_my_engine` with the call into your engine. It receives a
-parsed Substrait 0.103 plan and the physical tables used by that plan. Return
-the query execution time after any asynchronous model or GPU work completes.
+`my_engine.execute` stands for your engine. It returns the result rows and the
+query execution time, measured once all model and GPU work has finished. Engine
+startup and model loading stay outside the timer.
 
-The returned table contains one ID column for each selected relation alias. A
-query that selects `r.id` and `a.id`, for example, returns columns named `r`
-and `a`. This naming rule is the most common source of adapter errors.
-
-Start with IMDB-1. It contains one AI filter and gives you the shortest path
-through plan loading, inference, validation, and scoring. A successful run
-creates `results/imdb_1/report.md` with status `complete`.
-
-Continue with IMDB-2 for joins and IMDB-4 for filters followed by a join. Once
-those query shapes work, run the full workload by removing the `queries`
-argument:
+`rows` holds document IDs, with one column for each alias in the `SELECT` list.
+IMDB-4 selects `r.id` and `a.id`, so its rows look like:
 
 ```python
-quail_b.run(
-    run_query,
-    scale_factor=0.1,
-    output_dir="results/full_0.1",
-    metadata={"engine": "my_engine", "model": "my_model"},
-)
+pa.table({"r": ["rv17", "rv17", "rv42"], "a": ["as0", "as6", "as6"]})
 ```
 
-QUAIL-B downloads the selected tables and labels on the first run, then caches
-them in `~/.cache/quail-b`. Each run writes to a new output directory.
+When the run finishes, `results/imdb_4/report.md` lists the query's runtime and
+the precision and recall of its rows against the reference result. Omit
+`queries` to run all 31 queries. The first run downloads the tables and
+reference answers and caches them in `~/.cache/quail-b`; each run writes to a
+new `output_dir`.
 
-## What gets measured
+A good order for bringing up a new engine is IMDB-1 (one filter), then IMDB-2
+(one join), then IMDB-4, then the full workload.
 
-Every run reports query time and the precision and recall of the final rows.
-Your adapter can also return predicate traces for operator accuracy and token
-data for KV metrics. Start with final rows. Add traces after all query shapes
-run correctly.
+## Learn more
 
-Read the [adapter contract](docs/adapter-contract.md) for the exact adapter
-interface and result schemas. The [workload guide](docs/workload.md) explains the query
-families and scale factors. [Scoring and results](docs/scoring-and-results.md)
-defines each metric and output file.
+- [Adapter contract](docs/adapter-contract.md): the exact inputs and outputs,
+  prompt rendering, and the optional traces that enable accuracy and token
+  metrics.
+- [Workload](docs/workload.md): the query families, their plans, and table
+  sizes at each scale factor.
+- [Scoring and results](docs/scoring-and-results.md): how each metric is
+  computed and what each output file contains.
 
-The published ProtoJSON plans are in
-[`quail_b/plans/`](quail_b/plans/). The AI function declarations are in
+The query plans are in [`quail_b/plans/`](quail_b/plans/), and the AI functions
+are declared in
 [`quail_b/substrait_extensions.yaml`](quail_b/substrait_extensions.yaml).
