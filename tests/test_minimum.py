@@ -157,9 +157,12 @@ def _filter_output(**kwargs):
 
 def test_token_metrics_record_fresh_tokens_without_prompt_pieces():
     spec = _filter_spec()
-    output = _filter_output(measurements={"fresh_tokens": 40})
+    output = _filter_output(measurements={
+        "input_tokens": 50,
+        "fresh_tokens": 40,
+    })
     assert token_metrics(spec, output, {}) == {
-        "input_tokens": None,
+        "input_tokens": 50,
         "fresh_tokens": 40, "minimum_tokens": None, "regret_tokens": None,
     }
     assert token_metrics(spec, _filter_output(), {}) == {
@@ -183,6 +186,9 @@ def test_token_metrics_require_fresh_tokens_with_prompt_pieces():
     output.prompt_pieces = None
     output.measurements = {"fresh_tokens": -1}
     with pytest.raises(ValueError, match="nonnegative"):
+        token_metrics(spec, output, {})
+    output.measurements = {"input_tokens": True}
+    with pytest.raises(ValueError, match="input_tokens"):
         token_metrics(spec, output, {})
 
 

@@ -54,10 +54,23 @@ Required fields:
 Optional fields (used for predicate accuracy and token accounting):
 - `filter_answers`: A dictionary mapping filter operator ID (such as `"filter-1"`) to a `pyarrow.Table` of evaluated document IDs and boolean `answer` values.
 - `join_answers`: A dictionary mapping join operator ID (such as `"join-1"`) to a `pyarrow.Table` of evaluated left/right ID pairs and boolean `answer` values.
-- `measurements`: A dictionary for engine telemetry. Reporting `measurements["fresh_tokens"]` records the count of input tokens processed in model forward passes.
+- `measurements`: A dictionary for engine telemetry. `fresh_tokens` is the
+  number of input token positions processed by model forward passes.
+  `input_tokens` is the sum of the complete input length of every evaluated
+  prompt, including positions read from KV.
 - `prompt_pieces`: Tokenized prompt IDs for prefix KV accounting.
 
 If your engine does not record individual predicate answers, pass `filter_answers=None` and `join_answers=None`.
+
+Token accounting follows one of two paths:
+
+- With `prompt_pieces`, QUAIL-B derives input, minimum, and recomputed token
+  counts from the pieces and answer tables.
+- Without `prompt_pieces`, the engine reports `measurements["input_tokens"]`.
+  QUAIL-B reports input-token throughput, but minimum and recomputed token
+  counts remain unavailable.
+
+QUAIL-B never treats an unavailable count as zero.
 
 ### Concrete Adapter Example
 
