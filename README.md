@@ -7,12 +7,19 @@ For example, query IMDB-4 finds the movie aspects that each review discusses,
 for reviews that praise the movie and discuss its ending:
 
 ```sql
-SELECT r.id, a.id
+SELECT r.id AS r, a.id AS a
 FROM reviews AS r
-AI JOIN aspects AS a ON J1(r.body, a.aspect)  -- does the review discuss the aspect?
-WHERE AI_FILTER(F1, r.body)                   -- does it mention a positive aspect?
-  AND AI_FILTER(F4, r.body);                  -- does it discuss the ending?
+JOIN aspects AS a
+  ON AI.IF(('Does this review discuss this movie aspect? Review: ', r.body,
+            ' Aspect: ', a.aspect))
+WHERE AI.IF(('This review mentions a positive aspect of the movie: ', r.body))
+  AND AI.IF(('This review discusses the ending of the movie: ', r.body));
 ```
+
+The query is written with BigQuery's
+[`AI.IF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/bigqueryml-syntax-ai-if)
+function, and its prompts are shortened. QUAIL-B publishes each query as a
+Substrait plan with the exact prompt text.
 
 The benchmark contains 31 such queries over five document collections: movie
 reviews, adverse drug reaction reports, claims and evidence for fact
@@ -201,8 +208,9 @@ Project [r.id, a.id]
     └── Scan aspects AS a
 ```
 
-`F1`, `F4`, and `J1` are prompt templates, stored as string literals in the
-plan. `filter-1`, `filter-2`, and `join-1` are operator IDs. The prompt text
+`F1`, `F4`, and `J1` name the three prompts in the SQL above: positive aspect,
+ending, and review discusses aspect. The plan stores them as string literals.
+`filter-1`, `filter-2`, and `join-1` are operator IDs. The prompt text
 comes from [`quail_b/prompts.py`](quail_b/prompts.py) and
 [`quail_b/rendering.py`](quail_b/rendering.py). Every prompt starts with a
 document, followed by a question that begins "Evaluate TRUE or FALSE for the
