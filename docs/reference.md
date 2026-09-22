@@ -306,9 +306,11 @@ mean. Exact match means the two row sets are equal.
 
 ### Predicate accuracy
 
-The labels are answers from `Qwen/Qwen3-32B-FP8`, apart from the FEVER support
-join and the LePaRD citation join, which use dataset annotations. Accuracy
-therefore means agreement with those labels.
+**Accuracy is not a focus of this benchmark.** The labels are answers from one
+arbitrary model, `Qwen/Qwen3-32B-FP8`, so accuracy is a fake number that only
+measures agreement with that model. The exceptions are the FEVER support join
+and the LePaRD citation join, which use ground truth labels from the original
+datasets on Hugging Face.
 
 Predicate accuracy covers only the tuples the engine evaluated. It measures the
 engine's individual answers, while output quality also reflects which tuples

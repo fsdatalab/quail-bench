@@ -259,13 +259,18 @@ same at every scale factor. Use 0.1 while developing an adapter.
 QUAIL-B scores every run against reference answers: one TRUE or FALSE label
 for each document or document pair each AI predicate can be asked about.
 
-The labels are the answers of one model, `Qwen/Qwen3-32B-FP8`, and that model
-makes mistakes. Predicate accuracy and output precision and recall therefore
-measure agreement with Qwen3 32B, and say little about whether an answer is
-correct. An engine with a stronger model can be right more often and still
-score lower. The two exceptions come from the datasets' own annotations: the
-FEVER join asking whether a passage supports a claim uses FEVER's annotations
-where they exist, and the LePaRD citation join uses LePaRD's citation links.
+**Accuracy is not a focus of this benchmark.** The labels are the answers of
+one arbitrary model, `Qwen/Qwen3-32B-FP8`, so the accuracy QUAIL-B reports is a
+fake number: predicate accuracy and output precision and recall only measure
+agreement with that model. An engine with a stronger model can be right more
+often and still score lower. Use these numbers to check that an adapter runs
+the queries as intended, and compare engines on speed, tokens, and cost.
+
+Two joins use ground truth labels from the original datasets on Hugging Face:
+the FEVER join asking whether a passage supports a claim uses
+[FEVER](https://huggingface.co/datasets/fever/fever) labels where they exist,
+and the LePaRD citation join uses
+[LePaRD](https://huggingface.co/datasets/rmahari/LePaRD) citation links.
 
 The input tables and labels live in the public S3 bucket `s3://quail-bench`,
 under `ground_truth/quailb/schema_v1/`:
