@@ -3,9 +3,8 @@
 QUAIL-B is a benchmark for AI functions in SQL, or AI-SQL. It is actively being
 developed.
 
-For example, query IMDB-4 finds the
-movie aspects that each review discusses, for reviews that praise the movie and
-discuss its ending:
+For example, query IMDB-4 finds the movie aspects that each review discusses,
+for reviews that praise the movie and discuss its ending:
 
 ```sql
 SELECT r.id, a.id
