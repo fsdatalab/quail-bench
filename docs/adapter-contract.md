@@ -68,8 +68,8 @@ For example, IMDB-4 receives:
 
 Each table contains its published `id` and document columns. Physical table
 names form the dictionary keys. Relation aliases form the column names of
-`rows` and the answer tables. For `reviews AS r`, the dictionary key is `reviews` and the
-column name is `r`.
+`rows` and the answer tables. For `reviews AS r`, the dictionary key is
+`reviews` and the column name is `r`.
 
 ## Prompt rendering
 
