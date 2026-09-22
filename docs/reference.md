@@ -1,11 +1,20 @@
-# Adapter contract
+# QUAIL-B reference
 
-QUAIL-B calls one adapter function for every selected query. A basic adapter
-returns final rows and execution time. Predicate answers and token data add
-deeper metrics later.
+This page specifies what an adapter receives and returns, and exactly how
+QUAIL-B computes each metric. The [README](../README.md) covers installation,
+running the benchmark, the queries, and the results.
 
-The key naming rule is simple: input tables use their physical names, while
-output columns use relation aliases from the plan.
+- [Adapter function](#adapter-function)
+- [`QuerySpec`](#queryspec)
+- [Input tables](#input-tables)
+- [Prompt rendering](#prompt-rendering)
+- [`RunOutput`](#runoutput)
+- [Predicate answers](#predicate-answers)
+- [Measurements](#measurements)
+- [Prompt pieces](#prompt-pieces)
+- [Metric requirements](#metric-requirements)
+- [Metric definitions](#metric-definitions)
+- [Run records and rescoring](#run-records-and-rescoring)
 
 ## Adapter function
 
@@ -41,8 +50,8 @@ quail_b.RunOutput(
 | `plan_bytes` | `bytes` | Serialized form of the same plan |
 
 The plan defines table scans, relation aliases, prompts, filters, joins,
-ordinary equality conditions, and the final projection. It uses the standard
-Substrait relational operators and these extension functions:
+equality conditions, and the final projection. It uses the standard Substrait
+relational operators and these extension functions:
 
 ```text
 ai_filter:str_str
@@ -55,9 +64,7 @@ Their declarations and URN are in
 ## Input tables
 
 `tables` maps physical table names from the plan to `pyarrow.Table` values. It
-contains only the tables needed by the current query.
-
-For example, IMDB-4 receives:
+contains only the tables the current query scans. For IMDB-4:
 
 ```python
 {
@@ -67,15 +74,15 @@ For example, IMDB-4 receives:
 ```
 
 Each table contains its published `id` and document columns. Physical table
-names form the dictionary keys. Relation aliases form the column names of
-`rows` and the answer tables. For `reviews AS r`, the dictionary key is
-`reviews` and the column name is `r`.
+names are the dictionary keys. Relation aliases are the column names of `rows`
+and the answer tables. For `reviews AS r`, the dictionary key is `reviews` and
+the column name is `r`.
 
 ## Prompt rendering
 
 The string argument of each AI function is a prompt template. Reference labels
-correspond to the complete raw prompt produced from that template and its
-document or documents.
+correspond to the complete prompt produced from that template and its document
+or documents.
 
 Use the rendering functions in `quail_b.rendering`, or produce identical text:
 
@@ -92,15 +99,14 @@ comes first, an engine can compute a document's KV once and reuse it across
 every question asked of that document.
 
 For joins, `documents` follows template placeholder order. `anchor` selects the
-document placed first for prefix reuse. Both renderers end with `ANSWER:`. The
-model answer must be interpreted as `TRUE` or `FALSE`.
+document placed first. Both renderers end with `ANSWER:`, and the model answer
+must be read as `TRUE` or `FALSE`.
 
-Published labels use the plan's templates and raw prompt rendering. A different
-prompt format defines a different predicate.
+The published labels use these templates and this rendering. A different
+prompt defines a different predicate, and its results are incomparable with
+the labels.
 
 ## `RunOutput`
-
-`run_query` returns `quail_b.RunOutput`.
 
 | Field | Type | Required for |
 | --- | --- | --- |
@@ -111,12 +117,11 @@ prompt format defines a different predicate.
 | `measurements` | `dict` | Optional engine measurements |
 | `prompt_pieces` | `dict \| None` | Token and KV metrics |
 
-### Final rows
+### Result rows
 
 `rows` contains one ID column per relation alias selected by the plan. Its
-column names must exactly match the selected aliases.
-
-IMDB-4 selects `r.id` and `a.id`, so a valid shape is:
+column names must match the selected aliases exactly. IMDB-4 selects `r.id`
+and `a.id`:
 
 ```python
 pa.table({
@@ -139,8 +144,7 @@ Scoring ignores column order and row order.
 `runtime_s` is a finite, nonnegative number of seconds. It includes query
 execution through completion of asynchronous model or GPU work. It excludes
 engine startup, model loading, result collection, scoring, and result saving.
-
-Use the same timing boundary for every system being compared.
+Use the same timing boundary for every system you compare.
 
 ## Predicate answers
 
@@ -213,7 +217,7 @@ When every operator has a table, QUAIL-B also:
 
 ## Measurements
 
-The harness recognizes three engine measurements:
+`measurements` holds numbers the engine reports. QUAIL-B recognizes three keys:
 
 | Key | Type | Meaning |
 | --- | --- | --- |
@@ -230,12 +234,13 @@ enables input token throughput and cost per million input tokens. Minimum
 tokens and KV regret require `prompt_pieces`; with pieces present, QUAIL-B
 computes input tokens itself and ignores the reported total.
 
-QUAIL-B preserves other JSON serializable measurements as engine metadata.
+QUAIL-B saves other JSON serializable measurements as engine metadata.
 
 ## Prompt pieces
 
-`prompt_pieces` describes the token IDs around each document. It is required
-only for input token and KV metrics.
+`prompt_pieces` describes the token IDs around each document. With it, QUAIL-B
+can count the tokens every evaluated prompt contains and the minimum an engine
+must compute.
 
 | Entry | Type | Meaning |
 | --- | --- | --- |
@@ -263,10 +268,88 @@ tail: tokens after the partner document
 
 Prompt pieces require:
 
-- complete `filter_answers` and `join_answers` dictionaries;
+- an answer table for every filter and join;
 - every filter and join listed exactly once;
 - `measurements["fresh_tokens"]`;
 - the same tokenizer and token layout used during execution.
 
-QUAIL-B tokenizes the documents after execution and derives full input tokens,
+QUAIL-B tokenizes the documents after execution and derives input tokens,
 minimum tokens, recomputed tokens, and KV regret.
+
+## Metric requirements
+
+| Metric | Adapter data |
+| --- | --- |
+| Query time | `runtime_s` |
+| Output precision, recall, F1, exact match | `rows` |
+| Document throughput | `runtime_s`, for a query with zero joins |
+| Join throughput | Answer tables for every join, or a reported pair count |
+| Predicate accuracy | Predicate answers |
+| Fresh tokens | `measurements["fresh_tokens"]` |
+| Input tokens and their throughput | Prompt pieces, or reported input tokens |
+| Minimum tokens and KV regret | All answer tables, prompt pieces, and fresh tokens |
+| GPU cost | `gpu_count` and `gpu_hourly_rate_usd` |
+| Cost per million input tokens | GPU cost and a positive input token count |
+
+A metric that lacks its data is `unavailable` in `report.md` and null in
+`run.json` and `measurements.parquet`. QUAIL-B never reports a missing count as
+zero.
+
+## Metric definitions
+
+### Output quality
+
+QUAIL-B compares the distinct ID tuples in `rows` with the reference result.
+Precision is the share of returned rows that are in the reference result.
+Recall is the share of reference rows that were returned. F1 is their harmonic
+mean. Exact match means the two row sets are equal.
+
+### Predicate accuracy
+
+Predicate accuracy covers only the tuples the engine evaluated. It measures the
+engine's individual answers, while output quality also reflects which tuples
+the plan chose to evaluate.
+
+### Throughput
+
+Document throughput is input documents divided by `runtime_s`. Join throughput
+is evaluated document pairs, summed across all joins, divided by `runtime_s`.
+
+### Tokens and KV
+
+| Metric | Definition |
+| --- | --- |
+| Input tokens | Full evaluated prompts, including tokens served from KV |
+| Fresh tokens | Input positions processed by model forward passes |
+| Minimum tokens | Input positions required with an unlimited prefix KV cache |
+| Recomputed tokens | Fresh tokens minus minimum tokens |
+| KV regret | Recomputed tokens divided by fresh tokens, as a percentage |
+| Input token throughput | Input tokens divided by `runtime_s` |
+
+The minimum counts each distinct prompt prefix once, so a document's questions
+share the document and any leading tokens they have in common. For joins, each
+pair's label, partner document, and answer cue count once per pair. Recomputed
+tokens are therefore the work a perfect prefix KV cache would have avoided.
+
+Input tokens depend on which prompts the plan evaluates. Fresh tokens measure
+model computation. Two engines can therefore have the same input tokens and
+different fresh tokens.
+
+### Cost
+
+```text
+GPU cost = runtime_s / 3600 * gpu_count * gpu_hourly_rate_usd
+cost per million input tokens = GPU cost / input tokens * 1,000,000
+```
+
+## Run records and rescoring
+
+`run.json` records the QUAIL-B version, the corpus ID, the reference collection
+ID, a hash of each query definition, each query's status, and its metrics. If
+scoring fails, the query status is `scoring_failed` and its saved files remain
+in place.
+
+`quail-b report` rescores saved files against the recorded corpus and
+reference collection. It requires corpus and query hashes that match the
+installed QUAIL-B, and it rewrites `run.json`, `report.md`, and
+`measurements.parquet`.
