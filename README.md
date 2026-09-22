@@ -64,8 +64,9 @@ quail_b.run(
 )
 ```
 
-`my_engine.execute` stands for your engine. Typically it translates the
-Substrait plan into your engine's AI SQL dialect, such as
+`my_engine.execute` represents a call to your own engine code, which you
+write. Typically it translates the Substrait plan into your engine's AI SQL
+dialect, such as
 [BigQuery AI SQL](https://cloud.google.com/bigquery/docs/generative-ai-overview),
 and runs it. It returns the result rows and the query execution time, measured
 once all model and GPU work has finished. Engine startup and model loading
