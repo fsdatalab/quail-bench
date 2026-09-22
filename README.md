@@ -23,8 +23,8 @@ To benchmark your engine, you write an adapter: a Python function that receives
 one query and its input tables, runs the query on your engine, and returns the
 result rows. QUAIL-B
 
-- supplies each query as a Substrait plan, with its prompts and PyArrow input
-  tables,
+- supplies each query as a [Substrait](https://substrait.io/) plan, with its
+  prompts and [PyArrow](https://arrow.apache.org/docs/python/) input tables,
 - validates your results and scores them against the reference answers, and
 - writes a report of runtime, accuracy, and, if your adapter records them,
   token and KV metrics.
