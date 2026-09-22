@@ -52,13 +52,15 @@ def run_query(
     engine_plan = translate_substrait(query.plan)
 
     started = time.perf_counter()
-    result = execute(engine_plan, tables)
+    execution = submit(engine_plan, tables)
+    execution.wait()
     runtime_s = time.perf_counter() - started
+    rows = collect_rows(execution)
 
     return quail_b.RunOutput(
         filter_answers=None,
         join_answers=None,
-        rows=result.rows,
+        rows=rows,
         runtime_s=runtime_s,
     )
 
@@ -72,9 +74,9 @@ quail_b.run(
 )
 ```
 
-`translate_substrait` and `execute` are placeholders for your engine
-integration. The harness downloads the selected inputs and labels from the
-public data store and caches them in `~/.cache/quail-b`.
+`translate_substrait`, `submit`, and `collect_rows` are placeholders for your
+engine integration. The harness downloads the selected inputs and labels from
+the public data store and caches them in `~/.cache/quail-b`.
 
 When the first query works, omit `queries` to run all 31 queries:
 
@@ -144,8 +146,9 @@ rows = pa.table({
 })
 ```
 
-Measure `runtime_s` around query execution. Exclude engine startup, model
-loading, and result collection so runs remain comparable.
+Measure `runtime_s` around query execution. Wait for asynchronous engine or GPU
+work before stopping the timer. Exclude engine startup, model loading, and
+result collection so runs remain comparable.
 
 ### Optional predicate traces
 
@@ -157,6 +160,8 @@ Return predicate traces to measure operator accuracy and token efficiency:
   evaluated and its boolean answers.
 - `measurements["fresh_tokens"]` records input token positions processed by
   model forward passes instead of read from KV.
+- `measurements["evaluated_document_pairs"]` records the number of pairs an
+  engine evaluated when complete join traces are unavailable.
 - `prompt_pieces` records tokenized prompt parts for input-token and KV
   accounting.
 
@@ -183,9 +188,43 @@ join_answers = {
 }
 ```
 
+Every trace ID must exist in its input table. IDs and answers cannot be null.
+Each filter ID or join ID tuple may appear only once in an operator's trace.
+
 Operator IDs come from the Substrait plan. If you return traces for every
-operator, the final `rows` must be exactly the result implied by those answers.
-The harness checks this relationship.
+operator, the final `rows` must be the result implied by those answers. The
+harness checks the row count and validates a sample of the returned rows.
+
+Token accounting requires a trace for every operator and a `prompt_pieces`
+dictionary with this shape:
+
+```python
+prompt_pieces = {
+    "tokenizer": "hugging-face/tokenizer-name",
+    "preamble": [...],
+    "filters": [
+        {"id": "filter-1", "tail": [...]},
+    ],
+    "joins": [
+        {
+            "id": "join-1",
+            "anchor": "r",
+            "frame": [...],
+            "label": [...],
+            "tail": [...],
+        },
+    ],
+}
+```
+
+The `preamble`, `tail`, `frame`, and `label` values are token ID lists.
+`preamble` precedes every first document. A filter `tail` follows its document.
+For a join, `anchor` names the first document alias, `frame` follows that
+document, `label` precedes the partner document, and `tail` follows the partner.
+Include every operator in the `filters` and `joins` lists. Set
+`filter_answers` or `join_answers` to `{}` when the query has no operator of
+that kind. Set `measurements["fresh_tokens"]` whenever you provide
+`prompt_pieces`.
 
 ## Workload
 
@@ -204,8 +243,7 @@ and multi-join chains. Prompts are string literals in the plans. The plans use
 standard Substrait relational operators plus the two AI functions above.
 
 All plans are available as Substrait ProtoJSON in
-[`quail_b/plans/`](quail_b/plans/). The
-[workload figure](figures/quailb_anatomy.pdf) diagrams every plan.
+[`quail_b/plans/`](quail_b/plans/).
 
 ### Example: IMDB-4
 
@@ -273,7 +311,11 @@ quail_b.run(
 )
 ```
 
-Predicate traces add filter and join accuracy. Predicate traces,
+For a multi-join query, `evaluated_document_pairs` is the total across all join
+operators. Complete join traces override this measurement with their total row
+count.
+
+Predicate traces add filter and join accuracy. Complete predicate traces,
 `prompt_pieces`, and `fresh_tokens` add:
 
 - full input tokens, including tokens served from KV;
@@ -283,8 +325,8 @@ Predicate traces add filter and join accuracy. Predicate traces,
 - KV regret, the recomputed share of fresh tokens;
 - GPU cost per million input tokens when GPU pricing is also supplied.
 
-Reference predicate labels use `Qwen/Qwen3-32B-FP8`. FEVER and LePaRD also use
-their published dataset ground truth for output scoring.
+Predicate accuracy uses published reference labels. Most labels use
+`Qwen/Qwen3-32B-FP8`. Selected FEVER and LePaRD labels use dataset annotations.
 
 ## Results
 
@@ -300,8 +342,8 @@ results/my-run/
     └── rows.parquet
 ```
 
-Traced runs also write predicate-answer Parquet files and
-`prompt_pieces.json` in each query directory.
+Predicate traces are saved as Parquet files in each query directory. Runs that
+provide `prompt_pieces` also write `prompt_pieces.json`.
 
 - `report.md` is the human-readable summary.
 - `measurements.parquet` has one metrics row per completed query.
