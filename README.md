@@ -1,99 +1,42 @@
 # QUAIL-B
 
-QUAIL-B is a benchmark harness for AI query engines. Its workload contains 31
-queries over document tables. Each query combines relational operators with two
-LLM-powered operators:
+QUAIL-B measures how an AI query engine executes filters and joins over
+document tables. The benchmark contains 31 Substrait queries across five
+datasets and three scale factors.
 
-- `ai_filter(prompt, document) -> boolean`
-- `ai_join(prompt, left_document, right_document) -> boolean`
+This repository is the benchmark harness, not an execution engine. It provides
+the plans, input tables, reference answers, validation, scoring, and reports.
+You provide an engine adapter that executes one plan at a time.
 
-This package supplies the query plans, input tables, reference answers, result
-validation, and scoring. You supply the engine and a Python callback that runs
-one plan.
+## Before you start
 
-## How a benchmark run works
+Your system must be able to:
 
-For each selected query, the harness:
+- load input tables from PyArrow;
+- execute the relational operations in a Substrait 0.103 plan;
+- evaluate `ai_filter` and `ai_join` with the plan's prompts;
+- return the selected document IDs as a PyArrow table.
 
-1. loads its Substrait plan and input tables;
-2. calls your `run_query(query, tables)` function once;
-3. validates the returned IDs and timing;
-4. compares the final rows with the reference output;
-5. writes the results and a report.
+You implement one Python callback for the workload. QUAIL-B calls it once for
+each selected query. The callback can translate plans generically or dispatch
+on `query.id`.
 
-You write one callback for the whole workload, not one callback per query. A
-generic adapter can translate every Substrait plan. An adapter may instead
-dispatch on `query.id` if its engine needs query-specific code.
+Read the [adapter contract](docs/adapter-contract.md) before implementing the
+callback. It defines prompt rendering, result schemas, timing, and validation.
 
-The package does not start a model server, choose an execution strategy, or
-translate plans into an engine-specific language.
+## Run QUAIL-B against your engine
 
-## Quick start
+### 1. Install the harness
 
-QUAIL-B requires Python 3.12.
+QUAIL-B requires Python 3.12. From your adapter project, run:
 
 ```sh
 uv add "quail-b @ git+https://github.com/fsdatalab/quail-bench.git"
 ```
 
-Start with one query at scale factor 0.1:
+### 2. Implement the callback
 
-```python
-import time
-
-import pyarrow as pa
-import quail_b
-
-
-def run_query(
-    query: quail_b.QuerySpec,
-    tables: dict[str, pa.Table],
-) -> quail_b.RunOutput:
-    engine_plan = translate_substrait(query.plan)
-
-    started = time.perf_counter()
-    execution = submit(engine_plan, tables)
-    execution.wait()
-    runtime_s = time.perf_counter() - started
-    rows = collect_rows(execution)
-
-    return quail_b.RunOutput(
-        filter_answers=None,
-        join_answers=None,
-        rows=rows,
-        runtime_s=runtime_s,
-    )
-
-
-quail_b.run(
-    run_query,
-    queries=["IMDB-1"],
-    scale_factor=0.1,
-    output_dir="results/first-run",
-    metadata={"engine": "my-engine", "model": "my-model"},
-)
-```
-
-`translate_substrait`, `submit`, and `collect_rows` are placeholders for your
-engine integration. The harness downloads the selected inputs and labels from
-the public data store and caches them in `~/.cache/quail-b`.
-
-When the first query works, omit `queries` to run all 31 queries:
-
-```python
-quail_b.run(
-    run_query,
-    scale_factor=0.1,
-    output_dir="results/full-run",
-    metadata={"engine": "my-engine", "model": "my-model"},
-)
-```
-
-Each run needs a new `output_dir`.
-
-## Adapter contract
-
-The callback has this interface:
+The integration point is:
 
 ```python
 def run_query(
@@ -103,276 +46,105 @@ def run_query(
     ...
 ```
 
-### Inputs
+`query.plan` is the parsed Substrait plan. `tables` contains only the physical
+tables used by that plan.
 
-`query` describes one workload query:
-
-- `query.id` is its stable identifier, such as `"IMDB-4"`.
-- `query.description` is a short summary.
-- `query.plan` is a parsed Substrait 0.103 `Plan`.
-- `query.plan_bytes` is the serialized plan.
-
-The plan contains the table scans, relation aliases, prompt strings, AI
-operators, ordinary equality conditions, and final projection. The custom AI
-functions are declared in
-[`quail_b/substrait_extensions.yaml`](quail_b/substrait_extensions.yaml).
-
-`tables` maps every physical table used by the plan to a `pyarrow.Table`. For
-example, IMDB-4 receives `tables["reviews"]` and `tables["aspects"]`. Load these
-tables into your engine before executing the plan.
-
-### Required output
-
-Return a `quail_b.RunOutput`. For a basic integration, set:
-
-- `rows` to the final query result as a `pyarrow.Table`;
-- `runtime_s` to execution time in seconds;
-- `filter_answers` and `join_answers` to `None`.
-
-The `rows` table must:
-
-- contain one column for each alias selected by the plan;
-- use alias names as column names, such as `r` and `a`;
-- contain IDs from the corresponding input tables;
-- contain no null IDs or duplicate rows.
-
-For example, IMDB-4 selects `r.id` and `a.id`, so its result has columns `r`
-and `a`:
+The smallest valid result contains the final rows and execution time:
 
 ```python
-rows = pa.table({
-    "r": result.review_ids,
-    "a": result.aspect_ids,
-})
+return quail_b.RunOutput(
+    filter_answers=None,
+    join_answers=None,
+    rows=rows,
+    runtime_s=runtime_s,
+)
 ```
 
-Measure `runtime_s` around query execution. Wait for asynchronous engine or GPU
-work before stopping the timer. Exclude engine startup, model loading, and
-result collection so runs remain comparable.
+`rows` uses relation aliases from the plan as column names. For example, a
+query that selects `r.id` and `a.id` returns columns named `r` and `a`.
 
-### Optional predicate traces
+This is an adapter interface, not a complete program: plan translation,
+inference, synchronization, and result collection belong to your engine.
 
-Return predicate traces to measure operator accuracy and token efficiency:
+### 3. Run one filter query
 
-- `filter_answers` maps each filter operator ID to the documents your engine
-  evaluated and its boolean answers.
-- `join_answers` maps each join operator ID to the document pairs your engine
-  evaluated and its boolean answers.
-- `measurements["fresh_tokens"]` records input token positions processed by
-  model forward passes instead of read from KV.
-- `measurements["evaluated_document_pairs"]` records the number of pairs an
-  engine evaluated when complete join traces are unavailable.
-- `prompt_pieces` records tokenized prompt parts for input-token and KV
-  accounting.
-
-A filter trace has the relation alias and a non-null boolean `answer` column:
+Start with IMDB-1 at scale factor 0.1:
 
 ```python
-filter_answers = {
-    "filter-1": pa.table({
-        "r": evaluated_review_ids,
-        "answer": filter_decisions,
-    }),
-}
+import quail_b
+
+from my_adapter import run_query
+
+
+quail_b.run(
+    run_query,
+    queries=["IMDB-1"],
+    scale_factor=0.1,
+    output_dir="results/imdb-1",
+    metadata={"engine": "my-engine", "model": "my-model"},
+)
 ```
 
-A join trace has both relation aliases and an `answer` column:
+The harness downloads and caches the required inputs and labels in
+`~/.cache/quail-b`. The output directory must not already exist.
 
-```python
-join_answers = {
-    "join-1": pa.table({
-        "r": evaluated_review_ids,
-        "a": evaluated_aspect_ids,
-        "answer": join_decisions,
-    }),
-}
-```
+### 4. Check the result
 
-Every trace ID must exist in its input table. IDs and answers cannot be null.
-Each filter ID or join ID tuple may appear only once in an operator's trace.
+A successful run creates `results/imdb-1/report.md`. Confirm that:
 
-Operator IDs come from the Substrait plan. If you return traces for every
-operator, the final `rows` must be the result implied by those answers. The
-harness checks the row count and validates a sample of the returned rows.
+- the run status is `complete`;
+- IMDB-1 has an execution time;
+- output precision and recall are present.
 
-Token accounting requires a trace for every operator and a `prompt_pieces`
-dictionary with this shape:
+The report shows `unavailable` for predicate and token metrics until the
+adapter returns the optional traces described in the
+[adapter contract](docs/adapter-contract.md).
 
-```python
-prompt_pieces = {
-    "tokenizer": "hugging-face/tokenizer-name",
-    "preamble": [...],
-    "filters": [
-        {"id": "filter-1", "tail": [...]},
-    ],
-    "joins": [
-        {
-            "id": "join-1",
-            "anchor": "r",
-            "frame": [...],
-            "label": [...],
-            "tail": [...],
-        },
-    ],
-}
-```
+### 5. Expand coverage
 
-The `preamble`, `tail`, `frame`, and `label` values are token ID lists.
-`preamble` precedes every first document. A filter `tail` follows its document.
-For a join, `anchor` names the first document alias, `frame` follows that
-document, `label` precedes the partner document, and `tail` follows the partner.
-Include every operator in the `filters` and `joins` lists. Set
-`filter_answers` or `join_answers` to `{}` when the query has no operator of
-that kind. Set `measurements["fresh_tokens"]` whenever you provide
-`prompt_pieces`.
+Use this order while bringing up an adapter:
 
-## Workload
+1. IMDB-1: one AI filter;
+2. IMDB-2: one AI join;
+3. IMDB-4: two filters followed by a join;
+4. all queries at scale factor 0.1;
+5. scale factors 0.5 and 1.0.
 
-The 31 queries cover five datasets:
-
-| Dataset | Queries | Tables | Task |
-| --- | ---: | --- | --- |
-| IMDB | 10 | `reviews`, `aspects` | Review aspects and sentiment |
-| BioDEX | 4 | `reports`, `terms` | Adverse drug reactions |
-| FEVER | 10 | `claims`, `evidence` | Fact verification |
-| LePaRD | 5 | `citation_contexts`, `citation_passages` | Legal citations |
-| SWE-Next | 2 | `agent_traces` | Software-agent trajectories |
-
-The workload includes filters, joins, filter pushdown on either side of a join,
-and multi-join chains. Prompts are string literals in the plans. The plans use
-standard Substrait relational operators plus the two AI functions above.
-
-All plans are available as Substrait ProtoJSON in
-[`quail_b/plans/`](quail_b/plans/).
-
-### Example: IMDB-4
-
-IMDB-4 filters reviews with two prompts and joins the surviving reviews to
-movie aspects:
-
-```sql
-SELECT r.id, a.id
-FROM reviews AS r
-AI JOIN aspects AS a ON J1(r.body, a.aspect)
-WHERE AI_FILTER(F1, r.body)
-  AND AI_FILTER(F4, r.body);
-```
-
-Its operator tree is:
-
-```text
-Project [r.id, a.id]
-└── AI Join J1                                      join-1
-    ├── AI Selection F4                             filter-2
-    │   └── AI Selection F1                         filter-1
-    │       └── Scan reviews AS r
-    └── Scan aspects AS a
-```
-
-## Scale factors
-
-Choose `scale_factor=0.1`, `0.5`, or `1.0`. A scale factor changes the input
-cardinalities and matching reference labels, but not the query plans.
-
-| Dataset | Table | 0.1 | 0.5 | 1.0 |
-| --- | --- | ---: | ---: | ---: |
-| IMDB | `reviews` | 5,000 | 25,000 | 50,000 |
-| IMDB | `aspects` | 12 | 12 | 12 |
-| BioDEX | `reports` | 500 | 2,500 | 5,000 |
-| BioDEX | `terms` | 1,127 | 2,934 | 4,144 |
-| FEVER | `claims` | 500 | 2,500 | 5,000 |
-| FEVER | `evidence` | 287 | 1,037 | 1,478 |
-| LePaRD | `citation_contexts` | 500 | 2,496 | 4,972 |
-| LePaRD | `citation_passages` | 433 | 1,756 | 2,991 |
-| SWE-Next | `agent_traces` | 1,772 | 8,859 | 17,711 |
-
-Use scale factor 0.1 while developing an adapter. Use larger factors to measure
-scaling behavior after the full workload runs correctly.
-
-## Metrics
-
-Every integration reports:
-
-- query execution time;
-- output precision, recall, F1, and exact match;
-- document throughput for filter-only queries;
-- evaluated-pair throughput for joins when pair counts are available.
-
-Pass `gpu_count` and `gpu_hourly_rate_usd` to `quail_b.run` to report cost per
-query:
+Omit `queries` to run all 31 queries:
 
 ```python
 quail_b.run(
     run_query,
     scale_factor=0.1,
-    output_dir="results/costed-run",
-    gpu_count=1,
-    gpu_hourly_rate_usd=3.95,
+    output_dir="results/full-0.1",
+    metadata={"engine": "my-engine", "model": "my-model"},
 )
 ```
 
-For a multi-join query, `evaluated_document_pairs` is the total across all join
-operators. Complete join traces override this measurement with their total row
-count.
+Use a new output directory for every run.
 
-Predicate traces add filter and join accuracy. Complete predicate traces,
-`prompt_pieces`, and `fresh_tokens` add:
+## Division of responsibility
 
-- full input tokens, including tokens served from KV;
-- input-token throughput;
-- the minimum token computation under an unlimited prefix KV cache;
-- recomputed KV tokens;
-- KV regret, the recomputed share of fresh tokens;
-- GPU cost per million input tokens when GPU pricing is also supplied.
+| QUAIL-B | Your adapter |
+| --- | --- |
+| Selects queries and scale factor | Translates or dispatches each plan |
+| Loads published tables and labels | Loads the provided tables into the engine |
+| Supplies exact plans and prompts | Executes relational and AI operators |
+| Validates IDs and result schemas | Synchronizes execution and measures it |
+| Scores results and writes reports | Returns `quail_b.RunOutput` |
 
-Predicate accuracy uses published reference labels. Most labels use
-`Qwen/Qwen3-32B-FP8`. Selected FEVER and LePaRD labels use dataset annotations.
+QUAIL-B does not start a model server, choose an execution strategy, or provide
+engine runtime code.
 
-## Results
+## Documentation
 
-A run writes:
+- [Adapter contract](docs/adapter-contract.md): callback inputs, outputs,
+  prompts, traces, and validation.
+- [Workload](docs/workload.md): operators, query families, scale factors, and
+  a worked plan.
+- [Scoring and results](docs/scoring-and-results.md): metric availability,
+  definitions, output files, and report regeneration.
 
-```text
-results/my-run/
-├── run.json
-├── report.md
-├── measurements.parquet
-└── IMDB-1/
-    ├── plan.substrait
-    └── rows.parquet
-```
-
-Predicate traces are saved as Parquet files in each query directory. Runs that
-provide `prompt_pieces` also write `prompt_pieces.json`.
-
-- `report.md` is the human-readable summary.
-- `measurements.parquet` has one metrics row per completed query.
-- `run.json` contains the run configuration, status, files, and metrics.
-- Each query directory preserves the exact plan and returned data.
-
-Rebuild the report from a saved run with:
-
-```sh
-quail-b report results/my-run
-```
-
-## Inspect queries and data
-
-You can inspect a plan or table without starting a benchmark run:
-
-```python
-import quail_b
-
-query = quail_b.get_query("IMDB-4")
-plan = query.plan
-
-reviews = quail_b.load_table("reviews", scale_factor=0.1)
-```
-
-For repository development:
-
-```sh
-git clone https://github.com/fsdatalab/quail-bench.git
-cd quail-bench
-uv sync
-```
+The published ProtoJSON plans are in
+[`quail_b/plans/`](quail_b/plans/). The AI function declarations are in
+[`quail_b/substrait_extensions.yaml`](quail_b/substrait_extensions.yaml).
