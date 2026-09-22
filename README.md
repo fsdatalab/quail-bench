@@ -253,18 +253,60 @@ same at every scale factor. Use 0.1 while developing an adapter.
 | LePaRD | `citation_passages` | 433 | 1,756 | 2,991 |
 | SWE-Next | `agent_traces` | 1,772 | 8,859 | 17,711 |
 
-Each scale factor has one published collection of reference answers. Most
-labels come from `Qwen/Qwen3-32B-FP8`; FEVER and LePaRD also score against
-their datasets' own annotations.
+### Reference answers
 
-| Scale factor | Reference collection |
+QUAIL-B scores every run against reference answers: one TRUE or FALSE label
+for each document or document pair each AI predicate can be asked about.
+
+The labels are the answers of one model, `Qwen/Qwen3-32B-FP8`, and that model
+makes mistakes. Predicate accuracy and output precision and recall therefore
+measure agreement with Qwen3 32B, and say little about whether an answer is
+correct. An engine with a stronger model can be right more often and still
+score lower. The two exceptions come from the datasets' own annotations: the
+FEVER join asking whether a passage supports a claim uses FEVER's annotations
+where they exist, and the LePaRD citation join uses LePaRD's citation links.
+
+The input tables and labels live in the public S3 bucket `s3://quail-bench`,
+under `ground_truth/quailb/schema_v1/`:
+
+| Path | Contents |
 | --- | --- |
-| 0.1 | `gt_cd3ebdb784f64b9e028e50ea73cdedd0` |
-| 0.5 | `gt_68f9ce9439bd7615de92b33d576dff9e` |
-| 1.0 | `gt_e87691add604b02c4e43f0ff5bf0cc4f` |
+| `corpora/<corpus_id>/` | Input tables of one scale factor, as Parquet |
+| `label_sets/<dataset>/<predicate>/<label_set_id>/` | Labels of one predicate |
+| `collections/<collection_id>/` | Which label set each predicate uses |
 
-`run.json` records the corpus and collection IDs. Compare results only across
-runs with the same IDs.
+The IDs are content hashes. A corpus ID names the exact input tables, and a
+collection ID names one complete set of labels for that corpus, so any change
+to the data or labels produces new IDs. These are the published IDs:
+
+| Scale factor | Corpus ID | Collection ID |
+| --- | --- | --- |
+| 0.1 | `c_1aa2c4f0d0b6c816fd37aa5748c33341` | `gt_cd3ebdb784f64b9e028e50ea73cdedd0` |
+| 0.5 | `c_6773c85b3754908434661c1dadfad0fa` | `gt_68f9ce9439bd7615de92b33d576dff9e` |
+| 1.0 | `c_81a95887a650aaa1a343e0d688b81bef` | `gt_e87691add604b02c4e43f0ff5bf0cc4f` |
+
+`quail_b.run` loads the matching collection for you and records both IDs in
+`run.json`. Compare results only across runs with the same IDs.
+
+To look at the labels or score answers yourself, load them with the query's
+input tables:
+
+```python
+from quail_b.scoring import agreement, expected_rows
+
+benchmark = quail_b.load_benchmark(["IMDB-4"], scale_factor=0.1)
+labels = benchmark.ground_truth           # the collection for these queries
+query = benchmark.queries[0]
+
+expected = expected_rows(query, labels, benchmark.tables)  # reference result
+for key, predicate in labels.predicates.items():
+    print(key, predicate.table.num_rows)  # left_id, right_id, answer
+
+# compare your answers for F4 (filter-2) with its labels
+ending = labels.predicates["quailb.imdb.review.discusses_ending"]
+counts = agreement(your_filter_table, ["r"], ending)
+print(counts.correct, counts.evaluated)
+```
 
 ## Metrics
 
