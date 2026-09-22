@@ -260,15 +260,13 @@ QUAIL-B scores every run against reference answers: one TRUE or FALSE label
 for each document or document pair each AI predicate can be asked about.
 
 **Accuracy is not a focus of this benchmark.** Most labels are the answers of
-one arbitrary model, `Qwen/Qwen3-32B-FP8`. Accuracy against them is a fake
-number: it measures agreement with that model, and an engine with a better
-model can score lower. This applies to predicate-level accuracy and to output
-precision and recall.
+one arbitrary model, `Qwen/Qwen3-32B-FP8`, so it is not really meaningful to
+measure accuracy against them. We provide these fake labels anyway.
 
-Two joins have real labels. The join that asks whether a FEVER passage
-supports a claim uses the claim annotations from
-[FEVER](https://huggingface.co/datasets/fever/fever) where they exist. The
-LePaRD citation join uses the citation links from
+Two datasets have real labels for join operations. First, the join that asks
+whether a FEVER passage supports a claim uses the claim annotations from
+[FEVER](https://huggingface.co/datasets/fever/fever) where they exist. Second,
+the LePaRD citation join uses the citation links from
 [LePaRD](https://huggingface.co/datasets/rmahari/LePaRD).
 
 The input tables and labels live in the public S3 bucket `s3://quail-bench`,
