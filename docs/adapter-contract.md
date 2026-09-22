@@ -1,7 +1,11 @@
 # Adapter contract
 
-This page is the reference for integrating an execution engine with QUAIL-B.
-The harness calls one adapter function for every selected query.
+QUAIL-B calls one adapter function for every selected query. A basic adapter
+returns final rows and execution time. Predicate traces and token data add
+deeper metrics later.
+
+The key naming rule is simple: input tables use their physical names, while
+output columns use relation aliases from the plan.
 
 ## Callback
 
@@ -15,6 +19,17 @@ def run_query(
 
 The callback must finish one query or raise an exception. QUAIL-B stops the run
 at the first exception and records the failure in `run.json`.
+
+The smallest valid result is:
+
+```python
+quail_b.RunOutput(
+    filter_answers=None,
+    join_answers=None,
+    rows=rows,
+    runtime_s=runtime_s,
+)
+```
 
 ## `QuerySpec`
 
@@ -91,17 +106,6 @@ prompt format defines a different predicate.
 | `measurements` | `dict` | Optional engine measurements |
 | `prompt_pieces` | `dict \| None` | Token and KV metrics |
 
-An adapter that returns only final results uses:
-
-```python
-quail_b.RunOutput(
-    filter_answers=None,
-    join_answers=None,
-    rows=rows,
-    runtime_s=runtime_s,
-)
-```
-
 ### Final rows
 
 `rows` contains one ID column per relation alias selected by the plan. Its
@@ -134,6 +138,9 @@ engine startup, model loading, result collection, scoring, and result saving.
 Use the same timing boundary for every system being compared.
 
 ## Predicate traces
+
+The preceding sections cover output scoring. Predicate traces add visibility
+into the decisions made by each AI operator.
 
 Predicate traces are optional. A partial trace enables accuracy scoring for
 the evaluations it contains. A complete trace enables result consistency

@@ -29,14 +29,9 @@ boolean conjunction, and projection. Prompts are string literals in the plans.
 | LePaRD | LEP-1 to LEP-5 | `citation_contexts`, `citation_passages` | Legal citations |
 | SWE-Next | AGENT-1 to AGENT-2 | `agent_traces` | Software agent trajectories |
 
-The workload includes:
-
-- individual filters and joins;
-- chains of filters on one relation;
-- filters pushed to both sides of a join;
-- multiple joins against aliases of the same table;
-- chains of three joins;
-- joins constrained by ordinary equality conditions.
+The first queries isolate individual filters and joins. Later queries add
+filter chains, push filters into both join inputs, reuse tables through aliases,
+and connect three joins. Some joins also include ordinary equality conditions.
 
 The exact query order and descriptions are in
 [`quail_b/plans/catalog.json`](../quail_b/plans/catalog.json). Each query plan

@@ -25,12 +25,9 @@ level.
 ## Output quality
 
 The harness compares the distinct ID tuples in `RunOutput.rows` with the
-reference result:
-
-- precision is the matching share of returned rows;
-- recall is the returned share of expected rows;
-- F1 is the harmonic mean of precision and recall;
-- exact match is true when the two row sets are equal.
+reference result. Precision is the matching share of returned rows, while
+recall is the returned share of expected rows. F1 combines precision and
+recall. Exact match means that the two row sets are equal.
 
 Final rows enable output scoring.
 
