@@ -216,12 +216,14 @@ comes from [`quail_b/prompts.py`](quail_b/prompts.py) and
 document, followed by a question that begins "Evaluate TRUE or FALSE for the
 following question:", so an engine can reuse a document's KV across questions.
 
-### Bringing up an adapter
+### Developing an adapter
 
-These queries introduce each execution shape in turn. Get them right before
-running the full workload:
+The 31 queries have several different shapes: how many filters and joins they
+have, and how those operators are arranged in the plan. The table below lists
+one query for each distinct shape, from simplest to most complex. Test your
+adapter on these queries first, then run it on all 31.
 
-| Query | Shape | Checks |
+| Query | Shape | What it tests |
 | --- | --- | --- |
 | IMDB-1 | One filter | Scans, prompt rendering, and result IDs |
 | IMDB-2 | One join | Pair evaluation and two output columns |
