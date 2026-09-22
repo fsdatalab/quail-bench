@@ -96,7 +96,7 @@ A good order for bringing up a new engine is IMDB-1 (one filter), then IMDB-2
   metadata, GPU cost, data downloads and memory use, reference collections,
   and inspecting queries and tables.
 - [Adapter contract](docs/adapter-contract.md): the exact inputs and outputs,
-  prompt rendering, and the optional traces and token counts that enable
+  prompt rendering, and the optional predicate answers and token counts that enable
   accuracy and token metrics.
 - [Workload](docs/workload.md): the query families, their plans, and table
   sizes at each scale factor.

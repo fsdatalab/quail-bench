@@ -11,11 +11,11 @@ Predicate and token metrics require additional instrumentation.
 | Query time | Final rows and runtime |
 | Output precision, recall, F1, exact match | Final rows |
 | Document throughput | Runtime for a query with zero joins |
-| Join pair throughput | Complete join traces or a reported pair count |
-| Predicate accuracy | Predicate traces |
+| Join pair throughput | Answer tables for every join, or a reported pair count |
+| Predicate accuracy | Predicate answers |
 | Fresh tokens | A reported fresh token count |
 | Input tokens and their throughput | Prompt pieces, or reported input tokens |
-| Minimum and KV metrics | Complete traces, prompt pieces, and fresh tokens |
+| Minimum and KV metrics | All answer tables, prompt pieces, and fresh tokens |
 | GPU cost | GPU count and hourly price |
 | Cost per million input tokens | Input tokens, GPU count, and hourly price |
 
@@ -35,7 +35,7 @@ Final rows enable output scoring.
 
 ## Predicate accuracy
 
-When an adapter returns filter or join traces, QUAIL-B compares each recorded
+When an adapter returns predicate answers, QUAIL-B compares each recorded
 boolean answer with its published reference label. Accuracy applies only to
 the documents and pairs the engine evaluated.
 
@@ -54,14 +54,14 @@ documents and pairs the execution strategy selected.
 - Join throughput is evaluated document pairs divided by query time.
 
 For a query with multiple joins, evaluated pairs are summed across operators.
-QUAIL-B derives the sum from complete join traces. An adapter with partial
-traces can report `measurements["evaluated_document_pairs"]`.
+QUAIL-B derives the sum when every join has an answer table. Otherwise, an
+adapter can report `measurements["evaluated_document_pairs"]`.
 
 ## Token and KV metrics
 
 Token accounting follows one of two paths:
 
-- With `prompt_pieces`, complete predicate traces, and
+- With `prompt_pieces`, an answer table for every operator, and
   `measurements["fresh_tokens"]`, QUAIL-B computes input, minimum, and
   recomputed tokens itself.
 - With only `measurements["input_tokens"]`, QUAIL-B reports input tokens and
@@ -123,8 +123,8 @@ Only files supplied by the adapter are present in a query directory.
 | `run.json` | Configuration, identities, status, files, and nested metrics |
 | `<query_id>/plan.substrait` | Exact serialized plan used for the query |
 | `<query_id>/rows.parquet` | Final rows returned by the adapter |
-| `<query_id>/filters-*.parquet` | Optional filter traces |
-| `<query_id>/joins-*.parquet` | Optional join traces |
+| `<query_id>/filters-*.parquet` | Optional selection answers |
+| `<query_id>/joins-*.parquet` | Optional join answers |
 | `<query_id>/prompt_pieces.json` | Optional token layout |
 
 The run record includes the QUAIL-B version, corpus ID, reference collection

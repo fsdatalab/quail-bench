@@ -1,7 +1,7 @@
 # Adapter contract
 
 QUAIL-B calls one adapter function for every selected query. A basic adapter
-returns final rows and execution time. Predicate traces and token data add
+returns final rows and execution time. Predicate answers and token data add
 deeper metrics later.
 
 The key naming rule is simple: input tables use their physical names, while
@@ -67,8 +67,8 @@ For example, IMDB-4 receives:
 ```
 
 Each table contains its published `id` and document columns. Physical table
-names form the dictionary keys. Relation aliases form the result and trace
-column names. For `reviews AS r`, the dictionary key is `reviews` and the
+names form the dictionary keys. Relation aliases form the column names of
+`rows` and the answer tables. For `reviews AS r`, the dictionary key is `reviews` and the
 column name is `r`.
 
 ## Prompt rendering
@@ -142,54 +142,74 @@ engine startup, model loading, result collection, scoring, and result saving.
 
 Use the same timing boundary for every system being compared.
 
-## Predicate traces
+## Predicate answers
 
-The preceding sections cover output scoring. Predicate traces add visibility
-into the decisions made by each AI operator.
+`rows` shows only the final result. `filter_answers` and `join_answers` show
+how the engine got there: the value of each AI predicate for every tuple the
+engine evaluated it on. QUAIL-B compares each value with its reference label to
+measure the accuracy of each operator.
 
-Predicate traces are optional. A partial trace enables accuracy scoring for
-the evaluations it contains. A complete trace enables result consistency
-checks and is a prerequisite for token metrics.
+Both fields are optional. Each maps an operator ID from the plan to a table
+with one row per evaluated tuple and a boolean `answer` column.
 
-Dictionary keys are operator IDs from the plan, such as `filter-1` and
-`join-1`.
+### Example
 
-### Filter trace
+IMDB-4 has three AI operators:
 
-A filter table contains the filtered relation alias and a boolean `answer`:
+```text
+Project [r.id, a.id]
+└── AI Join J1                   join-1
+    ├── AI Selection F4          filter-2
+    │   └── AI Selection F1      filter-1
+    │       └── Scan reviews AS r
+    └── Scan aspects AS a
+```
+
+Suppose `reviews` has three rows and `aspects` has two. The engine evaluates
+`filter-1` on every review, `filter-2` on the reviews that pass `filter-1`, and
+`join-1` on each remaining review paired with each aspect:
 
 ```python
-{
+filter_answers = {
     "filter-1": pa.table({
+        "r": ["rv17", "rv42", "rv50"],
+        "answer": [True, True, False],
+    }),
+    "filter-2": pa.table({
         "r": ["rv17", "rv42"],
         "answer": [True, False],
     }),
 }
-```
-
-### Join trace
-
-A join table contains both relation aliases and a boolean `answer`:
-
-```python
-{
+join_answers = {
     "join-1": pa.table({
         "r": ["rv17", "rv17"],
-        "a": ["as0", "as1"],
+        "a": ["as0", "as6"],
         "answer": [True, False],
     }),
 }
+rows = pa.table({"r": ["rv17"], "a": ["as0"]})
 ```
 
-Trace IDs and answers must be nonnull. Every ID must exist in its input table.
-An ID or ID tuple can occur only once per operator table.
+A selection table has one ID column, named by the alias of the relation it
+filters. A join table has one ID column for each input alias. Each table lists
+only the tuples the engine evaluated, so a different plan or operator order
+produces different tables for the same query.
 
-When both trace dictionaries cover every operator, `rows` must represent the
-result implied by those answers. The harness checks the implied row count and
-validates a sample of returned rows.
+### Rules
 
-Use `{}` when a complete trace has zero operators of one kind. Use `None` for
-an omitted trace kind.
+- IDs and answers must be nonnull, and every ID must exist in its input table.
+- Each ID, or each ID pair for a join, appears at most once per table.
+- Return a table for some operators to score only those operators.
+- Return a table for every operator to enable the checks and metrics below.
+  Use `{}` for a query with zero operators of one kind, and `None` to omit a
+  kind entirely.
+
+When every operator has a table, QUAIL-B also:
+
+- checks that `rows` matches the result those answers produce: it compares the
+  row count and verifies a sample of rows;
+- counts evaluated join pairs from the join tables; and
+- computes input and minimum tokens from these tables and `prompt_pieces`.
 
 ## Measurements
 
@@ -201,8 +221,8 @@ The harness recognizes three engine measurements:
 | `fresh_tokens` | nonnegative `int` | Positions processed by model forward passes |
 | `input_tokens` | nonnegative `int` | Full length of every evaluated prompt |
 
-Complete join traces override `evaluated_document_pairs` with the sum of their
-row counts.
+When every join has an answer table, QUAIL-B uses the sum of their row counts
+in place of `evaluated_document_pairs`.
 
 `input_tokens` counts every position of every evaluated prompt, including
 positions read from KV. Report it when prompt pieces are unavailable. It

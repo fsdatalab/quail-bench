@@ -90,8 +90,8 @@ and `a` as aliases. The adapter therefore receives tables keyed by `reviews`
 and `aspects`, but returns final columns named `r` and `a`.
 
 `F1`, `F4`, and `J1` represent prompt templates stored as string literals in
-the plan. `filter-1`, `filter-2`, and `join-1` are operator IDs used by optional
-predicate traces.
+the plan. `filter-1`, `filter-2`, and `join-1` are operator IDs, which key the
+optional predicate answers.
 
 ## Scale factors
 
