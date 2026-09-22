@@ -284,7 +284,7 @@ minimum tokens, recomputed tokens, and KV regret.
 | Output precision, recall, F1, exact match | `rows` |
 | Document throughput | `runtime_s`, for a query with zero joins |
 | Join throughput | Answer tables for every join, or a reported pair count |
-| Predicate accuracy | Predicate answers |
+| Predicate-level accuracy | Predicate answers |
 | Fresh tokens | `measurements["fresh_tokens"]` |
 | Input tokens and their throughput | Prompt pieces, or reported input tokens |
 | Minimum tokens and KV regret | All answer tables, prompt pieces, and fresh tokens |
@@ -304,17 +304,16 @@ Precision is the share of returned rows that are in the reference result.
 Recall is the share of reference rows that were returned. F1 is their harmonic
 mean. Exact match means the two row sets are equal.
 
-### Predicate accuracy
+### Predicate-level accuracy
 
-**Accuracy is not a focus of this benchmark.** The labels are answers from one
-arbitrary model, `Qwen/Qwen3-32B-FP8`, so accuracy is a fake number that only
-measures agreement with that model. The exceptions are the FEVER support join
-and the LePaRD citation join, which use ground truth labels from the original
-datasets on Hugging Face.
+Predicate-level accuracy is the share of the engine's filter and join answers
+that match the reference labels. It counts only the tuples the engine
+evaluated. `run.json` also records true and false positives and negatives for
+each predicate.
 
-Predicate accuracy covers only the tuples the engine evaluated. It measures the
-engine's individual answers, while output quality also reflects which tuples
-the plan chose to evaluate.
+Accuracy is not a focus of this benchmark. See
+[Reference answers](../README.md#reference-answers) for how the labels were
+made.
 
 ### Throughput
 

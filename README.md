@@ -259,18 +259,17 @@ same at every scale factor. Use 0.1 while developing an adapter.
 QUAIL-B scores every run against reference answers: one TRUE or FALSE label
 for each document or document pair each AI predicate can be asked about.
 
-**Accuracy is not a focus of this benchmark.** The labels are the answers of
-one arbitrary model, `Qwen/Qwen3-32B-FP8`, so the accuracy QUAIL-B reports is a
-fake number: predicate accuracy and output precision and recall only measure
-agreement with that model. An engine with a stronger model can be right more
-often and still score lower. Use these numbers to check that an adapter runs
-the queries as intended, and compare engines on speed, tokens, and cost.
+**Accuracy is not a focus of this benchmark.** Most labels are the answers of
+one arbitrary model, `Qwen/Qwen3-32B-FP8`. Accuracy against them is a fake
+number: it measures agreement with that model, and an engine with a better
+model can score lower. This applies to predicate-level accuracy and to output
+precision and recall.
 
-Two joins use ground truth labels from the original datasets on Hugging Face:
-the FEVER join asking whether a passage supports a claim uses
-[FEVER](https://huggingface.co/datasets/fever/fever) labels where they exist,
-and the LePaRD citation join uses
-[LePaRD](https://huggingface.co/datasets/rmahari/LePaRD) citation links.
+Two joins have real labels. The join that asks whether a FEVER passage
+supports a claim uses the claim annotations from
+[FEVER](https://huggingface.co/datasets/fever/fever) where they exist. The
+LePaRD citation join uses the citation links from
+[LePaRD](https://huggingface.co/datasets/rmahari/LePaRD).
 
 The input tables and labels live in the public S3 bucket `s3://quail-bench`,
 under `ground_truth/quailb/schema_v1/`:
@@ -326,7 +325,7 @@ reports it as zero.
 | --- | --- |
 | Query time | `runtime_s`, in seconds |
 | Output precision and recall | Returned rows compared with the reference result |
-| Predicate accuracy | Each recorded filter and join answer compared with its label |
+| Predicate-level accuracy | Share of filter and join answers that match the labels |
 | Document throughput | Input documents per second, for queries with zero joins |
 | Join throughput | Evaluated document pairs per second |
 | GPU cost | `runtime_s / 3600 * gpu_count * gpu_hourly_rate_usd` |
