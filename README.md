@@ -1,21 +1,34 @@
 # QUAIL-B
 
-QUAIL-B is an academic benchmark of 31 AI SQL queries over document tables. AI SQL is SQL with LLM-powered operators.
+QUAIL-B is a benchmark harness for AI query engines. Its workload contains 31
+queries over document tables. Each query combines relational operators with two
+LLM-powered operators:
 
-This repository publishes the query plans, input tables, reference labels, and scoring harness. It does not include an execution engine. To benchmark your engine, you write an adapter function that translates each Substrait query plan into your engine's AI SQL dialect, executes it, and returns the execution results to QUAIL-B for scoring.
+- `ai_filter(prompt, document) -> boolean`
+- `ai_join(prompt, left_document, right_document) -> boolean`
 
-## Contents
+This package supplies the query plans, input tables, reference answers, result
+validation, and scoring. You supply the engine and a Python callback that runs
+one plan.
 
-- [Installation](#installation)
-- [How to Adapt Your Engine](#how-to-adapt-your-engine)
-- [Running the Benchmark](#running-the-benchmark)
-- [Queries](#queries)
-- [Scale Factors](#scale-factors)
-- [Metrics](#metrics)
-- [Results and CLI](#results-and-cli)
-- [Source Files](#source-files)
+## How a benchmark run works
 
-## Installation
+For each selected query, the harness:
+
+1. loads its Substrait plan and input tables;
+2. calls your `run_query(query, tables)` function once;
+3. validates the returned IDs and timing;
+4. compares the final rows with the reference output;
+5. writes the results and a report.
+
+You write one callback for the whole workload, not one callback per query. A
+generic adapter can translate every Substrait plan. An adapter may instead
+dispatch on `query.id` if its engine needs query-specific code.
+
+The package does not start a model server, choose an execution strategy, or
+translate plans into an engine-specific language.
+
+## Quick start
 
 QUAIL-B requires Python 3.12.
 
@@ -23,165 +36,181 @@ QUAIL-B requires Python 3.12.
 uv add "quail-b @ git+https://github.com/fsdatalab/quail-bench.git"
 ```
 
-For development:
-
-```sh
-git clone https://github.com/fsdatalab/quail-bench.git
-cd quail-bench
-uv sync
-```
-
-## How to Adapt Your Engine
-
-To run QUAIL-B against your query engine, you write an adapter function:
+Start with one query at scale factor 0.1:
 
 ```python
-run_query(query: quail_b.QuerySpec, tables: dict[str, pyarrow.Table]) -> quail_b.RunOutput
-```
+import time
 
-Your adapter receives:
-- `query`: A `QuerySpec` instance. Its `query.plan` property provides the parsed Substrait 0.103 `Plan`.
-- `tables`: A dictionary mapping table names to input PyArrow tables.
-
-You translate the Substrait plan into your engine's AI SQL dialect (for example, [BigQuery AI SQL](https://cloud.google.com/bigquery/docs/generative-ai-overview)), execute it, and return a `RunOutput`.
-
-### The `RunOutput` Contract
-
-Required fields:
-- `rows`: A `pyarrow.Table` containing final output tuples, with one ID column per selected alias (such as `r` and `a`).
-- `runtime_s`: Query execution time in seconds as a float. This excludes engine startup and model loading.
-
-Optional fields (used for predicate accuracy and token accounting):
-- `filter_answers`: A dictionary mapping filter operator ID (such as `"filter-1"`) to a `pyarrow.Table` of evaluated document IDs and boolean `answer` values.
-- `join_answers`: A dictionary mapping join operator ID (such as `"join-1"`) to a `pyarrow.Table` of evaluated left/right ID pairs and boolean `answer` values.
-- `measurements`: A dictionary for engine telemetry. Reporting `measurements["fresh_tokens"]` records the count of input tokens processed in model forward passes.
-- `prompt_pieces`: Tokenized prompt IDs for prefix KV accounting.
-
-If your engine does not record individual predicate answers, pass `filter_answers=None` and `join_answers=None`.
-
-### Concrete Adapter Example
-
-For query `IMDB-4` (see [Queries](#queries) below), your adapter translates the plan, executes the query against `tables["reviews"]` and `tables["aspects"]`, and returns the results:
-
-```python
 import pyarrow as pa
 import quail_b
 
 
-def run_query(query: quail_b.QuerySpec, tables: dict[str, pa.Table]) -> quail_b.RunOutput:
-    sql = to_engine_sql(query.plan)
-    result = execute(sql, tables)
+def run_query(
+    query: quail_b.QuerySpec,
+    tables: dict[str, pa.Table],
+) -> quail_b.RunOutput:
+    engine_plan = translate_substrait(query.plan)
+
+    started = time.perf_counter()
+    result = execute(engine_plan, tables)
+    runtime_s = time.perf_counter() - started
 
     return quail_b.RunOutput(
-        rows=pa.table({
-            "r": result.output_review_ids,
-            "a": result.output_aspect_ids,
-        }),
-        runtime_s=result.query_seconds,
-        filter_answers={
-            "filter-1": pa.table({"r": result.f1_ids, "answer": result.f1_answers}),
-            "filter-2": pa.table({"r": result.f4_ids, "answer": result.f4_answers}),
-        },
-        join_answers={
-            "join-1": pa.table({
-                "r": result.join_review_ids,
-                "a": result.join_aspect_ids,
-                "answer": result.join_answers,
-            }),
-        },
-        measurements={"fresh_tokens": result.fresh_tokens},
-        prompt_pieces=result.prompt_pieces,
+        filter_answers=None,
+        join_answers=None,
+        rows=result.rows,
+        runtime_s=runtime_s,
     )
-```
 
-`to_engine_sql` and `execute` are supplied by your adapter.
-
-## Running the Benchmark
-
-Pass your adapter function to `quail_b.run`:
-
-```python
-import quail_b
 
 quail_b.run(
     run_query,
-    queries=["IMDB-4"],  # Omit to run all 31 queries
+    queries=["IMDB-1"],
     scale_factor=0.1,
-    output_dir="results/my-run",  # Set your desired output directory path
-    metadata={"engine": "my-engine", "model": "Qwen/Qwen3-4B-FP8"},
-    gpu_count=1,
-    gpu_hourly_rate_usd=3.9492,
+    output_dir="results/first-run",
+    metadata={"engine": "my-engine", "model": "my-model"},
 )
 ```
 
-- `output_dir`: Path to the directory where QUAIL-B writes run results (e.g. `"results/vllm-qwen3-4b"` or any custom path). Must be a new directory.
-- `queries`: List of query IDs to run. Omit `queries=` (or pass `None`) to run all 31 benchmark queries.
-- Data is downloaded from `s3://quail-bench` and cached locally in `~/.cache/quail-b`.
-- Only the reference labels of the selected queries' predicates are loaded, as Arrow tables of about 25 bytes per answer. Loading the full published collection of 21 label sets at scale 0.1 (1.21 million answers) takes 1.9 s from cached files with a peak of 0.62 GiB, corpus tables included; at scale 1.0 (51.8 million answers) budget about 3 GiB.
+`translate_substrait` and `execute` are placeholders for your engine
+integration. The harness downloads the selected inputs and labels from the
+public data store and caches them in `~/.cache/quail-b`.
 
-### Inspecting Data and Queries Directly
-
-Inspect benchmark queries and load input tables directly without running the benchmark harness:
+When the first query works, omit `queries` to run all 31 queries:
 
 ```python
-import quail_b
-
-query = quail_b.get_query("IMDB-4")
-plan = query.plan
-
-reviews = quail_b.load_table("reviews", scale_factor=0.1)
+quail_b.run(
+    run_query,
+    scale_factor=0.1,
+    output_dir="results/full-run",
+    metadata={"engine": "my-engine", "model": "my-model"},
+)
 ```
 
-## Queries
+Each run needs a new `output_dir`.
 
-The benchmark defines 31 queries across 5 datasets:
+## Adapter contract
 
-| Dataset | Queries | Relations | Description |
+The callback has this interface:
+
+```python
+def run_query(
+    query: quail_b.QuerySpec,
+    tables: dict[str, pyarrow.Table],
+) -> quail_b.RunOutput:
+    ...
+```
+
+### Inputs
+
+`query` describes one workload query:
+
+- `query.id` is its stable identifier, such as `"IMDB-4"`.
+- `query.description` is a short summary.
+- `query.plan` is a parsed Substrait 0.103 `Plan`.
+- `query.plan_bytes` is the serialized plan.
+
+The plan contains the table scans, relation aliases, prompt strings, AI
+operators, ordinary equality conditions, and final projection. The custom AI
+functions are declared in
+[`quail_b/substrait_extensions.yaml`](quail_b/substrait_extensions.yaml).
+
+`tables` maps every physical table used by the plan to a `pyarrow.Table`. For
+example, IMDB-4 receives `tables["reviews"]` and `tables["aspects"]`. Load these
+tables into your engine before executing the plan.
+
+### Required output
+
+Return a `quail_b.RunOutput`. For a basic integration, set:
+
+- `rows` to the final query result as a `pyarrow.Table`;
+- `runtime_s` to execution time in seconds;
+- `filter_answers` and `join_answers` to `None`.
+
+The `rows` table must:
+
+- contain one column for each alias selected by the plan;
+- use alias names as column names, such as `r` and `a`;
+- contain IDs from the corresponding input tables;
+- contain no null IDs or duplicate rows.
+
+For example, IMDB-4 selects `r.id` and `a.id`, so its result has columns `r`
+and `a`:
+
+```python
+rows = pa.table({
+    "r": result.review_ids,
+    "a": result.aspect_ids,
+})
+```
+
+Measure `runtime_s` around query execution. Exclude engine startup, model
+loading, and result collection so runs remain comparable.
+
+### Optional predicate traces
+
+Return predicate traces to measure operator accuracy and token efficiency:
+
+- `filter_answers` maps each filter operator ID to the documents your engine
+  evaluated and its boolean answers.
+- `join_answers` maps each join operator ID to the document pairs your engine
+  evaluated and its boolean answers.
+- `measurements["fresh_tokens"]` records input token positions processed by
+  model forward passes instead of read from KV.
+- `prompt_pieces` records tokenized prompt parts for input-token and KV
+  accounting.
+
+A filter trace has the relation alias and a non-null boolean `answer` column:
+
+```python
+filter_answers = {
+    "filter-1": pa.table({
+        "r": evaluated_review_ids,
+        "answer": filter_decisions,
+    }),
+}
+```
+
+A join trace has both relation aliases and an `answer` column:
+
+```python
+join_answers = {
+    "join-1": pa.table({
+        "r": evaluated_review_ids,
+        "a": evaluated_aspect_ids,
+        "answer": join_decisions,
+    }),
+}
+```
+
+Operator IDs come from the Substrait plan. If you return traces for every
+operator, the final `rows` must be exactly the result implied by those answers.
+The harness checks this relationship.
+
+## Workload
+
+The 31 queries cover five datasets:
+
+| Dataset | Queries | Tables | Task |
 | --- | ---: | --- | --- |
-| IMDB | 10 | `reviews`, `aspects` | Movie review aspect extraction and sentiment analysis |
-| BioDEX | 4 | `reports`, `terms` | Adverse drug reaction reporting from medical papers |
-| FEVER | 10 | `claims`, `evidence` | Fact verification with two-sided selections and join chains |
-| LePaRD | 5 | `citation_contexts`, `citation_passages` | Legal precedent retrieval and citation matching |
-| SWE-Next | 2 | `agent_traces` | Software engineering agent trajectory evaluation |
+| IMDB | 10 | `reviews`, `aspects` | Review aspects and sentiment |
+| BioDEX | 4 | `reports`, `terms` | Adverse drug reactions |
+| FEVER | 10 | `claims`, `evidence` | Fact verification |
+| LePaRD | 5 | `citation_contexts`, `citation_passages` | Legal citations |
+| SWE-Next | 2 | `agent_traces` | Software-agent trajectories |
 
-The original LEP-5, LEP-6, and LEP-8 have empty reference outputs at sf=0.1
-with raw prompts as well as chat prompts. They are excluded. The original LEP-7
-is now LEP-5; its plan and prompt text are unchanged.
-Filter and join prompts use the raw document/question format ending in `ANSWER:`.
-The benchmark uses the existing raw-prompt reference collections. Saved chat
-results remain historical and must not be presented as raw-prompt results.
+The workload includes filters, joins, filter pushdown on either side of a join,
+and multi-join chains. Prompts are string literals in the plans. The plans use
+standard Substrait relational operators plus the two AI functions above.
 
-BIO-1 selects reports describing a serious or life-threatening adverse event.
-BIO-3 applies that filter before joining reports to reaction terms.
-BIO-4 finds serious reports with both neurological and cardiovascular reactions.
-It filters the reports and two aliases of the reaction terms, then joins each
-term alias to the same report. Its output is `(r.id, n.id, c.id)`, with one row
-per matching reaction pair. A term may belong to both categories.
+All plans are available as Substrait ProtoJSON in
+[`quail_b/plans/`](quail_b/plans/). The
+[workload figure](figures/quailb_anatomy.pdf) diagrams every plan.
 
-BIO-4 has Qwen3 32B fp8 reference labels for both term filters at all three
-scale factors. The labels reuse the existing report and reaction-join answers
-after checking their corpus and prompt identities. At sf=0.1, 505 of 1,127
-terms pass the neurological filter and 394 pass the cardiovascular filter.
-Those fractions are fixed planner estimates at every scale factor.
-The public collections below include both filters. BIO-4 loads the matching
-collection automatically when accuracy scoring is enabled.
+### Example: IMDB-4
 
-| Scale factor | Reference collection |
-|---|---|
-| 0.1 | `gt_cd3ebdb784f64b9e028e50ea73cdedd0` |
-| 0.5 | `gt_68f9ce9439bd7615de92b33d576dff9e` |
-| 1.0 | `gt_e87691add604b02c4e43f0ff5bf0cc4f` |
-
-Queries use two LLM-powered relational operators:
-
-- `ai_filter(prompt, document) -> boolean` (selection)
-- `ai_join(prompt, left, right) -> boolean` (join)
-
-All 31 queries are stored as standard Substrait 0.103 ProtoJSON plans in [`quail_b/plans/`](quail_b/plans/). Custom AI functions are declared in [`quail_b/substrait_extensions.yaml`](quail_b/substrait_extensions.yaml). [All 31 plans](figures/quailb_anatomy.pdf) are diagrammed in one figure.
-
-### Example Query: IMDB-4
-
-IMDB-4 applies two selection filters to movie reviews, followed by a join against movie aspects:
+IMDB-4 filters reviews with two prompts and joins the surviving reviews to
+movie aspects:
 
 ```sql
 SELECT r.id, a.id
@@ -191,7 +220,7 @@ WHERE AI_FILTER(F1, r.body)
   AND AI_FILTER(F4, r.body);
 ```
 
-Its relational operator tree is:
+Its operator tree is:
 
 ```text
 Project [r.id, a.id]
@@ -202,19 +231,12 @@ Project [r.id, a.id]
     └── Scan aspects AS a
 ```
 
-In the Substrait plan, `F1`, `F4`, and `J1` are string prompt literals. Exact prompt texts and rendering logic are defined in [`quail_b/prompts.py`](quail_b/prompts.py) and [`quail_b/rendering.py`](quail_b/rendering.py).
+## Scale factors
 
-Every filter and join instruction starts with "Evaluate TRUE or FALSE for the
-following question:". It follows the document, so the document's KV can be reused
-across questions.
+Choose `scale_factor=0.1`, `0.5`, or `1.0`. A scale factor changes the input
+cardinalities and matching reference labels, but not the query plans.
 
-## Scale Factors
-
-QUAIL-B defines three scale factors: `0.1`, `0.5`, and `1.0`. They correspond to 10%, 50%, and 100% of each dataset's sampling target.
-
-A scale factor changes the input table cardinalities and reference labels. It does not change the 31 query definitions.
-
-| Dataset | Relation | 0.1 | 0.5 | 1.0 |
+| Dataset | Table | 0.1 | 0.5 | 1.0 |
 | --- | --- | ---: | ---: | ---: |
 | IMDB | `reviews` | 5,000 | 25,000 | 50,000 |
 | IMDB | `aspects` | 12 | 12 | 12 |
@@ -226,82 +248,89 @@ A scale factor changes the input table cardinalities and reference labels. It do
 | LePaRD | `citation_passages` | 433 | 1,756 | 2,991 |
 | SWE-Next | `agent_traces` | 1,772 | 8,859 | 17,711 |
 
-Each scale factor deterministically samples upstream snapshots defined in [`quail_b/data.py`](quail_b/data.py).
+Use scale factor 0.1 while developing an adapter. Use larger factors to measure
+scaling behavior after the full workload runs correctly.
 
 ## Metrics
 
-| Metric | Definition |
-| --- | --- |
-| Query time / latency | Query execution time in seconds (`runtime_s`). Excludes engine startup. |
-| Filter throughput | Input documents processed per second (`documents/second`). |
-| Join throughput | Evaluated document pairs per second (`document pairs/second`). |
-| GPU cost | Query cost in dollars (`$/query`), calculated as execution hours × GPU count × hourly price. |
-| Cost per million input tokens | Query GPU cost divided by full input tokens, times 1,000,000 (`cost_usd_per_million_input_tokens`). Includes input tokens served from KV. |
-| KV regret percentage | Recomputed tokens divided by fresh tokens, times 100 (`kv_regret_percent`). |
-| Predicate accuracy | Agreement with reference labels on evaluated filter and join answers. |
-| Output precision & recall | Precision and recall of final output rows compared to reference result rows. |
-| Fresh tokens | Input token positions processed by model forward passes. |
-| Input tokens | Full input lengths summed across evaluated prompts, including tokens served from KV. Each evaluated prompt counts its complete input once. Output tokens and repeated computation within a prompt are excluded. |
-| Input token throughput | Input tokens divided by query execution time (`input_tokens_per_second`), excluding model startup and result collection. |
-| Minimum tokens | Input token positions required under an unlimited KV prefix cache: each distinct prefix of the document requests once (a document's questions and frames share their common lead), and each pair's label, partner document, and answer cue once per pair. |
-| Recomputed KV tokens | Fresh tokens minus minimum tokens (`regret_tokens`). Measures redundant KV computation. Tokens that must be computed once per request, such as a pair's suffix, are never regret. |
+Every integration reports:
 
-Input token throughput counts the prompts each method evaluated. Different filter
-answers or plans can change those prompts and their total input length. It does not
-measure how many token positions the GPU computed. If prompt pieces or an answer
-table are missing, the input token count is unknown. If query time is zero,
-input token throughput is unknown. Cost per million input tokens is unknown when
-cost or the input count is missing, or the input count is zero. KV regret percentage
-is unknown when regret or the fresh count is missing, or the fresh count is zero.
-Both derived metrics appear in `run.json`, `measurements.parquet`, and `report.md`.
+- query execution time;
+- output precision, recall, F1, and exact match;
+- document throughput for filter-only queries;
+- evaluated-pair throughput for joins when pair counts are available.
 
-Reference labels are generated using `Qwen/Qwen3-32B-FP8`. FEVER and LePaRD also evaluate against published dataset ground truth.
+Pass `gpu_count` and `gpu_hourly_rate_usd` to `quail_b.run` to report cost per
+query:
 
-## Results and CLI
+```python
+quail_b.run(
+    run_query,
+    scale_factor=0.1,
+    output_dir="results/costed-run",
+    gpu_count=1,
+    gpu_hourly_rate_usd=3.95,
+)
+```
 
-Each benchmark run writes results to your configured `output_dir` (one subdirectory per evaluated query):
+Predicate traces add filter and join accuracy. Predicate traces,
+`prompt_pieces`, and `fresh_tokens` add:
+
+- full input tokens, including tokens served from KV;
+- input-token throughput;
+- the minimum token computation under an unlimited prefix KV cache;
+- recomputed KV tokens;
+- KV regret, the recomputed share of fresh tokens;
+- GPU cost per million input tokens when GPU pricing is also supplied.
+
+Reference predicate labels use `Qwen/Qwen3-32B-FP8`. FEVER and LePaRD also use
+their published dataset ground truth for output scoring.
+
+## Results
+
+A run writes:
 
 ```text
 results/my-run/
 ├── run.json
 ├── report.md
 ├── measurements.parquet
-├── IMDB-1/
-├── IMDB-2/
-├── ...
-└── IMDB-4/
+└── IMDB-1/
     ├── plan.substrait
-    ├── rows.parquet
-    ├── filters-0.parquet
-    ├── filters-1.parquet
-    ├── joins-0.parquet
-    └── prompt_pieces.json
+    └── rows.parquet
 ```
 
-- `run.json`: Complete execution record with parameters, configuration metadata, and per-query metrics.
-- `report.md`: Markdown summary table with execution times, throughput, accuracy, and token counts.
-- `measurements.parquet`: Parquet table containing one row of metrics per completed query.
-- Per-query directories: Serialized Substrait plans, output rows, predicate answer tables, and token piece definitions.
+Traced runs also write predicate-answer Parquet files and
+`prompt_pieces.json` in each query directory.
 
-Rebuild or rescore a report from saved results:
+- `report.md` is the human-readable summary.
+- `measurements.parquet` has one metrics row per completed query.
+- `run.json` contains the run configuration, status, files, and metrics.
+- Each query directory preserves the exact plan and returned data.
+
+Rebuild the report from a saved run with:
 
 ```sh
 quail-b report results/my-run
 ```
 
-## Source Files
+## Inspect queries and data
 
-| Path | Contents |
-| --- | --- |
-| [`quail_b/plans/`](quail_b/plans/) | Substrait 0.103 query plans and workload catalog |
-| [`quail_b/queries.py`](quail_b/queries.py) | Query specifications and query loader |
-| [`quail_b/substrait.py`](quail_b/substrait.py) | Substrait plan parser and operator extraction |
-| [`quail_b/substrait_extensions.yaml`](quail_b/substrait_extensions.yaml) | Declarations for `ai_filter` and `ai_join` extensions |
-| [`quail_b/prompts.py`](quail_b/prompts.py) | Prompt templates and prompt identifiers |
-| [`quail_b/rendering.py`](quail_b/rendering.py) | Exact prompt text rendering logic |
-| [`quail_b/data.py`](quail_b/data.py) | Dataset tables, sampling logic, and scale factors |
-| [`quail_b/labels.py`](quail_b/labels.py) | Reference labels and ground truth loading |
-| [`quail_b/run.py`](quail_b/run.py) | Benchmark runner and answer validator |
-| [`quail_b/scoring.py`](quail_b/scoring.py) | Accuracy, precision, recall, and cost scoring |
-| [`quail_b/minimum.py`](quail_b/minimum.py) | Prefix trie and minimum token accounting |
-| [`quail_b/reporting.py`](quail_b/reporting.py) | Markdown reports and Parquet measurement export |
+You can inspect a plan or table without starting a benchmark run:
+
+```python
+import quail_b
+
+query = quail_b.get_query("IMDB-4")
+plan = query.plan
+
+reviews = quail_b.load_table("reviews", scale_factor=0.1)
+```
+
+For repository development:
+
+```sh
+git clone https://github.com/fsdatalab/quail-bench.git
+cd quail-bench
+uv sync
+```
