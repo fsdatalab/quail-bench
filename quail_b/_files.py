@@ -9,6 +9,7 @@ from contextvars import ContextVar
 from pathlib import Path
 
 from pyarrow import fs
+from pyarrow import parquet as pq
 
 PUBLIC_BUCKET = "quail-bench"
 GROUND_TRUTH_ROOT = "ground_truth/quailb/schema_v1"
@@ -25,6 +26,16 @@ def download_cache(directory=None):
         _cache_dir.reset(token)
 
 
+def _cache_directory() -> Path:
+    directory = _cache_dir.get() or os.environ.get("QUAIL_B_CACHE_DIR")
+    if directory is None:
+        directory = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache"))
+        directory = directory / "quail-b"
+    directory = Path(directory).expanduser()
+    directory.mkdir(parents=True, exist_ok=True)
+    return directory
+
+
 def _cached_file(root, path):
     """Cache immutable published files; always refresh active collection pointers."""
     if root is not None and not str(root).startswith("s3://"):
@@ -32,12 +43,7 @@ def _cached_file(root, path):
     if Path(path).name.startswith("active_collection."):
         return None
     filesystem, _, source = _location(root, path)
-    directory = _cache_dir.get() or os.environ.get("QUAIL_B_CACHE_DIR")
-    if directory is None:
-        directory = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache"))
-        directory = directory / "quail-b"
-    directory = Path(directory).expanduser()
-    directory.mkdir(parents=True, exist_ok=True)
+    directory = _cache_directory()
     key = hashlib.sha256(source.encode()).hexdigest()
     cached = directory / key
     if not cached.exists():
@@ -71,6 +77,39 @@ def _read_bytes(root, path):
     filesystem, _, source = _location(root, path)
     with filesystem.open_input_file(source) as stream:
         return stream.read()
+
+
+def _read_parquet_columns(root, path, columns):
+    """Read selected Parquet columns, caching the selection for S3 files.
+
+    Args:
+        root: Local directory or S3 URI, or None for the public bucket.
+        path: The Parquet file path under the root.
+        columns: The columns to read.
+
+    Returns:
+        A table with only the requested columns.
+    """
+    columns = list(columns)
+    filesystem, _, source = _location(root, path)
+    if root is not None and not str(root).startswith("s3://"):
+        return pq.read_table(source, filesystem=filesystem, columns=columns)
+    identity = "\0".join([source, *columns])
+    cached = _cache_directory() / (
+        f"{hashlib.sha256(identity.encode()).hexdigest()}.parquet")
+    if not cached.exists():
+        table = pq.read_table(
+            source, filesystem=filesystem, columns=columns, pre_buffer=True)
+        with tempfile.NamedTemporaryFile(
+                dir=cached.parent, suffix=".parquet", delete=False) as stream:
+            temporary = Path(stream.name)
+        try:
+            pq.write_table(table, temporary)
+            temporary.replace(cached)
+        finally:
+            temporary.unlink(missing_ok=True)
+        return table
+    return pq.read_table(cached, columns=columns)
 
 
 def _list_files(root, path):
