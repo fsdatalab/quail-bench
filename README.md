@@ -82,8 +82,8 @@ Your adapter can also return predicate traces for operator accuracy and token
 data for KV metrics. Start with final rows. Add traces after all query shapes
 run correctly.
 
-Read the [adapter contract](docs/adapter-contract.md) for the exact callback
-and result schemas. The [workload guide](docs/workload.md) explains the query
+Read the [adapter contract](docs/adapter-contract.md) for the exact adapter
+interface and result schemas. The [workload guide](docs/workload.md) explains the query
 families and scale factors. [Scoring and results](docs/scoring-and-results.md)
 defines each metric and output file.
 

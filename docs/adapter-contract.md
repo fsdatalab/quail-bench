@@ -7,7 +7,7 @@ deeper metrics later.
 The key naming rule is simple: input tables use their physical names, while
 output columns use relation aliases from the plan.
 
-## Callback
+## Adapter function
 
 ```python
 def run_query(
@@ -17,7 +17,7 @@ def run_query(
     ...
 ```
 
-The callback must finish one query or raise an exception. QUAIL-B stops the run
+The adapter must finish one query or raise an exception. QUAIL-B stops the run
 at the first exception and records the failure in `run.json`.
 
 The smallest valid result is:

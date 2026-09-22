@@ -135,7 +135,7 @@ ID, and a hash of each query definition.
 
 ## Failure status
 
-QUAIL-B stops at the first callback or scoring error. It writes the error and
+QUAIL-B stops at the first adapter or scoring error. It writes the error and
 partial status to `run.json` and updates `report.md`.
 
 The harness saves a returned output before scoring it. If scoring fails,
