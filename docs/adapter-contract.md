@@ -51,9 +51,10 @@ For example, IMDB-4 receives:
 }
 ```
 
-Each table contains its published `id` and document columns. Relation aliases
-belong to the plan, not this dictionary. If the plan reads `reviews AS r`, the
-dictionary key is `reviews`, while result and trace columns use `r`.
+Each table contains its published `id` and document columns. Physical table
+names form the dictionary keys. Relation aliases form the result and trace
+column names. For `reviews AS r`, the dictionary key is `reviews` and the
+column name is `r`.
 
 ## Prompt rendering
 
@@ -74,9 +75,8 @@ For joins, `documents` follows template placeholder order. `anchor` selects the
 document placed first for prefix reuse. Both renderers end with `ANSWER:`. The
 model answer must be interpreted as `TRUE` or `FALSE`.
 
-Do not replace the plan's templates or use a chat wrapper. A prompt format
-change defines a different predicate from the one represented by the published
-labels.
+Published labels use the plan's templates and raw prompt rendering. A different
+prompt format defines a different predicate.
 
 ## `RunOutput`
 
@@ -123,7 +123,7 @@ The harness rejects:
 - IDs absent from the corresponding input table;
 - duplicate ID tuples.
 
-Column order and row order do not affect scoring.
+Scoring ignores column order and row order.
 
 ### Runtime
 
@@ -169,15 +169,15 @@ A join table contains both relation aliases and a boolean `answer`:
 }
 ```
 
-Trace IDs and answers cannot be null. Every ID must exist in its input table.
+Trace IDs and answers must be nonnull. Every ID must exist in its input table.
 An ID or ID tuple can occur only once per operator table.
 
 When both trace dictionaries cover every operator, `rows` must represent the
 result implied by those answers. The harness checks the implied row count and
 validates a sample of returned rows.
 
-Use `{}` when a complete trace has no operators of one kind. Use `None` when
-that kind was not traced.
+Use `{}` when a complete trace has zero operators of one kind. Use `None` for
+an omitted trace kind.
 
 ## Measurements
 
@@ -186,13 +186,12 @@ The harness recognizes two engine measurements:
 | Key | Type | Meaning |
 | --- | --- | --- |
 | `evaluated_document_pairs` | nonnegative `int` | Pairs across all joins |
-| `fresh_tokens` | nonnegative `int` | Positions computed, not read from KV |
+| `fresh_tokens` | nonnegative `int` | Positions processed by model forward passes |
 
 Complete join traces override `evaluated_document_pairs` with the sum of their
 row counts.
 
-Other JSON serializable measurements may be stored for use by the engine, but
-QUAIL-B does not score them.
+QUAIL-B preserves other JSON serializable measurements as engine metadata.
 
 ## Prompt pieces
 

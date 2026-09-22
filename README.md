@@ -4,9 +4,8 @@ QUAIL-B measures how an AI query engine executes filters and joins over
 document tables. The benchmark contains 31 Substrait queries across five
 datasets and three scale factors.
 
-This repository is the benchmark harness, not an execution engine. It provides
-the plans, input tables, reference answers, validation, scoring, and reports.
-You provide an engine adapter that executes one plan at a time.
+QUAIL-B provides the plans, input tables, reference answers, validation,
+scoring, and reports. Your engine adapter executes one plan at a time.
 
 ## Before you start
 
@@ -63,8 +62,8 @@ return quail_b.RunOutput(
 `rows` uses relation aliases from the plan as column names. For example, a
 query that selects `r.id` and `a.id` returns columns named `r` and `a`.
 
-This is an adapter interface, not a complete program: plan translation,
-inference, synchronization, and result collection belong to your engine.
+Your engine provides plan translation, inference, synchronization, and result
+collection.
 
 ### 3. Run one filter query
 
@@ -86,7 +85,7 @@ quail_b.run(
 ```
 
 The harness downloads and caches the required inputs and labels in
-`~/.cache/quail-b`. The output directory must not already exist.
+`~/.cache/quail-b`. Choose a new output directory for each run.
 
 ### 4. Check the result
 
@@ -133,8 +132,8 @@ Use a new output directory for every run.
 | Validates IDs and result schemas | Synchronizes execution and measures it |
 | Scores results and writes reports | Returns `quail_b.RunOutput` |
 
-QUAIL-B does not start a model server, choose an execution strategy, or provide
-engine runtime code.
+Your infrastructure starts the model server. Your adapter chooses the execution
+strategy and invokes the engine runtime.
 
 ## Documentation
 

@@ -4,20 +4,20 @@ QUAIL-B separates final output quality from the behavior of individual AI
 operators. Every adapter can report output quality and execution time.
 Predicate and token metrics require additional instrumentation.
 
-## Metric availability
+## Metric requirements
 
-| Metric group | Final rows | Predicate traces | Complete traces and prompt pieces |
-| --- | :---: | :---: | :---: |
-| Query time | Yes | Yes | Yes |
-| Output precision, recall, F1, exact match | Yes | Yes | Yes |
-| Document throughput for queries without joins | Yes | Yes | Yes |
-| Join pair throughput | With pair count | With all joins traced | Yes |
-| Predicate accuracy | No | Yes | Yes |
-| Fresh tokens | With a reported count | With a reported count | Yes |
-| Input tokens and input token throughput | No | No | Yes |
-| Minimum tokens, recomputed tokens, KV regret | No | No | Yes |
-| GPU cost | With GPU data | With GPU data | With GPU data |
-| Cost per million input tokens | No | No | With GPU count and price |
+| Metric group | Adapter data |
+| --- | --- |
+| Query time | Final rows and runtime |
+| Output precision, recall, F1, exact match | Final rows |
+| Document throughput | Runtime for a query with zero joins |
+| Join pair throughput | Complete join traces or a reported pair count |
+| Predicate accuracy | Predicate traces |
+| Fresh tokens | A reported fresh token count |
+| Input tokens and input token throughput | Complete traces and prompt pieces |
+| Minimum and KV metrics | Complete traces, prompt pieces, and fresh tokens |
+| GPU cost | GPU count and hourly price |
+| Cost per million input tokens | Input tokens, GPU count, and hourly price |
 
 See the [adapter contract](adapter-contract.md) for the fields that enable each
 level.
@@ -32,7 +32,7 @@ reference result:
 - F1 is the harmonic mean of precision and recall;
 - exact match is true when the two row sets are equal.
 
-Output scoring is available without predicate traces.
+Final rows enable output scoring.
 
 ## Predicate accuracy
 
@@ -43,20 +43,20 @@ the documents and pairs the engine evaluated.
 Most reference labels use `Qwen/Qwen3-32B-FP8`. Selected FEVER and LePaRD
 labels use dataset annotations.
 
-Predicate accuracy and output quality answer different questions. An engine
-can agree on its evaluated predicates but miss output rows because its
-execution strategy did not evaluate a necessary document or pair.
+Predicate accuracy and output quality answer different questions. Predicate
+accuracy measures recorded evaluations. Output quality also reflects which
+documents and pairs the execution strategy selected.
 
 ## Throughput
 
 `runtime_s` is the denominator for throughput metrics.
 
-- For a query without joins, throughput is input documents divided by time.
+- For a query with zero joins, throughput is input documents divided by time.
 - Join throughput is evaluated document pairs divided by query time.
 
 For a query with multiple joins, evaluated pairs are summed across operators.
-QUAIL-B derives the sum from complete join traces. Without complete traces,
-the adapter can report `measurements["evaluated_document_pairs"]`.
+QUAIL-B derives the sum from complete join traces. An adapter with partial
+traces can report `measurements["evaluated_document_pairs"]`.
 
 ## Token and KV metrics
 
@@ -66,7 +66,7 @@ Full token accounting requires complete predicate traces, `prompt_pieces`, and
 | Metric | Definition |
 | --- | --- |
 | Input tokens | Full evaluated prompts, including tokens served from KV |
-| Fresh tokens | Input positions processed instead of read from KV |
+| Fresh tokens | Input positions processed by model forward passes |
 | Minimum tokens | Input positions required with an unlimited prefix KV cache |
 | Recomputed tokens | Fresh tokens minus minimum tokens |
 | Input token throughput | Input tokens divided by query time |
@@ -74,7 +74,7 @@ Full token accounting requires complete predicate traces, `prompt_pieces`, and
 
 The minimum counts each distinct document prefix once. It also counts the
 question and framing suffixes required by each evaluated filter or join. Work
-that must occur once for each pair is part of the minimum, not regret.
+required once for each pair contributes to the minimum.
 
 Input tokens measure the requests selected by an execution strategy. Fresh
 tokens measure model computation. Two engines can therefore have the same
@@ -153,6 +153,6 @@ Rescore the saved files against the recorded corpus and label collection:
 quail-b report results/my_run
 ```
 
-Rescoring rejects a run if its corpus or query definition hashes do not match
-the installed benchmark. It updates `run.json`, `report.md`, and
-`measurements.parquet` without executing the engine again.
+Rescoring requires corpus and query definition hashes that match the installed
+benchmark. It reads the saved outputs and updates `run.json`, `report.md`, and
+`measurements.parquet`.

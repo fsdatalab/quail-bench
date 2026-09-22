@@ -56,8 +56,8 @@ These queries introduce the main execution shapes in increasing complexity:
 | FEV-8 | Chain of three joins | Validate execution with multiple joins |
 | FEV-10 | Filtered join with equality | Validate ordinary and AI conditions |
 
-Passing these queries does not replace running the full workload. It provides
-shorter checkpoints while implementing an adapter.
+These queries provide short checkpoints while implementing an adapter. Run the
+full workload after these checkpoints pass.
 
 ## Worked plan: IMDB-4
 
@@ -94,8 +94,8 @@ predicate traces.
 ## Scale factors
 
 QUAIL-B publishes scale factors 0.1, 0.5, and 1.0. A scale factor selects a
-fixed input corpus and its matching reference labels. It does not change the
-query plans.
+fixed input corpus and its matching reference labels. The query plans remain
+fixed across scale factors.
 
 | Dataset | Table | 0.1 | 0.5 | 1.0 |
 | --- | --- | ---: | ---: | ---: |
