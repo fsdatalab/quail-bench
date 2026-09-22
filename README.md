@@ -62,12 +62,15 @@ Optional fields (used for predicate accuracy and token accounting):
 
 If your engine does not record individual predicate answers, pass `filter_answers=None` and `join_answers=None`.
 
-An engine should normally provide `prompt_pieces`. QUAIL-B then derives input,
-minimum, and recomputed token counts from those pieces and the answer tables.
-If an engine tokenizes complete prompt strings and cannot provide compatible
-pieces, omit `prompt_pieces` and report `measurements["input_tokens"]`.
-QUAIL-B can still report input-token throughput, but minimum and recomputed
-token counts remain unavailable. It never treats unavailable counts as zero.
+Token accounting follows one of two paths:
+
+- With `prompt_pieces`, QUAIL-B derives input, minimum, and recomputed token
+  counts from the pieces and answer tables.
+- Without `prompt_pieces`, the engine reports `measurements["input_tokens"]`.
+  QUAIL-B reports input-token throughput, but minimum and recomputed token
+  counts remain unavailable.
+
+QUAIL-B never treats an unavailable count as zero.
 
 ### Concrete Adapter Example
 

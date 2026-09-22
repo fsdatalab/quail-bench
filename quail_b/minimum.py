@@ -348,14 +348,14 @@ def input_tokens(spec, pieces, filter_answers, join_answers,
 
 
 def token_metrics(spec, output, corpus_rows, stores=None) -> dict:
-    """Return the run's input, fresh, minimum, and regret token counts.
+    """Compute token metrics from the most detailed data the engine provides.
 
-    With prompt pieces, the answer tables determine input and minimum
-    tokens. The engine must report fresh tokens, and regret is fresh minus
-    minimum. Without prompt pieces, an engine-reported input count is used
-    for throughput. Minimum and regret remain None because they cannot be
-    derived from a total count. With prompt pieces, input tokens is also
-    None if a stage has no answer table; an empty table counts as zero.
+    - With prompt pieces, derive input and minimum tokens from the answer
+      tables. Fresh tokens are required. Regret is fresh minus minimum.
+    - Without prompt pieces, use the engine's input-token total. Minimum
+      and regret are unavailable because a total does not describe prefixes.
+    - A missing answer table makes input tokens unavailable. An empty answer
+      table contributes zero input tokens.
 
     Args:
         spec: The query.
