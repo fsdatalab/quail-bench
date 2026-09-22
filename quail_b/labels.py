@@ -7,7 +7,6 @@ and is what a benchmark run scores against.
 
 from __future__ import annotations
 
-import io
 import json
 from concurrent.futures import ThreadPoolExecutor
 from contextvars import copy_context
@@ -16,12 +15,12 @@ from functools import cached_property
 
 import pyarrow as pa
 import pyarrow.compute as pc
-from pyarrow import parquet as pq
 
-from quail_b._files import _list_files, _read_bytes
+from quail_b._files import _list_files, _read_bytes, _read_parquet_columns
 from quail_b.data import GROUND_TRUTH_ROOT, _full_hash
 
 LABEL_COLUMNS = ("left_id", "right_id", "answer")
+LABEL_FILE_COLUMNS = ("predicate_key", "label_set_id", *LABEL_COLUMNS)
 
 
 def _answer_table(answers) -> pa.Table:
@@ -138,14 +137,18 @@ def _read_json(root, path: str) -> dict:
     return json.loads(_read_bytes(root, path))
 
 
-def _read_many(root, paths: list[str]) -> dict[str, bytes]:
+def _read_many(root, paths: list[str], read=_read_bytes) -> dict:
     workers = min(8, len(paths))
     if workers <= 1:
-        return {path: _read_bytes(root, path) for path in paths}
+        return {path: read(root, path) for path in paths}
     with ThreadPoolExecutor(max_workers=workers) as pool:
-        futures = [pool.submit(copy_context().run, _read_bytes, root, path)
+        futures = [pool.submit(copy_context().run, read, root, path)
                    for path in paths]
         return {path: future.result() for path, future in zip(paths, futures)}
+
+
+def _read_label_file(root, path: str) -> pa.Table:
+    return _read_parquet_columns(root, path, LABEL_FILE_COLUMNS)
 
 
 def _choose_collection(root, scale_factor: float,
@@ -324,14 +327,10 @@ def _validate_label_set_corpora(root, collection: dict,
                     f"{source_corpus_id} and {target_corpus_id}")
 
 
-def _read_label_set(parts: list[bytes], key: str, label_set_id: str,
+def _read_label_set(parts: list[pa.Table], key: str, label_set_id: str,
                     rows: int) -> pa.Table:
-    """Read one label set's Parquet parts and check them as columns."""
-    table = pa.concat_tables([
-        pq.read_table(io.BytesIO(part), columns=[
-            "predicate_key", "label_set_id", *LABEL_COLUMNS])
-        for part in parts
-    ])
+    """Check one label set's Parquet parts as columns."""
+    table = pa.concat_tables(parts)
     for column, expected in (("predicate_key", key),
                              ("label_set_id", label_set_id)):
         mismatch = pc.fill_null(pc.not_equal(table.column(column), expected), True)
@@ -391,8 +390,9 @@ def _load_ground_truth_collection(root, collection: dict, templates=None
         if not part_paths:
             raise FileNotFoundError(f"label set {label_set_id} has no rows")
         data_paths[key] = part_paths
-    data_bytes = _read_many(
-        root, [path for paths in data_paths.values() for path in paths])
+    data_tables = _read_many(
+        root, [path for paths in data_paths.values() for path in paths],
+        _read_label_file)
     predicates = {}
     for key, label_set_id in sorted(wanted.items()):
         manifest = manifests[key]
@@ -401,7 +401,7 @@ def _load_ground_truth_collection(root, collection: dict, templates=None
             label_set_id=label_set_id,
             predicate=manifest["predicate"],
             answers=_read_label_set(
-                [data_bytes[path] for path in data_paths[key]],
+                [data_tables[path] for path in data_paths[key]],
                 key, label_set_id, manifest["rows"]),
             source_rows=manifest["source_rows"],
             predicate_payload=manifest.get("predicate_payload"),
