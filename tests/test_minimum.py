@@ -164,10 +164,12 @@ def test_token_metrics_record_fresh_tokens_without_prompt_pieces():
     assert token_metrics(spec, output, {}) == {
         "input_tokens": 50,
         "fresh_tokens": 40, "minimum_tokens": None, "regret_tokens": None,
+        "regret_approximate": False,
     }
     assert token_metrics(spec, _filter_output(), {}) == {
         "input_tokens": None,
         "fresh_tokens": None, "minimum_tokens": None, "regret_tokens": None,
+        "regret_approximate": False,
     }
 
 
@@ -233,3 +235,12 @@ def test_input_tokens_do_not_count_recomputed_kv(monkeypatch):
         for fresh in (100, 200)]
     assert counts[0]["input_tokens"] == counts[1]["input_tokens"]
     assert counts[1]["regret_tokens"] - counts[0]["regret_tokens"] == 100
+    reported = counts[0]["input_tokens"] // 2
+    scaled = token_metrics(spec, _filter_output(prompt_pieces=pieces, measurements={
+        "fresh_tokens": 0, "input_tokens": reported}), corpus)
+    assert scaled == {
+        "input_tokens": reported, "fresh_tokens": 0,
+        "minimum_tokens": round(
+            counts[0]["minimum_tokens"] * reported / counts[0]["input_tokens"]),
+        "regret_tokens": 0, "regret_approximate": True,
+    }
