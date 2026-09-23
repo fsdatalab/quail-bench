@@ -352,6 +352,11 @@ def token_metrics(spec, output, corpus_rows, stores=None) -> dict:
 
     - With prompt pieces, derive input and minimum tokens from the answer
       tables. Fresh tokens are required. Regret is fresh minus minimum.
+    - With prompt pieces and an engine input-token total, the engine
+      tokenized each full prompt itself, so its tokens can differ from the
+      pieces where two pieces meet. The minimum is scaled by the engine
+      total over the piece total, regret is floored at zero, and
+      `regret_approximate` is True.
     - Without prompt pieces, use the engine's input-token total. Minimum
       and regret are unavailable because a total does not describe prefixes.
     - A missing answer table makes input tokens unavailable. An empty answer
@@ -368,7 +373,8 @@ def token_metrics(spec, output, corpus_rows, stores=None) -> dict:
     reported_input = _reported_input_tokens(output.measurements)
     if output.prompt_pieces is None:
         return {"input_tokens": reported_input, "fresh_tokens": fresh,
-                "minimum_tokens": None, "regret_tokens": None}
+                "minimum_tokens": None, "regret_tokens": None,
+                "regret_approximate": False}
     if fresh is None:
         raise ValueError("prompt pieces need a fresh_tokens measurement")
     if output.filter_answers is None or output.join_answers is None:
@@ -380,13 +386,21 @@ def token_metrics(spec, output, corpus_rows, stores=None) -> dict:
         stores[name] = DocumentTokens(corpus_rows, load_tokenizer(name))
     minimum = minimum_input_tokens(
         spec, pieces, output.filter_answers, output.join_answers, stores[name])
+    piece_input = input_tokens(
+        spec, pieces, output.filter_answers, output.join_answers, stores[name])
+    if reported_input is not None:
+        if piece_input:
+            minimum = round(minimum * reported_input / piece_input)
+        return {"input_tokens": reported_input, "fresh_tokens": fresh,
+                "minimum_tokens": minimum,
+                "regret_tokens": max(fresh - minimum, 0),
+                "regret_approximate": True}
     if fresh < minimum:
         raise ValueError(
             f"fresh_tokens ({fresh}) is below the minimum the requests need "
             f"({minimum})")
     return {
-        "input_tokens": input_tokens(
-            spec, pieces, output.filter_answers, output.join_answers, stores[name]),
+        "input_tokens": piece_input,
         "fresh_tokens": fresh, "minimum_tokens": minimum,
-        "regret_tokens": fresh - minimum,
+        "regret_tokens": fresh - minimum, "regret_approximate": False,
     }

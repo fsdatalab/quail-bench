@@ -29,6 +29,7 @@ MEASUREMENT_SCHEMA = pa.schema([
     ("fresh_tokens", pa.int64()),
     ("minimum_tokens", pa.int64()),
     ("regret_tokens", pa.int64()),
+    ("regret_approximate", pa.bool_()),
     ("evaluated_document_pairs", pa.int64()),
     ("input_rows", pa.int64()),
     ("answers_evaluated", pa.int64()),
@@ -61,6 +62,8 @@ def measurement_rows(record) -> list[dict]:
             unlimited KV. Null without prompt pieces and answers.
         regret_tokens: `fresh_tokens` minus `minimum_tokens`. The KV the
             engine computed again. Null when either side is null.
+        regret_approximate: True when the engine tokenized full prompts
+            itself, so the minimum is scaled to the engine's token count.
         evaluated_document_pairs: Join pairs the engine asked, summed
             across stages. Null on a filter-only query.
         input_rows: Input documents across aliases, counting a repeated
@@ -92,6 +95,7 @@ def measurement_rows(record) -> list[dict]:
             "fresh_tokens": metrics["fresh_tokens"],
             "minimum_tokens": metrics["minimum_tokens"],
             "regret_tokens": metrics["regret_tokens"],
+            "regret_approximate": metrics.get("regret_approximate", False),
             "evaluated_document_pairs": metrics["evaluated_document_pairs"],
             "input_rows": sum(metrics["input_rows"].values()),
             "answers_evaluated": answers.get("evaluated"),
