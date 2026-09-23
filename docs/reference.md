@@ -231,8 +231,14 @@ in place of `evaluated_document_pairs`.
 `input_tokens` counts every position of every evaluated prompt, including
 positions read from KV. Report it when prompt pieces are unavailable. It
 enables input token throughput and cost per million input tokens. Minimum
-tokens and KV regret require `prompt_pieces`; with pieces present, QUAIL-B
-computes input tokens itself and ignores the reported total.
+tokens and KV regret require `prompt_pieces`.
+
+Report both when the engine tokenizes each full prompt as one string. Its
+tokens can then differ from the pieces where two pieces meet, because the
+tokenizer can merge characters across that boundary. QUAIL-B keeps the
+reported total, scales the minimum by the reported total over the total the
+pieces give, floors regret at zero, and sets `regret_approximate`. With pieces
+and no reported total, QUAIL-B computes input tokens itself.
 
 QUAIL-B saves other JSON serializable measurements as engine metadata.
 
@@ -271,7 +277,8 @@ Prompt pieces require:
 - an answer table for every filter and join;
 - every filter and join listed exactly once;
 - `measurements["fresh_tokens"]`;
-- the same tokenizer and token layout used during execution.
+- the same tokenizer and token layout used during execution, or a reported
+  `input_tokens` total when the engine tokenized full prompts itself.
 
 QUAIL-B tokenizes the documents after execution and derives input tokens,
 minimum tokens, recomputed tokens, and KV regret.
