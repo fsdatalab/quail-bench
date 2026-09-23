@@ -233,12 +233,11 @@ positions read from KV. Report it when prompt pieces are unavailable. It
 enables input token throughput and cost per million input tokens. Minimum
 tokens and KV regret require `prompt_pieces`.
 
-Report both when the engine tokenizes each full prompt as one string. Its
-tokens can then differ from the pieces where two pieces meet, because the
-tokenizer can merge characters across that boundary. QUAIL-B keeps the
-reported total, scales the minimum by the reported total over the total the
-pieces give, floors regret at zero, and sets `regret_approximate`. With pieces
-and no reported total, QUAIL-B computes input tokens itself.
+An engine that tokenizes whole prompts can report `input_tokens` with
+`prompt_pieces`. Its count can differ slightly from the pieces, since a
+tokenizer can merge text across a piece boundary. QUAIL-B then uses the
+reported count, scales the minimum to match it, and marks KV regret as
+approximate with `regret_approximate`.
 
 QUAIL-B saves other JSON serializable measurements as engine metadata.
 
