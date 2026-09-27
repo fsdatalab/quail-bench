@@ -153,3 +153,109 @@ P_LOC = ("Judge strictly from the policy above whether this service "
 SCENARIO_MATCH = ("Based on the privacy policy in DOCUMENT {0}, could "
                   "the situation described in DOCUMENT {1} happen to a "
                   "user of this service?")
+
+
+# Classification templates. Each call also carries its labels and
+# optional descriptions, defined next to it. A template is used with
+# exactly one label list, so a template names one predicate.
+
+IMDB_SENTIMENT = (
+    "Judge strictly from the review above which category best describes "
+    "the overall sentiment it expresses about the movie.\n\n{0}"
+)
+IMDB_SENTIMENT_LABELS = ("positive", "negative", "neutral", "mixed")
+
+IMDB_GENRE = (
+    "Judge strictly from the review above which category best describes "
+    "the genre of the movie it reviews.\n\n{0}"
+)
+IMDB_GENRE_LABELS = (
+    "comedy", "drama", "horror", "action", "romance", "thriller",
+    "documentary", "animation", "science fiction", "fantasy", "crime",
+    "war", "western", "musical", "family", "mystery",
+)
+
+IMDB_FOCUS = (
+    "Judge strictly from the review above which category best describes "
+    "what the review mainly does.\n\n{0}"
+)
+IMDB_FOCUS_LABELS = (
+    "praises the acting", "praises the plot", "praises the ending",
+    "criticizes the acting", "criticizes the plot", "criticizes the ending",
+    "other",
+)
+
+# MedDRA's system organ classes, less "product issues", which a
+# reaction term does not describe.
+BIO_ORGAN_CLASS = (
+    "Judge strictly from the reaction above which MedDRA system organ "
+    "class it belongs to.\n\n{0}"
+)
+BIO_ORGAN_CLASS_LABELS = (
+    "cardiac disorders", "vascular disorders", "nervous system disorders",
+    "psychiatric disorders", "eye disorders", "ear and labyrinth disorders",
+    "respiratory, thoracic and mediastinal disorders",
+    "gastrointestinal disorders", "hepatobiliary disorders",
+    "renal and urinary disorders", "skin and subcutaneous tissue disorders",
+    "musculoskeletal and connective tissue disorders",
+    "blood and lymphatic system disorders", "immune system disorders",
+    "endocrine disorders", "metabolism and nutrition disorders",
+    "infections and infestations",
+    "neoplasms benign, malignant and unspecified",
+    "injury, poisoning and procedural complications", "investigations",
+    "general disorders and administration site conditions",
+    "reproductive system and breast disorders",
+    "pregnancy, puerperium and perinatal conditions",
+    "congenital, familial and genetic disorders",
+    "surgical and medical procedures", "social circumstances",
+)
+
+FEV_SUBJECT = (
+    "Judge strictly from the claim above which category best describes "
+    "what the claim is mainly about.\n\n{0}"
+)
+FEV_SUBJECT_LABELS = (
+    "person", "organization", "place", "event", "work of art", "species",
+    "other",
+)
+
+LEP_TREATMENT = (
+    "Judge strictly from the excerpt above which category best describes "
+    "how it treats the case it cites.\n\n{0}"
+)
+LEP_TREATMENT_LABELS = (
+    "followed", "explained", "distinguished", "criticized", "questioned",
+    "overruled",
+)
+LEP_TREATMENT_DESCRIPTIONS = (
+    "applies the cited case as controlling",
+    "restates or clarifies the cited case without relying on it",
+    "says the cited case differs and does not control",
+    "disapproves of the cited case's reasoning",
+    "doubts whether the cited case is still good law",
+    "declares that the cited case is no longer good law",
+)
+
+AGENT_OUTCOME = (
+    "Judge strictly from the agent trace above which category best "
+    "describes the outcome by the end of the trace.\n\n{0}"
+)
+AGENT_OUTCOME_LABELS = (
+    "fixed the bug", "fixed a different bug", "did not fix the bug",
+    "gave up",
+)
+AGENT_OUTCOME_DESCRIPTIONS = (
+    "made a change that plausibly fixes the reported issue",
+    "changed code that does not address the reported issue",
+    "finished without a change that fixes the issue",
+    "stopped early and said it could not continue",
+)
+
+AGENT_DIFFICULTY = (
+    "Judge strictly from the agent trace above which step gave the agent "
+    "the most trouble.\n\n{0}"
+)
+AGENT_DIFFICULTY_LABELS = (
+    "understanding the codebase", "reproducing the bug", "writing the fix",
+    "running the tests", "setting up the environment", "none",
+)

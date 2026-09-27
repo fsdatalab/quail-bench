@@ -188,6 +188,7 @@ def test_prompt_pieces_give_the_minimum_and_the_regret(
         "regret_approximate": False,
         "evaluated_document_pairs": 2, "input_rows": 3,
         "answers_evaluated": 2 * stages + 2, "answers_correct": 2 * stages + 2,
+        "labels_evaluated": None, "labels_correct": None,
         "predicted_rows": 2, "expected_rows": 2, "matching_rows": 2,
         "cost_usd": cost,
         "cost_usd_per_million_input_tokens": cost_per_million,

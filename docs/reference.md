@@ -56,7 +56,15 @@ relational operators and these extension functions:
 ```text
 ai_filter:str_str
 ai_join:str_str_str
+ai_classify:str_str_list_list
 ```
+
+A classification appears as a `ProjectRel` that adds one label column to its
+relation; its hint alias is the operator ID, such as `classify-1`, and its
+hint output names end with `alias.column`, such as `r.focus`. A `FilterRel`
+whose condition is a standard `SingularOrList` over that column keeps the
+documents with an accepted label; its ID is `label-filter-N` and it asks the
+model nothing. See [Classification](#classification).
 
 Their declarations and URN are in
 [`quail_b/substrait_extensions.yaml`](../quail_b/substrait_extensions.yaml).
@@ -98,6 +106,9 @@ Every prompt starts with a document. The question follows it and begins
 comes first, an engine can compute a document's KV once and reuse it across
 every question asked of that document.
 
+Classification prompts use `render_classify_prompt(template, document,
+labels, descriptions)`, described under [Classification](#classification).
+
 For joins, `documents` follows template placeholder order. `anchor` selects the
 document placed first. Both renderers end with `ANSWER:`, and the model answer
 must be read as `TRUE` or `FALSE`.
@@ -116,6 +127,7 @@ the labels.
 | `runtime_s` | `float` | Every run |
 | `measurements` | `dict` | Optional engine measurements |
 | `prompt_pieces` | `dict \| None` | Token and KV metrics |
+| `classify_answers` | `dict[str, pa.Table] \| None` | Label accuracy |
 
 ### Result rows
 
@@ -129,6 +141,10 @@ pa.table({
     "a": ["as0", "as1"],
 })
 ```
+
+A query that returns a label column, such as IMDB-13's `r.focus`, adds one
+string column named by the query, here `focus`, holding one of that call's
+labels.
 
 The harness rejects:
 
@@ -215,6 +231,69 @@ When every operator has a table, QUAIL-B also:
 - counts evaluated join pairs from the join tables; and
 - computes input and minimum tokens from these tables and `prompt_pieces`.
 
+## Classification
+
+`ai_classify(prompt, document, labels, descriptions)` returns one label from
+the list for each document. `descriptions` has one entry per label; an empty
+string means none. Labels are distinct, and no label continues another label
+word for word.
+
+### Prompt and reference label
+
+`render_classify_prompt` produces the text the labels are scored after:
+
+```text
+DOCUMENT:
+<document>
+
+Answer with exactly one of the categories below for the following question: <question>
+
+Categories:
+- <label 1>: <description 1>
+- <label 2>
+ANSWER:
+```
+
+Each label follows as `" " + label`. The reference label is the label with the
+largest sum of its tokens' log probabilities, each normalized over the full
+vocabulary at temperature 1, from `Qwen/Qwen3-32B-FP8`. No end marker is
+scored, and the earlier label wins a tie. `quail_b.predicates.CLASSIFY_JUDGE_SPEC`
+records this definition. An engine may compute it any way, for example by
+scoring only the first token when the first tokens differ, but its answers are
+compared with this definition.
+
+### Answers
+
+`classify_answers` maps each classify operator ID to a table with the
+relation's alias column and a string `label` column, one row per document the
+engine classified. A document with no row cannot pass a label filter or appear
+with its label. Every label must be one of the call's labels.
+
+```python
+classify_answers = {
+    "classify-1": pa.table({
+        "r": ["rv17", "rv42"],
+        "label": ["praises the ending", "criticizes the plot"],
+    }),
+}
+```
+
+With answer tables for every operator, `rows` must match the rows the answers
+imply, label columns included.
+
+### Label files
+
+A classification label set stores `left_id` and a string `label` column where a
+filter stores its boolean `answer`. Its manifest's predicate lists `labels`.
+
+### Queries waiting for labels
+
+The nine classification queries are marked `labels_pending` in the catalog.
+`quail_b.queries()` leaves them out until their labels are published;
+`queries(include_pending=True)` and `get_query` return them. Running one needs a
+label collection that includes its predicates, passed with `root` or
+`collection_id`.
+
 ## Measurements
 
 `measurements` holds numbers the engine reports. QUAIL-B recognizes three keys:
@@ -292,9 +371,10 @@ minimum tokens, recomputed tokens, and KV regret.
 | Document throughput | `runtime_s`, for a query with zero joins |
 | Join throughput | Answer tables for every join, or a reported pair count |
 | Predicate-level accuracy | Predicate answers |
+| Label accuracy | Classification answers |
 | Fresh tokens | `measurements["fresh_tokens"]` |
 | Input tokens and their throughput | Prompt pieces, or reported input tokens |
-| Minimum tokens and KV regret | All answer tables, prompt pieces, and fresh tokens |
+| Minimum tokens and KV regret | All answer tables, prompt pieces, and fresh tokens; not yet defined for classification queries |
 | GPU cost | `gpu_count` and `gpu_hourly_rate_usd` |
 | Cost per million input tokens | GPU cost and a positive input token count |
 
@@ -317,6 +397,12 @@ Predicate-level accuracy is the share of the engine's filter and join answers
 that match the reference labels. It counts only the tuples the engine
 evaluated. `run.json` also records true and false positives and negatives for
 each predicate.
+
+### Label accuracy
+
+Label accuracy is the share of the engine's classification answers that match
+the reference labels, over the documents the engine classified. It is reported
+beside predicate-level accuracy, not merged into it.
 
 Accuracy is not a focus of this benchmark. See
 [Reference answers](../README.md#reference-answers) for how the labels were

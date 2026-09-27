@@ -34,6 +34,8 @@ MEASUREMENT_SCHEMA = pa.schema([
     ("input_rows", pa.int64()),
     ("answers_evaluated", pa.int64()),
     ("answers_correct", pa.int64()),
+    ("labels_evaluated", pa.int64()),
+    ("labels_correct", pa.int64()),
     ("predicted_rows", pa.int64()),
     ("expected_rows", pa.int64()),
     ("matching_rows", pa.int64()),
@@ -71,6 +73,9 @@ def measurement_rows(record) -> list[dict]:
         answers_evaluated: Predicate answers compared to the labels.
             Null when the engine saved no answers.
         answers_correct: Those answers that matched the labels.
+        labels_evaluated: Classification answers compared to the labels.
+            Null when the query has no classification or none was saved.
+        labels_correct: Those classification answers that matched.
         predicted_rows: Distinct result rows the engine produced.
         expected_rows: Distinct result rows the labels require.
         matching_rows: Expected rows the engine also produced.
@@ -86,6 +91,7 @@ def measurement_rows(record) -> list[dict]:
             continue
         metrics = item["metrics"]
         answers = metrics["accuracy"]["answer_accuracy"] or {}
+        labels = metrics["accuracy"].get("label_accuracy") or {}
         output = metrics["accuracy"]["output_accuracy"]
         rows.append({
             "query": item["id"],
@@ -100,6 +106,8 @@ def measurement_rows(record) -> list[dict]:
             "input_rows": sum(metrics["input_rows"].values()),
             "answers_evaluated": answers.get("evaluated"),
             "answers_correct": answers.get("correct"),
+            "labels_evaluated": labels.get("evaluated"),
+            "labels_correct": labels.get("correct"),
             "predicted_rows": output["predicted_rows"],
             "expected_rows": output["expected_rows"],
             "matching_rows": output["matching_rows"],
@@ -155,17 +163,20 @@ def _write_report(directory, record):
             f"{_number(metrics.get('kv_regret_percent'))} |")
     lines.extend([
         "", "## Accuracy", "",
-        "| Query | Predicate accuracy | Evaluated answers | Output precision | "
-        "Output recall |",
-        "| --- | ---: | ---: | ---: | ---: |",
+        "| Query | Predicate accuracy | Evaluated answers | Label accuracy | "
+        "Evaluated labels | Output precision | Output recall |",
+        "| --- | ---: | ---: | ---: | ---: | ---: | ---: |",
     ])
     for item in record["queries"]:
         accuracy = item.get("metrics", {}).get("accuracy", {})
         answers = accuracy.get("answer_accuracy") or {}
+        labels = accuracy.get("label_accuracy") or {}
         output = accuracy.get("output_accuracy", {})
         lines.append(
             f"| {item['id']} | {_number(answers.get('accuracy'))} | "
             f"{_number(answers.get('evaluated'))} | "
+            f"{_number(labels.get('accuracy'))} | "
+            f"{_number(labels.get('evaluated'))} | "
             f"{_number(output.get('precision'))} | {_number(output.get('recall'))} |")
     lines.extend([
         "", "## Input rows and token counts", "",
@@ -232,7 +243,9 @@ def report(run_dir, *, rescore=True, cache_dir=None, root=None):
         try:
             query_directory = _query_directory(directory, item)
             output = _read_output(query_directory, item, rows=False)
-            if output.filter_answers is None or output.join_answers is None:
+            if (output.filter_answers is None or output.join_answers is None
+                    or (spec._info.classifies
+                        and output.classify_answers is None)):
                 output = _read_output(query_directory, item)
             item["metrics"] = _score(
                 spec, output, suite, record["gpu_count"],

@@ -50,6 +50,24 @@
     "privacy": false
   },
   {
+    "id": "IMDB-11",
+    "description": "classify: sentiment, 4 labels of one token each",
+    "privacy": false,
+    "labels_pending": true
+  },
+  {
+    "id": "IMDB-12",
+    "description": "F1 -> classify: genre, 16 labels, one of two tokens",
+    "privacy": false,
+    "labels_pending": true
+  },
+  {
+    "id": "IMDB-13",
+    "description": "classify: focus, 7 labels sharing first tokens, kept if about the ending -> J1; label repeated per pair",
+    "privacy": false,
+    "labels_pending": true
+  },
+  {
     "id": "BIO-1",
     "description": "filter: serious adverse event",
     "privacy": false
@@ -68,6 +86,18 @@
     "id": "BIO-4",
     "description": "3F + 2J: serious reports with neurological and cardiovascular reactions",
     "privacy": false
+  },
+  {
+    "id": "BIO-5",
+    "description": "classify: organ class of each reaction, 26 labels of 1 to 11 tokens, short documents",
+    "privacy": false,
+    "labels_pending": true
+  },
+  {
+    "id": "BIO-6",
+    "description": "serious adverse event reports x reactions classified cardiac or vascular, classified before the join",
+    "privacy": false,
+    "labels_pending": true
   },
   {
     "id": "FEV-1",
@@ -120,6 +150,12 @@
     "privacy": false
   },
   {
+    "id": "FEV-11",
+    "description": "classify: claim subject, 7 labels, one call both returned and kept if person or organization",
+    "privacy": false,
+    "labels_pending": true
+  },
+  {
     "id": "LEP-1",
     "description": "filter: LEP1 (reasoning does not apply)",
     "privacy": false
@@ -145,6 +181,12 @@
     "privacy": false
   },
   {
+    "id": "LEP-6",
+    "description": "LEP2 -> classify: treatment, 6 labels with descriptions, kept if distinguished, criticized, or questioned",
+    "privacy": false,
+    "labels_pending": true
+  },
+  {
     "id": "AGENT-1",
     "description": "filter: recovered after an unsuccessful approach",
     "privacy": false
@@ -153,6 +195,18 @@
     "id": "AGENT-2",
     "description": "filter: implemented a plausible fix",
     "privacy": false
+  },
+  {
+    "id": "AGENT-3",
+    "description": "recovered -> classify: outcome, 4 labels sharing a first token, long documents",
+    "privacy": false,
+    "labels_pending": true
+  },
+  {
+    "id": "AGENT-4",
+    "description": "two classifications of one trace: outcome and hardest step",
+    "privacy": false,
+    "labels_pending": true
   },
   {
     "id": "PRIV-1",

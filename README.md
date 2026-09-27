@@ -1,8 +1,9 @@
 # QUAIL-B
 
 QUAIL-B is a benchmark for AI functions in SQL, or AI-SQL. It is actively being
-developed. **Currently we only support AI-powered filters and joins in the
-benchmark; we will expand to AI-powered classify, extract, map, and groupby.**
+developed. **The published queries use AI-powered filters and joins. Nine
+classification queries are defined and wait for their reference labels; we
+will expand to AI-powered extract, map, and groupby.**
 
 For example, query IMDB-4 finds the movie aspects that each review discusses,
 for reviews that praise the movie and discuss its ending:
@@ -180,7 +181,12 @@ ai_join(prompt, left_document, right_document) -> boolean
 ```
 
 The plans combine them with scans, equality conditions, conjunction, and
-projection.
+projection. The classification queries add a third function, described under
+[Classification queries](#classification-queries):
+
+```text
+ai_classify(prompt, document, labels, descriptions) -> string
+```
 
 | Dataset | Queries | Tables | Task |
 | --- | --- | --- | --- |
@@ -234,6 +240,31 @@ adapter on these queries first, then run it on all 31.
 | FEV-8 | Chain of three joins | Multiple joins |
 | FEV-10 | Filtered join with equality | Equality and AI conditions together |
 | BIO-4 | Three filters, two joins | Filters on two aliases of one table |
+
+### Classification queries
+
+Nine queries return or filter on a label chosen from a fixed list. They are
+marked `labels_pending` in the catalog: `queries()` and `quail_b.run` with
+`queries=None` leave them out until their labels are published. Each one
+varies what an engine can exploit: how many labels there are, how many tokens
+each has under the Qwen3 tokenizer, whether labels start with the same tokens,
+how long the documents are, and where the classification sits in the plan.
+
+| Query | Shape | Labels |
+| --- | --- | --- |
+| IMDB-11 | Classify every review, return the label | 4, one token each |
+| IMDB-12 | Filter F1, then classify the survivors | 16, one of two tokens |
+| IMDB-13 | Classify, keep two labels, then join aspects; the label repeats per pair | 7 of 1 to 4 tokens; six share first tokens |
+| BIO-5 | Classify every reaction term, return the label | 26 of 1 to 11 tokens; documents of a few tokens |
+| BIO-6 | BIO-5's classification as a filter on one join input | Same call as BIO-5 |
+| FEV-11 | One call both returned and filtered | 7, one of three tokens |
+| LEP-6 | Filter, then classify with label descriptions and keep three labels | 6, with descriptions |
+| AGENT-3 | Filter, then classify long agent traces | 4 of 2 to 5 tokens; two share a first token |
+| AGENT-4 | Two classifications of the same trace | 4 and 6 |
+
+A classification answer is the label with the largest sum of label-token log
+probabilities; the [reference](docs/reference.md#classification) defines the
+prompt, the answer tables, and label accuracy.
 
 ## Scale factors
 

@@ -122,11 +122,13 @@ class QuerySpec:
 
 
 @cache
-def _load_queries() -> tuple[tuple[QuerySpec, ...], tuple[QuerySpec, ...]]:
+def _load_queries() -> tuple[tuple[QuerySpec, ...], ...]:
+    """Return (regular, privacy, labels pending) query definitions."""
     root = files("quail_b").joinpath("plans")
     catalog = json.loads(root.joinpath("catalog.json").read_text())
     regular = []
     privacy = []
+    pending = []
     seen = set()
     for item in catalog:
         query_id = item["id"]
@@ -138,8 +140,13 @@ def _load_queries() -> tuple[tuple[QuerySpec, ...], tuple[QuerySpec, ...]]:
             plan_pb2.Plan(),
         )
         query = QuerySpec.from_plan(query_id, item["description"], plan)
-        (privacy if item["privacy"] else regular).append(query)
-    return tuple(regular), tuple(privacy)
+        if item.get("labels_pending"):
+            pending.append(query)
+        elif item["privacy"]:
+            privacy.append(query)
+        else:
+            regular.append(query)
+    return tuple(regular), tuple(privacy), tuple(pending)
 
 
 def __getattr__(name: str):
@@ -147,7 +154,7 @@ def __getattr__(name: str):
     # files on first use, so importing the package does not parse them.
     if name not in ("QUERIES", "PRIVACY_QUERIES", "QUERY_ORDER"):
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    regular, privacy = _load_queries()
+    regular, privacy, _pending = _load_queries()
     globals().update(
         QUERIES=regular,
         PRIVACY_QUERIES=privacy,
@@ -165,11 +172,25 @@ QUERY_FAMILY_WORKLOADS = {
 }
 
 
-def queries(include_privacy: bool = False) -> dict[str, QuerySpec]:
-    """Return the benchmark queries by id, in benchmark order."""
-    regular, privacy = _load_queries()
-    specs = regular + (privacy if include_privacy else ())
+def queries(include_privacy: bool = False,
+            include_pending: bool = False) -> dict[str, QuerySpec]:
+    """Return the benchmark queries by id, in benchmark order.
+
+    Args:
+        include_privacy: Also return the privacy policy queries.
+        include_pending: Also return queries whose reference labels are
+            not published yet. They run only against a label collection
+            that includes their predicates.
+    """
+    regular, privacy, pending = _load_queries()
+    specs = (regular + (privacy if include_privacy else ())
+             + (pending if include_pending else ()))
     return {spec.id: spec for spec in specs}
+
+
+def pending_query_ids() -> tuple[str, ...]:
+    """Return the IDs of queries whose reference labels are unpublished."""
+    return tuple(spec.id for spec in _load_queries()[2])
 
 
 def split_query_ids(ids, containers):
@@ -216,5 +237,5 @@ def query_family_name(ids):
 
 
 def get_query(query_id: str) -> QuerySpec:
-    """Return one benchmark query definition by id."""
-    return queries()[query_id]
+    """Return one benchmark query definition by id, labels pending or not."""
+    return queries(include_pending=True)[query_id]

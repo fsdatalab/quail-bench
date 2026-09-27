@@ -83,6 +83,43 @@ def render_filter_prompt(template: str, document: str) -> str:
     return preamble + document + render_filter_question(m.group(2))
 
 
+CLASSIFY_INSTRUCTION = ("Answer with exactly one of the categories below "
+                        "for the following question: ")
+CATEGORIES_HEADER = "\n\nCategories:"
+# Labels follow the answer cue after one space, as a word would.
+LABEL_PREFIX = " "
+
+
+def render_categories(labels, descriptions=None) -> str:
+    """Return the category list, one `- label` or `- label: description` line each."""
+    descriptions = descriptions or ("",) * len(labels)
+    if len(descriptions) != len(labels):
+        raise ValueError("each label needs one description, empty for none")
+    return CATEGORIES_HEADER + "".join(
+        f"\n- {label}" + (f": {description}" if description else "")
+        for label, description in zip(labels, descriptions))
+
+
+def render_classify_prompt(template: str, document: str, labels,
+                           descriptions=None) -> str:
+    """Return the text a classification scores its labels after.
+
+    The document comes first, then the instruction and question, the
+    category list, and the answer cue. A label's text is
+    `LABEL_PREFIX + label`, appended after this text.
+    """
+    _check_placeholders(template, 1)
+    _frame, canonical = split_frame(template)
+    preamble, tail = split_template(canonical)
+    m = re.match(r"(\{\d+\})(.*)", tail, re.DOTALL)
+    if m is None or not tail.startswith("{0}"):
+        raise ValueError(f"unexpected classify template layout: {template!r}")
+    content = m.group(2).lstrip("\n")
+    sep = m.group(2)[:len(m.group(2)) - len(content)] or "\n\n"
+    return (preamble + document + sep + CLASSIFY_INSTRUCTION + content
+            + render_categories(labels, descriptions) + ANSWER_CUE)
+
+
 def join_label(placeholder: int) -> str:
     return JOIN_DOC_LABEL.format(_marker(placeholder))
 

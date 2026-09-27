@@ -29,8 +29,10 @@ class RunOutput:
         join_answers: Join operator ID to a table with one ID column
             per joined relation and a boolean `answer` column, one row per
             evaluated tuple.
-        rows: The final rows, one ID column per selected alias. None
-            when a saved run is rescored from its answers alone.
+        rows: The final rows: one ID column per selected alias, named by
+            the alias, and one string column per selected label column,
+            named by the query. None when a saved run is rescored from
+            its answers alone.
         runtime_s: Completed query execution time, excluding result collection.
         measurements: Engine-reported numbers:
 
@@ -44,7 +46,12 @@ class RunOutput:
             `quail_b.minimum.validate_prompt_pieces` describes, or None.
             With the answers and `fresh_tokens`, scoring fills
             `input_tokens`, `input_tokens_per_second`, `minimum_tokens`,
-            and `regret_tokens`.
+            and `regret_tokens`. Classification queries do not define
+            prompt pieces yet.
+        classify_answers: Classify operator ID to a table with the
+            relation's alias column and a string `label` column, one row
+            per document the engine classified. A document with no row
+            cannot pass a label filter or appear with its label.
     """
 
     filter_answers: dict[str, pa.Table] | None
@@ -53,7 +60,21 @@ class RunOutput:
     runtime_s: float | None = None
     measurements: dict = field(default_factory=dict)
     prompt_pieces: dict | None = None
+    classify_answers: dict[str, pa.Table] | None = None
 
+
+def output_columns(spec: QuerySpec) -> list[str]:
+    """Return the result column names: aliases for ids, then label names."""
+    return [alias if column == "id" else column
+            for alias, column in (name.split(".", 1)
+                                  for name in spec._info.select)]
+
+
+def _selected_labels(spec: QuerySpec):
+    """Return the classify operators whose label column the query returns."""
+    selected = set(output_columns(spec))
+    return [operator for operator in spec._info.classifies
+            if operator.output in selected]
 
 @dataclass
 class BinaryCounts:
@@ -100,6 +121,24 @@ class BinaryCounts:
             "true_negative": self.true_negative,
             "false_positive": self.false_positive,
             "false_negative": self.false_negative,
+        }
+
+
+@dataclass
+class LabelCounts:
+    correct: int = 0
+    evaluated: int = 0
+
+    def merge(self, other: "LabelCounts") -> None:
+        self.correct += other.correct
+        self.evaluated += other.evaluated
+
+    def as_dict(self) -> dict:
+        return {
+            "correct": self.correct,
+            "evaluated": self.evaluated,
+            "accuracy": (round(self.correct / self.evaluated, 6)
+                         if self.evaluated else None),
         }
 
 
@@ -239,18 +278,66 @@ def _apply_conditions(table: pa.Table, join, spec: QuerySpec,
     return table.filter(mask)
 
 
+def _label_table(table: pa.Table, alias: str, output: str) -> pa.Table:
+    """Return an answer table as distinct string (alias, output) rows."""
+    return _distinct(pa.table({
+        alias: pc.cast(table.column(alias), pa.string()),
+        output: pc.cast(table.column("label"), pa.string()),
+    }))
+
+
+def answer_labels(spec: QuerySpec, classify_answers) -> dict | None:
+    """Return label column name to the engine's (alias, label) rows."""
+    if spec._info.classifies and classify_answers is None:
+        return None
+    labels = {}
+    for operator in spec._info.classifies:
+        table = classify_answers.get(operator.id)
+        if table is None:
+            return None
+        labels[operator.output] = _label_table(
+            table, operator.relation, operator.output)
+    return labels
+
+
+def _narrow(survivors: dict, alias: str, passed) -> None:
+    kept = survivors[alias]
+    survivors[alias] = set(passed) if kept is None else kept & set(passed)
+
+
+def _apply_labels(spec: QuerySpec, survivors: dict, labels: dict) -> None:
+    """Keep ids that have every used label and pass every label filter."""
+    used = {operator.output for operator in spec._info.label_filters}
+    used.update(operator.output for operator in _selected_labels(spec))
+    for operator in spec._info.classifies:
+        if operator.output in used:
+            table = labels[operator.output]
+            _narrow(survivors, operator.relation,
+                    table.column(operator.relation).to_pylist())
+    for label_filter in spec._info.label_filters:
+        table = labels[label_filter.output]
+        mask = pc.is_in(table.column(label_filter.output),
+                        value_set=pa.array(label_filter.accepted, pa.string()))
+        _narrow(survivors, label_filter.relation,
+                table.filter(mask).column(label_filter.relation).to_pylist())
+
+
 def answer_relations(spec: QuerySpec, filter_answers, join_answers,
-                     corpus_rows=None):
+                     corpus_rows=None, classify_answers=None):
     """Return (survivors, relations) an engine's own answers imply.
 
     survivors maps each alias to the string ids that passed every filter
-    on it, or None when it has no filter. relations holds one table per
-    join, in written order, with the pairs that answered TRUE, satisfy
-    the join's equality conditions, and survived every filter.
-    corpus_rows is needed only when a join has equality conditions.
-    Returns None when the answers are missing.
+    and label filter on it and have every label column the query uses,
+    or None when nothing narrows it. relations holds one table per join,
+    in written order, with the pairs that answered TRUE, satisfy the
+    join's equality conditions, and survived. corpus_rows is needed only
+    when a join has equality conditions. Returns None when the answers
+    are missing.
     """
     if join_answers is None or filter_answers is None:
+        return None
+    labels = answer_labels(spec, classify_answers)
+    if labels is None:
         return None
     survivors = {
         relation.alias: None for relation in spec._info.relations
@@ -268,6 +355,7 @@ def answer_relations(spec: QuerySpec, filter_answers, join_answers,
         }
         kept = survivors[alias]
         survivors[alias] = passed if kept is None else kept & passed
+    _apply_labels(spec, survivors, labels)
     relations = []
     for join in spec._info.joins:
         table = join_answers.get(join.id)
@@ -285,23 +373,32 @@ def answer_relations(spec: QuerySpec, filter_answers, join_answers,
     return survivors, relations
 
 
+def _with_labels(rows: pa.Table, spec: QuerySpec, labels: dict) -> pa.Table:
+    """Add the returned label columns to id rows and keep output columns."""
+    for operator in _selected_labels(spec):
+        rows = rows.join(labels[operator.output], keys=[operator.relation],
+                         join_type="inner")
+    return _distinct(rows.select(sorted(output_columns(spec))))
+
+
 def rows_from_answers(spec: QuerySpec, filter_answers, join_answers,
-                      corpus_rows=None) -> pa.Table:
+                      corpus_rows=None, classify_answers=None) -> pa.Table:
     """Return the final rows an engine's own answers imply.
 
     For a run that saved its predicate answers but not its rows: a row
-    survives when every filter on its alias answered TRUE, every join
-    it takes part in answered TRUE, and every join equality holds.
-    corpus_rows is needed only when a join has equality conditions.
+    survives when every filter on its alias answered TRUE, every label
+    filter accepted its label, every join it takes part in answered
+    TRUE, and every join equality holds. corpus_rows is needed only
+    when a join has equality conditions.
     """
     survivors, relations = answer_relations(
-        spec, filter_answers, join_answers, corpus_rows)
+        spec, filter_answers, join_answers, corpus_rows, classify_answers)
     if relations:
         rows = _join_all(relations)
     else:
         alias = spec._info.base_alias
         rows = _id_table({alias: sorted(survivors[alias])})
-    return _distinct(rows.select(sorted(rows.column_names)))
+    return _with_labels(rows, spec, answer_labels(spec, classify_answers))
 
 
 def implied_row_count(spec: QuerySpec, survivors: dict, relations: list) -> int:
@@ -339,10 +436,30 @@ def implied_row_count(spec: QuerySpec, survivors: dict, relations: list) -> int:
 
 
 def implied_rows_mask(rows: pa.Table, survivors: dict, relations: list,
-                      spec: QuerySpec) -> pa.ChunkedArray:
-    """Per row of string ids, whether the answers imply it."""
+                      spec: QuerySpec, labels: dict | None = None
+                      ) -> pa.ChunkedArray:
+    """Per row of strings, whether the answers imply it.
+
+    Args:
+        rows: One string column per selected alias and label column.
+        survivors: As answer_relations returns them.
+        relations: As answer_relations returns them.
+        spec: The query.
+        labels: As answer_labels returns them; needed when the query
+            returns a label column.
+    """
     mask = pa.array([True] * rows.num_rows, pa.bool_())
-    for alias in rows.column_names:
+    for operator in _selected_labels(spec):
+        pairs = pc.binary_join_element_wise(
+            rows.column(operator.relation), rows.column(operator.output),
+            "\x1f")
+        table = labels[operator.output]
+        known = pc.binary_join_element_wise(
+            table.column(operator.relation), table.column(operator.output),
+            "\x1f")
+        mask = pc.and_(mask, pc.is_in(pairs, value_set=known))
+    aliases = {relation.alias for relation in spec._info.relations}
+    for alias in (name for name in rows.column_names if name in aliases):
         if survivors.get(alias) is not None:
             mask = pc.and_(mask, pc.is_in(
                 rows.column(alias),
@@ -369,7 +486,8 @@ def scores_from_answers(spec: QuerySpec, output: RunOutput, corpus_rows):
     must hold every joined alias, so that a row is a join tuple.
     """
     answers = answer_relations(
-        spec, output.filter_answers, output.join_answers, corpus_rows)
+        spec, output.filter_answers, output.join_answers, corpus_rows,
+        output.classify_answers)
     if answers is None:
         return None
     selected = {name.split(".")[0] for name in spec._info.select}
@@ -397,6 +515,29 @@ def _labels(ground_truth, template: str):
     return ground_truth.predicates[ground_truth.key_for_template(template)]
 
 
+def _classify_labels(ground_truth, operator):
+    """Return the reference labels of one classify operator."""
+    labels = _labels(ground_truth, operator.prompt)
+    if (labels.kind != "classify"
+            or tuple(labels.predicate["labels"]) != operator.labels):
+        raise ValueError(
+            f"{labels.key} is not a classification with the labels of "
+            f"{operator.id}")
+    return labels
+
+
+def expected_labels(spec: QuerySpec, ground_truth) -> dict:
+    """Return label column name to the reference (alias, label) rows."""
+    labels = {}
+    for operator in spec._info.classifies:
+        reference = _classify_labels(ground_truth, operator).table
+        labels[operator.output] = _label_table(
+            reference.rename_columns(
+                [operator.relation, "right_id", "label"]),
+            operator.relation, operator.output)
+    return labels
+
+
 def expected_survivors(spec: QuerySpec, ground_truth, corpus_rows
                        ) -> dict[str, list[str]]:
     """Return, per alias, the ids that pass every filter on it."""
@@ -418,7 +559,19 @@ def expected_survivors(spec: QuerySpec, ground_truth, corpus_rows
             ids = ids.filter(pc.is_in(
                 ids, value_set=labels.true_pairs.column("left_id")))
         survivors[relation.alias] = ids.to_pylist()
-    return survivors
+    for operator in spec._info.classifies:
+        labels = _classify_labels(ground_truth, operator)
+        ids = pa.array(survivors[operator.relation], pa.string())
+        unknown = pc.invert(pc.is_in(
+            ids, value_set=labels.table.column("left_id")))
+        if pc.any(unknown).as_py():
+            raise KeyError(
+                f"no ground truth for {labels.key} and "
+                f"{pc.sum(unknown).as_py()} rows")
+    kept = {alias: set(ids) for alias, ids in survivors.items()}
+    _apply_labels(spec, kept, expected_labels(spec, ground_truth))
+    return {alias: [row_id for row_id in ids if row_id in kept[alias]]
+            for alias, ids in survivors.items()}
 
 
 def expected_rows(spec: QuerySpec, ground_truth, corpus_rows) -> pa.Table:
@@ -439,7 +592,26 @@ def expected_rows(spec: QuerySpec, ground_truth, corpus_rows) -> pa.Table:
         rows = rows.join(
             _id_table({alias: survivors[alias]}),
             keys=[alias], join_type="inner")
-    return _distinct(rows.select(sorted(rows.column_names)))
+    return _with_labels(rows, spec, expected_labels(spec, ground_truth))
+
+
+def label_agreement(table: pa.Table, alias: str, labels) -> LabelCounts:
+    """Count a classify answer table's agreement with its reference labels.
+
+    Raises:
+        KeyError: A document the engine classified has no label.
+    """
+    answers = _label_table(table, alias, "predicted")
+    reference = labels.table.select(["left_id", "label"]).rename_columns(
+        [alias, "expected"])
+    joined = answers.join(reference, keys=[alias], join_type="left outer")
+    expected = joined.column("expected")
+    if expected.null_count:
+        raise KeyError(
+            f"no ground truth for {labels.key} and {expected.null_count} "
+            "classified rows")
+    correct = pc.sum(pc.equal(joined.column("predicted"), expected)).as_py()
+    return LabelCounts(correct=correct or 0, evaluated=joined.num_rows)
 
 
 def agreement(table: pa.Table, aliases, labels) -> BinaryCounts:
@@ -523,10 +695,13 @@ def row_counts(spec: QuerySpec, output: RunOutput, ground_truth,
     """
     import duckdb
 
-    selected = [name.split(".")[0] for name in spec._info.select]
+    selected = output_columns(spec)
+    selected_aliases = {name.split(".")[0] for name in spec._info.select}
     aliases = [relation.alias for relation in spec._info.relations]
-    # with every alias selected, the joined tuples are already distinct
-    distinct = set(selected) != set(aliases)
+    # with every alias selected, the joined tuples are already distinct;
+    # a label column is a function of its alias's id
+    distinct = selected_aliases != set(aliases)
+    returned_labels = [operator.output for operator in _selected_labels(spec)]
     with tempfile.TemporaryDirectory(prefix="quail_b_rows_") as spill:
         con = duckdb.connect()
         con.execute(f"SET temp_directory = '{spill}'")
@@ -544,8 +719,13 @@ def row_counts(spec: QuerySpec, output: RunOutput, ground_truth,
                 list(join.relations))
             con.register(f"expected_pairs:{index}",
                          _apply_conditions(pairs, join, spec, corpus_rows))
+        reference_labels = expected_labels(spec, ground_truth)
+        for output_name in returned_labels:
+            con.register(f"expected_labels:{output_name}",
+                         reference_labels[output_name])
         expected_pairs = [f"expected_pairs:{i}"
-                          for i in range(len(spec._info.joins))]
+                          for i in range(len(spec._info.joins))] + [
+            f"expected_labels:{name}" for name in returned_labels]
         expected_from = _chain(
             expected_pairs, [f"expected:{alias}" for alias in aliases])
 
@@ -579,7 +759,12 @@ def row_counts(spec: QuerySpec, output: RunOutput, ground_truth,
                 engine_ids.append(f"corpus:{alias}")
         for index, relation in enumerate(relations):
             con.register(f"engine_pairs:{index}", relation)
-        engine_pairs = [f"engine_pairs:{i}" for i in range(len(relations))]
+        engine_labels = answer_labels(spec, output.classify_answers)
+        for output_name in returned_labels:
+            con.register(f"engine_labels:{output_name}",
+                         engine_labels[output_name])
+        engine_pairs = [f"engine_pairs:{i}" for i in range(len(relations))] + [
+            f"engine_labels:{name}" for name in returned_labels]
         engine_from = _chain(engine_pairs, engine_ids)
         predicted_count = count(_projection(selected, engine_from, distinct))
         if distinct:
@@ -594,7 +779,7 @@ def row_counts(spec: QuerySpec, output: RunOutput, ground_truth,
                     f"SELECT * FROM {_quoted(expected_name)} INTERSECT "
                     f"SELECT * FROM {_quoted(engine_name)}")
             matched_count = count(_projection(selected, _chain(
-                [f"both_pairs:{i}" for i in range(len(relations))],
+                [f"both_pairs:{i}" for i in range(len(engine_pairs))],
                 [f"expected:{alias}" for alias in aliases] + engine_ids),
                 False))
         return predicted_count, expected_count, matched_count
@@ -621,6 +806,16 @@ def evaluate(spec: QuerySpec, output: RunOutput, ground_truth, corpus_rows) -> d
         item.counts = agreement(table, join.relations, labels)
         total.merge(item.counts)
         per_predicate.append(item.as_dict())
+    classifies = {operator.id: operator for operator in spec._info.classifies}
+    label_total = LabelCounts()
+    for operator_id, table in (output.classify_answers or {}).items():
+        operator = classifies[operator_id]
+        labels = _classify_labels(ground_truth, operator)
+        counts = label_agreement(table, operator.relation, labels)
+        label_total.merge(counts)
+        per_predicate.append({
+            "predicate_key": labels.key, "op": "classify",
+            "alias": operator.relation, **counts.as_dict()})
 
     predicted_count, expected_count, matched_count = row_counts(
         spec, output, ground_truth, corpus_rows)
@@ -636,6 +831,8 @@ def evaluate(spec: QuerySpec, output: RunOutput, ground_truth, corpus_rows) -> d
         "ground_truth_collection_id": ground_truth.collection_id,
         "ground_truth_reference_model": ground_truth.reference_model,
         "answer_accuracy": (total.as_dict() if total.evaluated else None),
+        "label_accuracy": (
+            label_total.as_dict() if label_total.evaluated else None),
         "output_accuracy": _row_metrics(
             predicted_count, expected_count, matched_count),
         "per_predicate": per_predicate,
