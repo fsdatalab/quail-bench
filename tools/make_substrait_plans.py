@@ -476,6 +476,11 @@ def _sentiment(node):
                      prompts.IMDB_SENTIMENT_LABELS, "sentiment")
 
 
+def _critical(node):
+    """Reviews whose sentiment is negative or mixed."""
+    return LabelFilter(_sentiment(node), "sentiment", ("negative", "mixed"))
+
+
 def _organ_class(node):
     return _classify(node, prompts.BIO_ORGAN_CLASS,
                      prompts.BIO_ORGAN_CLASS_LABELS, "organ_class")
@@ -533,22 +538,23 @@ QUERIES = (
           _imdb_chain(_reviews("r1"))),
     Query("IMDB-10", "F1 -> 3J chain r1-a1-r2-a2",
           _imdb_chain(_filters(_reviews("r1"), F1))),
-    Query("IMDB-11", "classify: sentiment, 4 labels of one token each",
+    Query("IMDB-11", "classify: the sentiment of every review",
           _sentiment(_reviews()), select=("r", "r.sentiment"),
           labels_pending=True),
-    Query("IMDB-12", "F1 -> classify: genre, 16 labels, 15 of 2 to 4 "
-          "tokens, 4 pairs sharing a first token",
+    Query("IMDB-12", "F1 -> classify: the IMDb genre of each review's movie",
           _classify(_filters(_reviews(), F1), prompts.IMDB_GENRE,
                     prompts.IMDB_GENRE_LABELS, "genre"),
           select=("r", "r.genre"), labels_pending=True),
-    Query("IMDB-13", "classify: focus, 7 labels sharing first tokens, "
-          "kept if about the ending -> J1; label repeated per pair",
-          Join(LabelFilter(
-                   _classify(_reviews(), prompts.IMDB_FOCUS,
-                             prompts.IMDB_FOCUS_LABELS, "focus"),
-                   "focus", ("praises the ending", "criticizes the ending")),
-               _aspects(), ("r", "a"), DISCUSS_ASPECT),
-          select=("r", "r.focus", "a"), labels_pending=True),
+    Query("IMDB-13", "negative or mixed reviews -> J1: the aspects critical "
+          "reviews discuss, with each review's sentiment",
+          Join(_critical(_reviews()), _aspects(), ("r", "a"),
+               DISCUSS_ASPECT),
+          select=("r", "r.sentiment", "a"), labels_pending=True),
+    Query("IMDB-14", "negative or mixed reviews -> classify: their main "
+          "complaint, returned with their sentiment",
+          _classify(_critical(_reviews()), prompts.IMDB_COMPLAINT,
+                    prompts.IMDB_COMPLAINT_LABELS, "complaint"),
+          select=("r", "r.sentiment", "r.complaint"), labels_pending=True),
 
     Query("BIO-1", "filter: serious adverse event",
           _filters(_reports(), SERIOUS_ADVERSE_EVENT)),
@@ -564,12 +570,12 @@ QUERIES = (
                     ("r", "n"), REACTION),
                _filters(_terms("c"), CARDIOVASCULAR_REACTION),
                ("r", "c"), REACTION)),
-    Query("BIO-5", "classify: organ class of each reaction, 26 labels of "
-          "1 to 11 tokens, short documents",
+    Query("BIO-5", "classify: the MedDRA system organ class of every "
+          "reaction term",
           _organ_class(_terms()), select=("m", "m.organ_class"),
           labels_pending=True),
-    Query("BIO-6", "serious adverse event reports x reactions classified "
-          "cardiac or vascular, classified before the join",
+    Query("BIO-6", "serious adverse event reports x their cardiac or "
+          "vascular reactions",
           Join(_filters(_reports(), SERIOUS_ADVERSE_EVENT),
                LabelFilter(_organ_class(_terms()), "organ_class",
                            ("cardiac disorders", "vascular disorders")),
@@ -613,12 +619,12 @@ QUERIES = (
           Join(_filters(_claims("c", "evidence_wiki_url"), F11),
                _filters(_evidence(), F13), ("c", "e"), SUPPORT,
                on=(("evidence_wiki_url", "id"),))),
-    Query("FEV-11", "classify: claim subject, 14 labels of 2 to 4 tokens, "
-          "one call both returned and kept if about a person",
-          LabelFilter(_classify(_claims(), prompts.FEV_SUBJECT,
-                                prompts.FEV_SUBJECT_LABELS, "subject"),
-                      "subject", ("living person", "historical person")),
-          select=("c", "c.subject"), labels_pending=True),
+    Query("FEV-11", "classify: claim topic; the political and historical "
+          "claims, with their topic",
+          LabelFilter(_classify(_claims(), prompts.FEV_TOPIC,
+                                prompts.FEV_TOPIC_LABELS, "topic"),
+                      "topic", ("politics", "history")),
+          select=("c", "c.topic"), labels_pending=True),
 
     Query("LEP-1", "filter: LEP1 (reasoning does not apply)",
           _filters(_contexts(), LEP1)),
@@ -634,29 +640,28 @@ QUERIES = (
           "LEPS1 on passages, each filtered before the join",
           Join(_filters(_contexts(), LEP1, LEP2),
                _filters(_passages(), LEPS1), ("d", "s"), LEPJOIN)),
-    Query("LEP-6", "LEP2 -> classify: treatment, 8 labels of 3 to 7 "
-          "tokens with descriptions, kept if distinguished or criticized",
-          LabelFilter(
-              _classify(_filters(_contexts(), LEP2), prompts.LEP_TREATMENT,
-                        prompts.LEP_TREATMENT_LABELS, "treatment",
-                        prompts.LEP_TREATMENT_DESCRIPTIONS),
-              "treatment", ("distinguished on the facts",
-                            "distinguished on the law",
-                            "criticized as wrongly decided")),
-          select=("d", "d.treatment"), labels_pending=True),
+    Query("LEP-6", "constitutional or criminal law excerpts -> the "
+          "passages they cite, with each excerpt's area of law",
+          Join(LabelFilter(
+                   _classify(_contexts(), prompts.LEP_AREA,
+                             prompts.LEP_AREA_LABELS, "area"),
+                   "area", ("constitutional law", "criminal law")),
+               _passages(), ("d", "s"), LEPJOIN),
+          select=("d", "d.area", "s"), labels_pending=True),
     Query("AGENT-1", "filter: recovered after an unsuccessful approach",
           _filters(_traces(), AGENT_RECOVERED)),
     Query("AGENT-2", "filter: implemented a plausible fix",
           _filters(_traces(), AGENT_IMPLEMENTED_FIX)),
-    Query("AGENT-3", "recovered -> classify: outcome, 4 labels sharing a "
-          "first token, long documents",
+    Query("AGENT-3", "recovered -> classify: whether the agent resolved "
+          "the issue",
           _outcome(_filters(_traces(), AGENT_RECOVERED)),
           select=("t", "t.outcome"), labels_pending=True),
-    Query("AGENT-4", "two classifications of one trace: outcome and "
-          "hardest step",
-          _classify(_outcome(_traces()), prompts.AGENT_DIFFICULTY,
-                    prompts.AGENT_DIFFICULTY_LABELS, "difficulty"),
-          select=("t", "t.outcome", "t.difficulty"), labels_pending=True),
+    Query("AGENT-4", "unresolved traces -> classify: why the agent failed",
+          _classify(LabelFilter(_outcome(_traces()), "outcome",
+                                ("not resolved", "gave up")),
+                    prompts.AGENT_FAILURE, prompts.AGENT_FAILURE_LABELS,
+                    "failure", prompts.AGENT_FAILURE_DESCRIPTIONS),
+          select=("t", "t.failure"), labels_pending=True),
 
     # PrivacyPolicies: only when that corpus is available.
     Query("PRIV-1", "2 filters: P_MSG + P_LOC",

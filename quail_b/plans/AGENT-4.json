@@ -23,8 +23,7 @@
               "emit": {
                 "output_mapping": [
                   4,
-                  5,
-                  6
+                  5
                 ]
               }
             },
@@ -33,16 +32,6 @@
                 "selection": {
                   "direct_reference": {
                     "struct_field": {}
-                  },
-                  "root_reference": {}
-                }
-              },
-              {
-                "selection": {
-                  "direct_reference": {
-                    "struct_field": {
-                      "field": 2
-                    }
                   },
                   "root_reference": {}
                 }
@@ -68,7 +57,7 @@
                       "t.id",
                       "t.trace",
                       "t.outcome",
-                      "t.difficulty"
+                      "t.failure"
                     ]
                   }
                 },
@@ -79,7 +68,7 @@
                         {
                           "value": {
                             "literal": {
-                              "string": "Judge strictly from the agent trace above which step gave the agent the most trouble.\n\n{0}"
+                              "string": "Judge strictly from the agent trace above what most caused the agent not to resolve the issue.\n\n{0}"
                             }
                           }
                         },
@@ -101,22 +90,28 @@
                               "list": {
                                 "values": [
                                   {
-                                    "string": "understanding the codebase"
+                                    "string": "misunderstood the issue"
                                   },
                                   {
-                                    "string": "reproducing the bug"
+                                    "string": "could not reproduce the bug"
                                   },
                                   {
-                                    "string": "writing the fix"
+                                    "string": "edited the wrong code"
                                   },
                                   {
-                                    "string": "running the tests"
+                                    "string": "incorrect fix"
                                   },
                                   {
-                                    "string": "setting up the environment"
+                                    "string": "broke existing tests"
                                   },
                                   {
-                                    "string": "none"
+                                    "string": "did not run the tests"
+                                  },
+                                  {
+                                    "string": "environment or tool error"
+                                  },
+                                  {
+                                    "string": "ran out of steps"
                                   }
                                 ]
                               }
@@ -129,22 +124,28 @@
                               "list": {
                                 "values": [
                                   {
-                                    "string": ""
+                                    "string": "worked on a different problem than the one reported"
                                   },
                                   {
-                                    "string": ""
+                                    "string": "never saw the reported failure happen"
                                   },
                                   {
-                                    "string": ""
+                                    "string": "changed files that do not cause the issue"
                                   },
                                   {
-                                    "string": ""
+                                    "string": "changed the right code, but the change does not fix the issue"
                                   },
                                   {
-                                    "string": ""
+                                    "string": "fixed the issue but made other tests fail"
                                   },
                                   {
-                                    "string": ""
+                                    "string": "never checked the change against tests"
+                                  },
+                                  {
+                                    "string": "a broken setup, missing dependency, or tool failure blocked progress"
+                                  },
+                                  {
+                                    "string": "reached the step limit while still making progress"
                                   }
                                 ]
                               }
@@ -162,128 +163,164 @@
                   }
                 ],
                 "input": {
-                  "project": {
+                  "filter": {
                     "common": {
                       "direct": {},
                       "hint": {
-                        "alias": "classify-1",
-                        "output_names": [
-                          "t.id",
-                          "t.trace",
-                          "t.outcome"
-                        ]
+                        "alias": "label-filter-1"
                       }
                     },
-                    "expressions": [
-                      {
-                        "scalar_function": {
-                          "arguments": [
-                            {
-                              "value": {
-                                "literal": {
-                                  "string": "Judge strictly from the agent trace above which category best describes the outcome by the end of the trace.\n\n{0}"
-                                }
-                              }
-                            },
-                            {
-                              "value": {
-                                "selection": {
-                                  "direct_reference": {
-                                    "struct_field": {
-                                      "field": 1
-                                    }
-                                  },
-                                  "root_reference": {}
-                                }
-                              }
-                            },
-                            {
-                              "value": {
-                                "literal": {
-                                  "list": {
-                                    "values": [
-                                      {
-                                        "string": "fixed the bug"
-                                      },
-                                      {
-                                        "string": "fixed a different bug"
-                                      },
-                                      {
-                                        "string": "did not fix the bug"
-                                      },
-                                      {
-                                        "string": "gave up"
-                                      }
-                                    ]
-                                  }
-                                }
-                              }
-                            },
-                            {
-                              "value": {
-                                "literal": {
-                                  "list": {
-                                    "values": [
-                                      {
-                                        "string": "made a change that plausibly fixes the reported issue"
-                                      },
-                                      {
-                                        "string": "changed code that does not address the reported issue"
-                                      },
-                                      {
-                                        "string": "finished without a change that fixes the issue"
-                                      },
-                                      {
-                                        "string": "stopped early and said it could not continue"
-                                      }
-                                    ]
-                                  }
-                                }
-                              }
+                    "condition": {
+                      "singular_or_list": {
+                        "options": [
+                          {
+                            "literal": {
+                              "string": "not resolved"
                             }
-                          ],
-                          "function_reference": 5,
-                          "output_type": {
-                            "string": {
-                              "nullability": "NULLABILITY_REQUIRED"
+                          },
+                          {
+                            "literal": {
+                              "string": "gave up"
                             }
+                          }
+                        ],
+                        "value": {
+                          "selection": {
+                            "direct_reference": {
+                              "struct_field": {
+                                "field": 2
+                              }
+                            },
+                            "root_reference": {}
                           }
                         }
                       }
-                    ],
+                    },
                     "input": {
-                      "read": {
-                        "base_schema": {
-                          "names": [
-                            "id",
-                            "trace"
-                          ],
-                          "struct": {
-                            "nullability": "NULLABILITY_REQUIRED",
-                            "types": [
-                              {
-                                "string": {
-                                  "nullability": "NULLABILITY_REQUIRED"
+                      "project": {
+                        "common": {
+                          "direct": {},
+                          "hint": {
+                            "alias": "classify-1",
+                            "output_names": [
+                              "t.id",
+                              "t.trace",
+                              "t.outcome"
+                            ]
+                          }
+                        },
+                        "expressions": [
+                          {
+                            "scalar_function": {
+                              "arguments": [
+                                {
+                                  "value": {
+                                    "literal": {
+                                      "string": "Judge strictly from the agent trace above whether the agent resolved the reported issue by the end of the trace.\n\n{0}"
+                                    }
+                                  }
+                                },
+                                {
+                                  "value": {
+                                    "selection": {
+                                      "direct_reference": {
+                                        "struct_field": {
+                                          "field": 1
+                                        }
+                                      },
+                                      "root_reference": {}
+                                    }
+                                  }
+                                },
+                                {
+                                  "value": {
+                                    "literal": {
+                                      "list": {
+                                        "values": [
+                                          {
+                                            "string": "resolved"
+                                          },
+                                          {
+                                            "string": "partially resolved"
+                                          },
+                                          {
+                                            "string": "not resolved"
+                                          },
+                                          {
+                                            "string": "gave up"
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  }
+                                },
+                                {
+                                  "value": {
+                                    "literal": {
+                                      "list": {
+                                        "values": [
+                                          {
+                                            "string": "made a change that fixes the reported issue"
+                                          },
+                                          {
+                                            "string": "fixed part of the issue but not all of it"
+                                          },
+                                          {
+                                            "string": "finished without a change that fixes the issue"
+                                          },
+                                          {
+                                            "string": "stopped early and said it could not continue"
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  }
                                 }
-                              },
-                              {
+                              ],
+                              "function_reference": 5,
+                              "output_type": {
                                 "string": {
                                   "nullability": "NULLABILITY_REQUIRED"
                                 }
                               }
-                            ]
+                            }
                           }
-                        },
-                        "common": {
-                          "direct": {},
-                          "hint": {
-                            "alias": "t"
+                        ],
+                        "input": {
+                          "read": {
+                            "base_schema": {
+                              "names": [
+                                "id",
+                                "trace"
+                              ],
+                              "struct": {
+                                "nullability": "NULLABILITY_REQUIRED",
+                                "types": [
+                                  {
+                                    "string": {
+                                      "nullability": "NULLABILITY_REQUIRED"
+                                    }
+                                  },
+                                  {
+                                    "string": {
+                                      "nullability": "NULLABILITY_REQUIRED"
+                                    }
+                                  }
+                                ]
+                              }
+                            },
+                            "common": {
+                              "direct": {},
+                              "hint": {
+                                "alias": "t"
+                              }
+                            },
+                            "named_table": {
+                              "names": [
+                                "agent_traces"
+                              ]
+                            }
                           }
-                        },
-                        "named_table": {
-                          "names": [
-                            "agent_traces"
-                          ]
                         }
                       }
                     }
@@ -295,8 +332,7 @@
         },
         "names": [
           "t",
-          "outcome",
-          "difficulty"
+          "failure"
         ]
       }
     }

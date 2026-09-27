@@ -74,7 +74,7 @@
                         {
                           "value": {
                             "literal": {
-                              "string": "Judge strictly from the agent trace above which category best describes the outcome by the end of the trace.\n\n{0}"
+                              "string": "Judge strictly from the agent trace above whether the agent resolved the reported issue by the end of the trace.\n\n{0}"
                             }
                           }
                         },
@@ -96,13 +96,13 @@
                               "list": {
                                 "values": [
                                   {
-                                    "string": "fixed the bug"
+                                    "string": "resolved"
                                   },
                                   {
-                                    "string": "fixed a different bug"
+                                    "string": "partially resolved"
                                   },
                                   {
-                                    "string": "did not fix the bug"
+                                    "string": "not resolved"
                                   },
                                   {
                                     "string": "gave up"
@@ -118,10 +118,10 @@
                               "list": {
                                 "values": [
                                   {
-                                    "string": "made a change that plausibly fixes the reported issue"
+                                    "string": "made a change that fixes the reported issue"
                                   },
                                   {
-                                    "string": "changed code that does not address the reported issue"
+                                    "string": "fixed part of the issue but not all of it"
                                   },
                                   {
                                     "string": "finished without a change that fixes the issue"

@@ -155,6 +155,7 @@ SCENARIO_MATCH = ("Based on the privacy policy in DOCUMENT {0}, could "
                   "user of this service?")
 
 
+
 # Classification templates. Each call also carries its labels and
 # optional descriptions, defined next to it. A template is used with
 # exactly one label list, so a template names one predicate.
@@ -165,26 +166,25 @@ IMDB_SENTIMENT = (
 )
 IMDB_SENTIMENT_LABELS = ("positive", "negative", "neutral", "mixed")
 
+# IMDb's own genre list.
 IMDB_GENRE = (
-    "Judge strictly from the review above which category best describes "
-    "the genre of the movie it reviews.\n\n{0}"
+    "Judge strictly from the review above which genre best describes the "
+    "movie it reviews.\n\n{0}"
 )
 IMDB_GENRE_LABELS = (
-    "romantic comedy", "romantic drama", "crime drama", "crime thriller",
-    "action thriller", "action comedy", "horror comedy", "horror thriller",
-    "psychological thriller", "science fiction", "historical drama",
-    "war drama", "animated film", "superhero film", "coming-of-age drama",
-    "musical",
+    "action", "adventure", "animation", "biography", "comedy", "crime",
+    "documentary", "drama", "family", "fantasy", "history", "horror",
+    "music", "musical", "mystery", "romance", "sci-fi", "sport", "thriller",
+    "war", "western",
 )
 
-IMDB_FOCUS = (
-    "Judge strictly from the review above which category best describes "
-    "what the review mainly does.\n\n{0}"
+IMDB_COMPLAINT = (
+    "Judge strictly from the review above what it criticizes most about "
+    "the movie.\n\n{0}"
 )
-IMDB_FOCUS_LABELS = (
-    "praises the acting", "praises the plot", "praises the ending",
-    "criticizes the acting", "criticizes the plot", "criticizes the ending",
-    "other",
+IMDB_COMPLAINT_LABELS = (
+    "acting", "plot", "pacing", "dialogue", "visual effects", "soundtrack",
+    "ending", "direction", "no specific complaint",
 )
 
 # MedDRA's system organ classes, less "product issues", which a
@@ -212,59 +212,55 @@ BIO_ORGAN_CLASS_LABELS = (
     "surgical and medical procedures", "social circumstances",
 )
 
-FEV_SUBJECT = (
-    "Judge strictly from the claim above which category best describes "
-    "what the claim is mainly about.\n\n{0}"
+FEV_TOPIC = (
+    "Judge strictly from the claim above which topic it is about.\n\n{0}"
 )
-FEV_SUBJECT_LABELS = (
-    "living person", "historical person", "fictional character",
-    "business or company", "sports team", "government body",
-    "country or region", "city or town", "film or television show",
-    "book or album", "historical event", "sporting event", "animal or plant",
-    "something else",
+FEV_TOPIC_LABELS = (
+    "politics", "sports", "film and television", "music", "literature",
+    "science", "history", "geography", "business", "religion", "other",
 )
 
-LEP_TREATMENT = (
-    "Judge strictly from the excerpt above which category best describes "
-    "how it treats the case it cites.\n\n{0}"
+LEP_AREA = (
+    "Judge strictly from the excerpt above which area of law it "
+    "concerns.\n\n{0}"
 )
-LEP_TREATMENT_LABELS = (
-    "followed as binding", "followed as persuasive",
-    "distinguished on the facts", "distinguished on the law",
-    "cited for background", "criticized as wrongly decided",
-    "questioned as outdated", "overruled or abrogated",
-)
-LEP_TREATMENT_DESCRIPTIONS = (
-    "applies the cited case as controlling precedent",
-    "relies on the cited case without being bound by it",
-    "says the cited case's facts differ, so it does not control",
-    "says the cited case rests on a different rule of law",
-    "mentions the cited case without relying on it",
-    "disapproves of the cited case's reasoning",
-    "doubts whether the cited case is still good law",
-    "declares that the cited case is no longer good law",
+LEP_AREA_LABELS = (
+    "constitutional law", "criminal law", "civil procedure", "civil rights",
+    "contracts", "torts", "property", "administrative law",
+    "employment law", "intellectual property", "tax law", "family law",
+    "immigration law", "bankruptcy", "antitrust",
 )
 
 AGENT_OUTCOME = (
-    "Judge strictly from the agent trace above which category best "
-    "describes the outcome by the end of the trace.\n\n{0}"
+    "Judge strictly from the agent trace above whether the agent resolved "
+    "the reported issue by the end of the trace.\n\n{0}"
 )
 AGENT_OUTCOME_LABELS = (
-    "fixed the bug", "fixed a different bug", "did not fix the bug",
-    "gave up",
+    "resolved", "partially resolved", "not resolved", "gave up",
 )
 AGENT_OUTCOME_DESCRIPTIONS = (
-    "made a change that plausibly fixes the reported issue",
-    "changed code that does not address the reported issue",
+    "made a change that fixes the reported issue",
+    "fixed part of the issue but not all of it",
     "finished without a change that fixes the issue",
     "stopped early and said it could not continue",
 )
 
-AGENT_DIFFICULTY = (
-    "Judge strictly from the agent trace above which step gave the agent "
-    "the most trouble.\n\n{0}"
+AGENT_FAILURE = (
+    "Judge strictly from the agent trace above what most caused the agent "
+    "not to resolve the issue.\n\n{0}"
 )
-AGENT_DIFFICULTY_LABELS = (
-    "understanding the codebase", "reproducing the bug", "writing the fix",
-    "running the tests", "setting up the environment", "none",
+AGENT_FAILURE_LABELS = (
+    "misunderstood the issue", "could not reproduce the bug",
+    "edited the wrong code", "incorrect fix", "broke existing tests",
+    "did not run the tests", "environment or tool error", "ran out of steps",
+)
+AGENT_FAILURE_DESCRIPTIONS = (
+    "worked on a different problem than the one reported",
+    "never saw the reported failure happen",
+    "changed files that do not cause the issue",
+    "changed the right code, but the change does not fix the issue",
+    "fixed the issue but made other tests fail",
+    "never checked the change against tests",
+    "a broken setup, missing dependency, or tool failure blocked progress",
+    "reached the step limit while still making progress",
 )

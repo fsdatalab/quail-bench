@@ -158,32 +158,31 @@ CLASSIFY_PREDICATES = (
         prompts.IMDB_GENRE, "review", "reviews", "body",
         labels=prompts.IMDB_GENRE_LABELS),
     PredicateSpec(
-        "quailb.imdb.review.focus", "imdb", "review_focus", "classify",
-        prompts.IMDB_FOCUS, "review", "reviews", "body",
-        labels=prompts.IMDB_FOCUS_LABELS),
+        "quailb.imdb.review.main_complaint", "imdb", "review_main_complaint",
+        "classify", prompts.IMDB_COMPLAINT, "review", "reviews", "body",
+        labels=prompts.IMDB_COMPLAINT_LABELS),
     PredicateSpec(
         "quailb.biodex.reaction.organ_class", "biodex",
         "reaction_organ_class", "classify", prompts.BIO_ORGAN_CLASS,
         "reaction", "terms", "term", labels=prompts.BIO_ORGAN_CLASS_LABELS),
     PredicateSpec(
-        "quailb.fever.claim.subject", "fever", "claim_subject", "classify",
-        prompts.FEV_SUBJECT, "claim", "claims", "claim",
-        labels=prompts.FEV_SUBJECT_LABELS),
+        "quailb.fever.claim.topic", "fever", "claim_topic", "classify",
+        prompts.FEV_TOPIC, "claim", "claims", "claim",
+        labels=prompts.FEV_TOPIC_LABELS),
     PredicateSpec(
-        "quailb.lepard.excerpt.treatment_of_cited_case", "lepard",
-        "excerpt_treatment_of_cited_case", "classify", prompts.LEP_TREATMENT,
-        "excerpt", "citation_contexts", "destination_context",
-        labels=prompts.LEP_TREATMENT_LABELS,
-        descriptions=prompts.LEP_TREATMENT_DESCRIPTIONS),
+        "quailb.lepard.excerpt.area_of_law", "lepard", "excerpt_area_of_law",
+        "classify", prompts.LEP_AREA, "excerpt", "citation_contexts",
+        "destination_context", labels=prompts.LEP_AREA_LABELS),
     PredicateSpec(
         "quailb.agent.trace.outcome", "agent", "trace_outcome", "classify",
         prompts.AGENT_OUTCOME, "agent_trace", "agent_traces", "trace",
         labels=prompts.AGENT_OUTCOME_LABELS,
         descriptions=prompts.AGENT_OUTCOME_DESCRIPTIONS),
     PredicateSpec(
-        "quailb.agent.trace.hardest_step", "agent", "trace_hardest_step",
-        "classify", prompts.AGENT_DIFFICULTY, "agent_trace", "agent_traces",
-        "trace", labels=prompts.AGENT_DIFFICULTY_LABELS),
+        "quailb.agent.trace.failure_mode", "agent", "trace_failure_mode",
+        "classify", prompts.AGENT_FAILURE, "agent_trace", "agent_traces",
+        "trace", labels=prompts.AGENT_FAILURE_LABELS,
+        descriptions=prompts.AGENT_FAILURE_DESCRIPTIONS),
 )
 
 PREDICATE_BY_KEY = {p.key: p for p in PREDICATES + CLASSIFY_PREDICATES}

@@ -129,12 +129,12 @@
                         "options": [
                           {
                             "literal": {
-                              "string": "praises the ending"
+                              "string": "negative"
                             }
                           },
                           {
                             "literal": {
-                              "string": "criticizes the ending"
+                              "string": "mixed"
                             }
                           }
                         ],
@@ -159,7 +159,7 @@
                             "output_names": [
                               "r.id",
                               "r.body",
-                              "r.focus"
+                              "r.sentiment"
                             ]
                           }
                         },
@@ -170,7 +170,7 @@
                                 {
                                   "value": {
                                     "literal": {
-                                      "string": "Judge strictly from the review above which category best describes what the review mainly does.\n\n{0}"
+                                      "string": "Judge strictly from the review above which category best describes the overall sentiment it expresses about the movie.\n\n{0}"
                                     }
                                   }
                                 },
@@ -192,25 +192,16 @@
                                       "list": {
                                         "values": [
                                           {
-                                            "string": "praises the acting"
+                                            "string": "positive"
                                           },
                                           {
-                                            "string": "praises the plot"
+                                            "string": "negative"
                                           },
                                           {
-                                            "string": "praises the ending"
+                                            "string": "neutral"
                                           },
                                           {
-                                            "string": "criticizes the acting"
-                                          },
-                                          {
-                                            "string": "criticizes the plot"
-                                          },
-                                          {
-                                            "string": "criticizes the ending"
-                                          },
-                                          {
-                                            "string": "other"
+                                            "string": "mixed"
                                           }
                                         ]
                                       }
@@ -222,15 +213,6 @@
                                     "literal": {
                                       "list": {
                                         "values": [
-                                          {
-                                            "string": ""
-                                          },
-                                          {
-                                            "string": ""
-                                          },
-                                          {
-                                            "string": ""
-                                          },
                                           {
                                             "string": ""
                                           },
@@ -341,7 +323,7 @@
         },
         "names": [
           "r",
-          "focus",
+          "sentiment",
           "a"
         ]
       }

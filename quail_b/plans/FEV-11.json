@@ -60,12 +60,12 @@
                     "options": [
                       {
                         "literal": {
-                          "string": "living person"
+                          "string": "politics"
                         }
                       },
                       {
                         "literal": {
-                          "string": "historical person"
+                          "string": "history"
                         }
                       }
                     ],
@@ -90,7 +90,7 @@
                         "output_names": [
                           "c.id",
                           "c.claim",
-                          "c.subject"
+                          "c.topic"
                         ]
                       }
                     },
@@ -101,7 +101,7 @@
                             {
                               "value": {
                                 "literal": {
-                                  "string": "Judge strictly from the claim above which category best describes what the claim is mainly about.\n\n{0}"
+                                  "string": "Judge strictly from the claim above which topic it is about.\n\n{0}"
                                 }
                               }
                             },
@@ -123,46 +123,37 @@
                                   "list": {
                                     "values": [
                                       {
-                                        "string": "living person"
+                                        "string": "politics"
                                       },
                                       {
-                                        "string": "historical person"
+                                        "string": "sports"
                                       },
                                       {
-                                        "string": "fictional character"
+                                        "string": "film and television"
                                       },
                                       {
-                                        "string": "business or company"
+                                        "string": "music"
                                       },
                                       {
-                                        "string": "sports team"
+                                        "string": "literature"
                                       },
                                       {
-                                        "string": "government body"
+                                        "string": "science"
                                       },
                                       {
-                                        "string": "country or region"
+                                        "string": "history"
                                       },
                                       {
-                                        "string": "city or town"
+                                        "string": "geography"
                                       },
                                       {
-                                        "string": "film or television show"
+                                        "string": "business"
                                       },
                                       {
-                                        "string": "book or album"
+                                        "string": "religion"
                                       },
                                       {
-                                        "string": "historical event"
-                                      },
-                                      {
-                                        "string": "sporting event"
-                                      },
-                                      {
-                                        "string": "animal or plant"
-                                      },
-                                      {
-                                        "string": "something else"
+                                        "string": "other"
                                       }
                                     ]
                                   }
@@ -174,15 +165,6 @@
                                 "literal": {
                                   "list": {
                                     "values": [
-                                      {
-                                        "string": ""
-                                      },
-                                      {
-                                        "string": ""
-                                      },
-                                      {
-                                        "string": ""
-                                      },
                                       {
                                         "string": ""
                                       },
@@ -275,7 +257,7 @@
         },
         "names": [
           "c",
-          "subject"
+          "topic"
         ]
       }
     }

@@ -61,7 +61,7 @@ ai_classify:str_str_list_list
 
 A classification appears as a `ProjectRel` that adds one label column to its
 relation; its hint alias is the operator ID, such as `classify-1`, and its
-hint output names end with `alias.column`, such as `r.focus`. A `FilterRel`
+hint output names end with `alias.column`, such as `r.sentiment`. A `FilterRel`
 whose condition is a standard `SingularOrList` over that column keeps the
 documents with an accepted label; its ID is `label-filter-N` and it asks the
 model nothing. See [Classification](#classification).
@@ -142,9 +142,9 @@ pa.table({
 })
 ```
 
-A query that returns a label column, such as IMDB-13's `r.focus`, adds one
-string column named by the query, here `focus`, holding one of that call's
-labels.
+A query that returns a label column, such as IMDB-13's `r.sentiment`, adds
+one string column named by the query, here `sentiment`, holding one of that
+call's labels.
 
 The harness rejects:
 
@@ -273,7 +273,7 @@ with its label. Every label must be one of the call's labels.
 classify_answers = {
     "classify-1": pa.table({
         "r": ["rv17", "rv42"],
-        "label": ["praises the ending", "criticizes the plot"],
+        "label": ["negative", "mixed"],
     }),
 }
 ```
@@ -288,7 +288,7 @@ filter stores its boolean `answer`. Its manifest's predicate lists `labels`.
 
 ### Queries waiting for labels
 
-The nine classification queries are marked `labels_pending` in the catalog.
+The ten classification queries are marked `labels_pending` in the catalog.
 `quail_b.queries()` leaves them out until their labels are published;
 `queries(include_pending=True)` and `get_query` return them. Running one needs a
 label collection that includes its predicates, passed with `root` or

@@ -1,7 +1,7 @@
 # QUAIL-B
 
 QUAIL-B is a benchmark for AI functions in SQL, or AI-SQL. It is actively being
-developed. **The published queries use AI-powered filters and joins. Nine
+developed. **The published queries use AI-powered filters and joins. Ten
 classification queries are defined and wait for their reference labels; we
 will expand to AI-powered extract, map, and groupby.**
 
@@ -243,24 +243,26 @@ adapter on these queries first, then run it on all 31.
 
 ### Classification queries
 
-Nine queries return or filter on a label chosen from a fixed list. They are
+Ten queries return or filter on a label chosen from a fixed list. They are
 marked `labels_pending` in the catalog: `queries()` and `quail_b.run` with
-`queries=None` leave them out until their labels are published. Each one
-varies what an engine can exploit: how many labels there are, how many tokens
-each has under the Qwen3 tokenizer, whether labels start with the same tokens,
-how long the documents are, and where the classification sits in the plan.
+`queries=None` leave them out until their labels are published. Each asks a
+question an analyst would ask of that collection, with a standard label list
+where one exists, such as IMDb's genres or MedDRA's system organ classes.
+Label length follows from the list, from one token for sentiment to eleven
+for an organ class under the Qwen3 tokenizer.
 
-| Query | Shape | Labels |
+| Query | Question | Labels |
 | --- | --- | --- |
-| IMDB-11 | Classify every review, return the label | 4, one token each |
-| IMDB-12 | Filter F1, then classify the survivors | 16; 15 of 2 to 4 tokens, and four pairs share a first token |
-| IMDB-13 | Classify, keep two labels, then join aspects; the label repeats per pair | 7 of 1 to 4 tokens; six share first tokens |
-| BIO-5 | Classify every reaction term, return the label | 26 of 1 to 11 tokens; documents of a few tokens |
-| BIO-6 | BIO-5's classification as a filter on one join input | Same call as BIO-5 |
-| FEV-11 | One call both returned and filtered | 14 of 2 to 4 tokens; one pair shares a first token |
-| LEP-6 | Filter, then classify with label descriptions and keep three labels | 8 of 3 to 7 tokens, with descriptions; two pairs share their first two or three tokens |
-| AGENT-3 | Filter, then classify long agent traces | 4 of 2 to 5 tokens; two share a first token |
-| AGENT-4 | Two classifications of the same trace | 4 and 6 |
+| IMDB-11 | What is the sentiment of each review? | 4, one token each |
+| IMDB-12 | Among reviews that praise something (F1), what genre is each movie? | IMDb's 21 genres |
+| IMDB-13 | Which aspects do negative or mixed reviews discuss? | Sentiment, as a filter before J1, returned per pair |
+| IMDB-14 | What do negative or mixed reviews complain about most? | Sentiment, then 9 complaints; both returned |
+| BIO-5 | Which system organ class does each reaction term belong to? | MedDRA's 26 classes, 1 to 11 tokens |
+| BIO-6 | Which cardiac or vascular reactions do serious reports describe? | Organ class, as a filter on one join input |
+| FEV-11 | Which claims are about politics or history, and which topic? | 11 topics; one call returned and filtered |
+| LEP-6 | Which passages do constitutional or criminal law excerpts cite? | 15 areas of law, as a filter before the join |
+| AGENT-3 | Did agents that recovered from a failed approach resolve the issue? | 4 outcomes with descriptions, after a filter |
+| AGENT-4 | Why did the agents that did not resolve the issue fail? | Outcome, then 8 failure modes with descriptions |
 
 A classification answer is the label with the largest sum of label-token log
 probabilities; the [reference](docs/reference.md#classification) defines the

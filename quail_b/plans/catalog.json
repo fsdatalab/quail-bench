@@ -51,19 +51,25 @@
   },
   {
     "id": "IMDB-11",
-    "description": "classify: sentiment, 4 labels of one token each",
+    "description": "classify: the sentiment of every review",
     "privacy": false,
     "labels_pending": true
   },
   {
     "id": "IMDB-12",
-    "description": "F1 -> classify: genre, 16 labels, 15 of 2 to 4 tokens, 4 pairs sharing a first token",
+    "description": "F1 -> classify: the IMDb genre of each review's movie",
     "privacy": false,
     "labels_pending": true
   },
   {
     "id": "IMDB-13",
-    "description": "classify: focus, 7 labels sharing first tokens, kept if about the ending -> J1; label repeated per pair",
+    "description": "negative or mixed reviews -> J1: the aspects critical reviews discuss, with each review's sentiment",
+    "privacy": false,
+    "labels_pending": true
+  },
+  {
+    "id": "IMDB-14",
+    "description": "negative or mixed reviews -> classify: their main complaint, returned with their sentiment",
     "privacy": false,
     "labels_pending": true
   },
@@ -89,13 +95,13 @@
   },
   {
     "id": "BIO-5",
-    "description": "classify: organ class of each reaction, 26 labels of 1 to 11 tokens, short documents",
+    "description": "classify: the MedDRA system organ class of every reaction term",
     "privacy": false,
     "labels_pending": true
   },
   {
     "id": "BIO-6",
-    "description": "serious adverse event reports x reactions classified cardiac or vascular, classified before the join",
+    "description": "serious adverse event reports x their cardiac or vascular reactions",
     "privacy": false,
     "labels_pending": true
   },
@@ -151,7 +157,7 @@
   },
   {
     "id": "FEV-11",
-    "description": "classify: claim subject, 14 labels of 2 to 4 tokens, one call both returned and kept if about a person",
+    "description": "classify: claim topic; the political and historical claims, with their topic",
     "privacy": false,
     "labels_pending": true
   },
@@ -182,7 +188,7 @@
   },
   {
     "id": "LEP-6",
-    "description": "LEP2 -> classify: treatment, 8 labels of 3 to 7 tokens with descriptions, kept if distinguished or criticized",
+    "description": "constitutional or criminal law excerpts -> the passages they cite, with each excerpt's area of law",
     "privacy": false,
     "labels_pending": true
   },
@@ -198,13 +204,13 @@
   },
   {
     "id": "AGENT-3",
-    "description": "recovered -> classify: outcome, 4 labels sharing a first token, long documents",
+    "description": "recovered -> classify: whether the agent resolved the issue",
     "privacy": false,
     "labels_pending": true
   },
   {
     "id": "AGENT-4",
-    "description": "two classifications of one trace: outcome and hardest step",
+    "description": "unresolved traces -> classify: why the agent failed",
     "privacy": false,
     "labels_pending": true
   },

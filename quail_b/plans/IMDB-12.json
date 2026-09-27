@@ -74,7 +74,7 @@
                         {
                           "value": {
                             "literal": {
-                              "string": "Judge strictly from the review above which category best describes the genre of the movie it reviews.\n\n{0}"
+                              "string": "Judge strictly from the review above which genre best describes the movie it reviews.\n\n{0}"
                             }
                           }
                         },
@@ -96,52 +96,67 @@
                               "list": {
                                 "values": [
                                   {
-                                    "string": "romantic comedy"
+                                    "string": "action"
                                   },
                                   {
-                                    "string": "romantic drama"
+                                    "string": "adventure"
                                   },
                                   {
-                                    "string": "crime drama"
+                                    "string": "animation"
                                   },
                                   {
-                                    "string": "crime thriller"
+                                    "string": "biography"
                                   },
                                   {
-                                    "string": "action thriller"
+                                    "string": "comedy"
                                   },
                                   {
-                                    "string": "action comedy"
+                                    "string": "crime"
                                   },
                                   {
-                                    "string": "horror comedy"
+                                    "string": "documentary"
                                   },
                                   {
-                                    "string": "horror thriller"
+                                    "string": "drama"
                                   },
                                   {
-                                    "string": "psychological thriller"
+                                    "string": "family"
                                   },
                                   {
-                                    "string": "science fiction"
+                                    "string": "fantasy"
                                   },
                                   {
-                                    "string": "historical drama"
+                                    "string": "history"
                                   },
                                   {
-                                    "string": "war drama"
+                                    "string": "horror"
                                   },
                                   {
-                                    "string": "animated film"
-                                  },
-                                  {
-                                    "string": "superhero film"
-                                  },
-                                  {
-                                    "string": "coming-of-age drama"
+                                    "string": "music"
                                   },
                                   {
                                     "string": "musical"
+                                  },
+                                  {
+                                    "string": "mystery"
+                                  },
+                                  {
+                                    "string": "romance"
+                                  },
+                                  {
+                                    "string": "sci-fi"
+                                  },
+                                  {
+                                    "string": "sport"
+                                  },
+                                  {
+                                    "string": "thriller"
+                                  },
+                                  {
+                                    "string": "war"
+                                  },
+                                  {
+                                    "string": "western"
                                   }
                                 ]
                               }
@@ -153,6 +168,21 @@
                             "literal": {
                               "list": {
                                 "values": [
+                                  {
+                                    "string": ""
+                                  },
+                                  {
+                                    "string": ""
+                                  },
+                                  {
+                                    "string": ""
+                                  },
+                                  {
+                                    "string": ""
+                                  },
+                                  {
+                                    "string": ""
+                                  },
                                   {
                                     "string": ""
                                   },
