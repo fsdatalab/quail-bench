@@ -96,52 +96,52 @@
                               "list": {
                                 "values": [
                                   {
-                                    "string": "comedy"
+                                    "string": "romantic comedy"
                                   },
                                   {
-                                    "string": "drama"
+                                    "string": "romantic drama"
                                   },
                                   {
-                                    "string": "horror"
+                                    "string": "crime drama"
                                   },
                                   {
-                                    "string": "action"
+                                    "string": "crime thriller"
                                   },
                                   {
-                                    "string": "romance"
+                                    "string": "action thriller"
                                   },
                                   {
-                                    "string": "thriller"
+                                    "string": "action comedy"
                                   },
                                   {
-                                    "string": "documentary"
+                                    "string": "horror comedy"
                                   },
                                   {
-                                    "string": "animation"
+                                    "string": "horror thriller"
+                                  },
+                                  {
+                                    "string": "psychological thriller"
                                   },
                                   {
                                     "string": "science fiction"
                                   },
                                   {
-                                    "string": "fantasy"
+                                    "string": "historical drama"
                                   },
                                   {
-                                    "string": "crime"
+                                    "string": "war drama"
                                   },
                                   {
-                                    "string": "war"
+                                    "string": "animated film"
                                   },
                                   {
-                                    "string": "western"
+                                    "string": "superhero film"
+                                  },
+                                  {
+                                    "string": "coming-of-age drama"
                                   },
                                   {
                                     "string": "musical"
-                                  },
-                                  {
-                                    "string": "family"
-                                  },
-                                  {
-                                    "string": "mystery"
                                   }
                                 ]
                               }

@@ -536,7 +536,8 @@ QUERIES = (
     Query("IMDB-11", "classify: sentiment, 4 labels of one token each",
           _sentiment(_reviews()), select=("r", "r.sentiment"),
           labels_pending=True),
-    Query("IMDB-12", "F1 -> classify: genre, 16 labels, one of two tokens",
+    Query("IMDB-12", "F1 -> classify: genre, 16 labels, 15 of 2 to 4 "
+          "tokens, 4 pairs sharing a first token",
           _classify(_filters(_reviews(), F1), prompts.IMDB_GENRE,
                     prompts.IMDB_GENRE_LABELS, "genre"),
           select=("r", "r.genre"), labels_pending=True),

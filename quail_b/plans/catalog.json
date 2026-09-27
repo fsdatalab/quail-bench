@@ -57,7 +57,7 @@
   },
   {
     "id": "IMDB-12",
-    "description": "F1 -> classify: genre, 16 labels, one of two tokens",
+    "description": "F1 -> classify: genre, 16 labels, 15 of 2 to 4 tokens, 4 pairs sharing a first token",
     "privacy": false,
     "labels_pending": true
   },

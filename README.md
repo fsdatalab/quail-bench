@@ -253,7 +253,7 @@ how long the documents are, and where the classification sits in the plan.
 | Query | Shape | Labels |
 | --- | --- | --- |
 | IMDB-11 | Classify every review, return the label | 4, one token each |
-| IMDB-12 | Filter F1, then classify the survivors | 16, one of two tokens |
+| IMDB-12 | Filter F1, then classify the survivors | 16; 15 of 2 to 4 tokens, and four pairs share a first token |
 | IMDB-13 | Classify, keep two labels, then join aspects; the label repeats per pair | 7 of 1 to 4 tokens; six share first tokens |
 | BIO-5 | Classify every reaction term, return the label | 26 of 1 to 11 tokens; documents of a few tokens |
 | BIO-6 | BIO-5's classification as a filter on one join input | Same call as BIO-5 |

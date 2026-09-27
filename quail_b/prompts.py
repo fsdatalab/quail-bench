@@ -170,9 +170,11 @@ IMDB_GENRE = (
     "the genre of the movie it reviews.\n\n{0}"
 )
 IMDB_GENRE_LABELS = (
-    "comedy", "drama", "horror", "action", "romance", "thriller",
-    "documentary", "animation", "science fiction", "fantasy", "crime",
-    "war", "western", "musical", "family", "mystery",
+    "romantic comedy", "romantic drama", "crime drama", "crime thriller",
+    "action thriller", "action comedy", "horror comedy", "horror thriller",
+    "psychological thriller", "science fiction", "historical drama",
+    "war drama", "animated film", "superhero film", "coming-of-age drama",
+    "musical",
 )
 
 IMDB_FOCUS = (
