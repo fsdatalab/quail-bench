@@ -217,8 +217,11 @@ FEV_SUBJECT = (
     "what the claim is mainly about.\n\n{0}"
 )
 FEV_SUBJECT_LABELS = (
-    "person", "organization", "place", "event", "work of art", "species",
-    "other",
+    "living person", "historical person", "fictional character",
+    "business or company", "sports team", "government body",
+    "country or region", "city or town", "film or television show",
+    "book or album", "historical event", "sporting event", "animal or plant",
+    "something else",
 )
 
 LEP_TREATMENT = (
@@ -226,13 +229,17 @@ LEP_TREATMENT = (
     "how it treats the case it cites.\n\n{0}"
 )
 LEP_TREATMENT_LABELS = (
-    "followed", "explained", "distinguished", "criticized", "questioned",
-    "overruled",
+    "followed as binding", "followed as persuasive",
+    "distinguished on the facts", "distinguished on the law",
+    "cited for background", "criticized as wrongly decided",
+    "questioned as outdated", "overruled or abrogated",
 )
 LEP_TREATMENT_DESCRIPTIONS = (
-    "applies the cited case as controlling",
-    "restates or clarifies the cited case without relying on it",
-    "says the cited case differs and does not control",
+    "applies the cited case as controlling precedent",
+    "relies on the cited case without being bound by it",
+    "says the cited case's facts differ, so it does not control",
+    "says the cited case rests on a different rule of law",
+    "mentions the cited case without relying on it",
     "disapproves of the cited case's reasoning",
     "doubts whether the cited case is still good law",
     "declares that the cited case is no longer good law",

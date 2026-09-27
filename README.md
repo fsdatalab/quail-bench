@@ -257,8 +257,8 @@ how long the documents are, and where the classification sits in the plan.
 | IMDB-13 | Classify, keep two labels, then join aspects; the label repeats per pair | 7 of 1 to 4 tokens; six share first tokens |
 | BIO-5 | Classify every reaction term, return the label | 26 of 1 to 11 tokens; documents of a few tokens |
 | BIO-6 | BIO-5's classification as a filter on one join input | Same call as BIO-5 |
-| FEV-11 | One call both returned and filtered | 7, one of three tokens |
-| LEP-6 | Filter, then classify with label descriptions and keep three labels | 6, with descriptions |
+| FEV-11 | One call both returned and filtered | 14 of 2 to 4 tokens; one pair shares a first token |
+| LEP-6 | Filter, then classify with label descriptions and keep three labels | 8 of 3 to 7 tokens, with descriptions; two pairs share their first two or three tokens |
 | AGENT-3 | Filter, then classify long agent traces | 4 of 2 to 5 tokens; two share a first token |
 | AGENT-4 | Two classifications of the same trace | 4 and 6 |
 

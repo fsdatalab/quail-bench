@@ -60,12 +60,12 @@
                     "options": [
                       {
                         "literal": {
-                          "string": "person"
+                          "string": "living person"
                         }
                       },
                       {
                         "literal": {
-                          "string": "organization"
+                          "string": "historical person"
                         }
                       }
                     ],
@@ -123,25 +123,46 @@
                                   "list": {
                                     "values": [
                                       {
-                                        "string": "person"
+                                        "string": "living person"
                                       },
                                       {
-                                        "string": "organization"
+                                        "string": "historical person"
                                       },
                                       {
-                                        "string": "place"
+                                        "string": "fictional character"
                                       },
                                       {
-                                        "string": "event"
+                                        "string": "business or company"
                                       },
                                       {
-                                        "string": "work of art"
+                                        "string": "sports team"
                                       },
                                       {
-                                        "string": "species"
+                                        "string": "government body"
                                       },
                                       {
-                                        "string": "other"
+                                        "string": "country or region"
+                                      },
+                                      {
+                                        "string": "city or town"
+                                      },
+                                      {
+                                        "string": "film or television show"
+                                      },
+                                      {
+                                        "string": "book or album"
+                                      },
+                                      {
+                                        "string": "historical event"
+                                      },
+                                      {
+                                        "string": "sporting event"
+                                      },
+                                      {
+                                        "string": "animal or plant"
+                                      },
+                                      {
+                                        "string": "something else"
                                       }
                                     ]
                                   }
@@ -153,6 +174,27 @@
                                 "literal": {
                                   "list": {
                                     "values": [
+                                      {
+                                        "string": ""
+                                      },
+                                      {
+                                        "string": ""
+                                      },
+                                      {
+                                        "string": ""
+                                      },
+                                      {
+                                        "string": ""
+                                      },
+                                      {
+                                        "string": ""
+                                      },
+                                      {
+                                        "string": ""
+                                      },
+                                      {
+                                        "string": ""
+                                      },
                                       {
                                         "string": ""
                                       },

@@ -94,18 +94,18 @@ def test_invalid_label_uses_are_rejected():
 
 def test_classify_prompt_text():
     text = rendering.render_classify_prompt(
-        prompts.FEV_SUBJECT, "Paris is in France.", ("person", "place"),
+        prompts.FEV_SUBJECT, "Paris is in France.", ("living person", "city or town"),
         ("a human", ""))
     expected_text = (
         "DOCUMENT:\nParis is in France.\n\n"
         "Answer with exactly one of the categories below for the following "
         "question: Judge strictly from the claim above which category best "
         "describes what the claim is mainly about.\n\n"
-        "Categories:\n- person: a human\n- place\nANSWER:")
+        "Categories:\n- living person: a human\n- city or town\nANSWER:")
     assert text == expected_text
     spec = predicates.PREDICATE_BY_KEY["quailb.fever.claim.subject"]
     assert predicates.render_classify_prompt(spec, "x").endswith(
-        "- species\n- other\nANSWER:")
+        "- animal or plant\n- something else\nANSWER:")
 
 
 def test_classify_label_sets_have_their_own_identity():
@@ -298,8 +298,8 @@ def test_two_label_columns_and_a_shared_call(tmp_path):
                                         ("t1", "gave up")]),
         (_classify_predicate(step), [("t0", "writing the fix"),
                                      ("t1", "none")]),
-        (_classify_predicate(subject), [("c0", "person"), ("c1", "place"),
-                                        ("c2", "organization")]),
+        (_classify_predicate(subject), [("c0", "living person"), ("c1", "city or town"),
+                                        ("c2", "historical person")]),
     ])
 
     def execute(spec, tables):
@@ -317,10 +317,11 @@ def test_two_label_columns_and_a_shared_call(tmp_path):
                         "label": ["writing the fix", "running the tests"]})})
         return quail_b.RunOutput(
             {}, {}, pa.table({"c": ["c0", "c2"],
-                              "subject": ["person", "organization"]}),
+                              "subject": ["living person", "historical person"]}),
             runtime_s=1.0, classify_answers={"classify-1": pa.table({
                 "c": ["c0", "c1", "c2"],
-                "label": ["person", "event", "organization"]})})
+                "label": ["living person", "sporting event",
+                          "historical person"]})})
 
     record = quail_b.run(execute, queries=["AGENT-4", "FEV-11"],
                          output_dir=tmp_path / "run", root=tmp_path)

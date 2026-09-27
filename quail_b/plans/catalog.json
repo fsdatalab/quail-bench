@@ -151,7 +151,7 @@
   },
   {
     "id": "FEV-11",
-    "description": "classify: claim subject, 7 labels, one call both returned and kept if person or organization",
+    "description": "classify: claim subject, 14 labels of 2 to 4 tokens, one call both returned and kept if about a person",
     "privacy": false,
     "labels_pending": true
   },
@@ -182,7 +182,7 @@
   },
   {
     "id": "LEP-6",
-    "description": "LEP2 -> classify: treatment, 6 labels with descriptions, kept if distinguished, criticized, or questioned",
+    "description": "LEP2 -> classify: treatment, 8 labels of 3 to 7 tokens with descriptions, kept if distinguished or criticized",
     "privacy": false,
     "labels_pending": true
   },

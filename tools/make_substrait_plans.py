@@ -613,11 +613,11 @@ QUERIES = (
           Join(_filters(_claims("c", "evidence_wiki_url"), F11),
                _filters(_evidence(), F13), ("c", "e"), SUPPORT,
                on=(("evidence_wiki_url", "id"),))),
-    Query("FEV-11", "classify: claim subject, 7 labels, one call both "
-          "returned and kept if person or organization",
+    Query("FEV-11", "classify: claim subject, 14 labels of 2 to 4 tokens, "
+          "one call both returned and kept if about a person",
           LabelFilter(_classify(_claims(), prompts.FEV_SUBJECT,
                                 prompts.FEV_SUBJECT_LABELS, "subject"),
-                      "subject", ("person", "organization")),
+                      "subject", ("living person", "historical person")),
           select=("c", "c.subject"), labels_pending=True),
 
     Query("LEP-1", "filter: LEP1 (reasoning does not apply)",
@@ -634,13 +634,15 @@ QUERIES = (
           "LEPS1 on passages, each filtered before the join",
           Join(_filters(_contexts(), LEP1, LEP2),
                _filters(_passages(), LEPS1), ("d", "s"), LEPJOIN)),
-    Query("LEP-6", "LEP2 -> classify: treatment, 6 labels with "
-          "descriptions, kept if distinguished, criticized, or questioned",
+    Query("LEP-6", "LEP2 -> classify: treatment, 8 labels of 3 to 7 "
+          "tokens with descriptions, kept if distinguished or criticized",
           LabelFilter(
               _classify(_filters(_contexts(), LEP2), prompts.LEP_TREATMENT,
                         prompts.LEP_TREATMENT_LABELS, "treatment",
                         prompts.LEP_TREATMENT_DESCRIPTIONS),
-              "treatment", ("distinguished", "criticized", "questioned")),
+              "treatment", ("distinguished on the facts",
+                            "distinguished on the law",
+                            "criticized as wrongly decided")),
           select=("d", "d.treatment"), labels_pending=True),
     Query("AGENT-1", "filter: recovered after an unsuccessful approach",
           _filters(_traces(), AGENT_RECOVERED)),
