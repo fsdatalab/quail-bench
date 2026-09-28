@@ -16,14 +16,16 @@ from quail_b.minimum import token_metrics
 from quail_b.rendering import PROMPT_FORMAT
 from quail_b.scoring import (
     RunOutput,
+    answer_labels,
     corpus_ids,
     encode_ids,
     evaluate,
     implied_row_count,
     implied_rows_mask,
+    output_columns,
     scores_from_answers,
 )
-from quail_b.substrait import _Filter
+from quail_b.substrait import _Classify, _Filter, _Join, _LabelFilter
 
 RUN_SCHEMA_VERSION = 2
 
@@ -62,7 +64,26 @@ def _query_hash(spec):
                 "relation": operator.relation,
                 "prompt": operator.prompt,
             })
+        elif isinstance(operator, _Classify):
+            operators.append({
+                "kind": "classify",
+                "id": operator.id,
+                "relation": operator.relation,
+                "prompt": operator.prompt,
+                "labels": operator.labels,
+                "descriptions": operator.descriptions,
+                "output": operator.output,
+            })
+        elif isinstance(operator, _LabelFilter):
+            operators.append({
+                "kind": "label_filter",
+                "id": operator.id,
+                "relation": operator.relation,
+                "output": operator.output,
+                "accepted": operator.accepted,
+            })
         else:
+            assert isinstance(operator, _Join)
             operators.append({
                 "kind": "join",
                 "id": operator.id,
@@ -109,8 +130,11 @@ def _save_output(directory, output, spec):
         "filters": None,
         "joins": None,
     }
+    if output.classify_answers is not None:
+        paths["classifications"] = None
     for kind, answers in (
-            ("filters", output.filter_answers), ("joins", output.join_answers)):
+            ("filters", output.filter_answers), ("joins", output.join_answers),
+            ("classifications", output.classify_answers)):
         if answers is None:
             continue
         paths[kind] = []
@@ -135,6 +159,7 @@ def _read_output(directory, record, rows=True):
     paths = record["files"]
     filters = paths["filters"]
     joins = paths["joins"]
+    classifications = paths.get("classifications")
     pieces = paths.get("prompt_pieces")
     return RunOutput(
         None if filters is None else {
@@ -144,7 +169,10 @@ def _read_output(directory, record, rows=True):
         pq.read_table(file(paths["rows"])) if rows else None,
         record.get("runtime_s"),
         record.get("measurements", {}),
-        None if pieces is None else json.loads(file(pieces).read_text()))
+        None if pieces is None else json.loads(file(pieces).read_text()),
+        None if classifications is None else {
+            item["key"]: pq.read_table(file(item["path"]))
+            for item in classifications})
 
 
 ROW_SAMPLE = 100_000    # rows of a traced result checked one by one
@@ -195,17 +223,36 @@ def _validate_output(spec, output, tables):
                 codes.group_by(aliases).aggregate([]).num_rows != codes.num_rows):
             raise ValueError("duplicate document IDs in an answer table")
 
-    selected = [name.split(".")[0] for name in spec._info.select]
+    selected = [name.split(".")[0] for name in spec._info.select
+                if name.endswith(".id")]
+    columns = output_columns(spec)
+    label_names = {
+        operator.output: operator for operator in spec._info.classifies}
+
+    def validate_labels(table, names):
+        for name in names:
+            column = table[name]
+            if column.null_count or not pa.types.is_string(column.type):
+                raise ValueError("labels must be non-null strings")
+            allowed = pa.array(label_names[name].labels, pa.string())
+            if not pc.all(pc.is_in(column, value_set=allowed)).as_py():
+                raise ValueError(
+                    f"a {name} label is not one of the query's labels")
+
+    returned = [name for name in columns if name in label_names]
     answers = scores_from_answers(spec, output, tables)
     if output.rows is None:
         # a saved run rescored from its answers: its rows were checked
         # when they were saved
         if answers is None:
             raise ValueError("a run without answers must include its rows")
-    elif set(output.rows.column_names) != set(selected):
-        raise ValueError("output columns must match the query's selected aliases")
+    elif set(output.rows.column_names) != set(columns):
+        raise ValueError("output columns must match the query's selected "
+                         "aliases and label columns")
     elif answers is None:
         validate_ids(output.rows, selected)
+        if output.rows.num_rows:
+            validate_labels(output.rows, returned)
     else:
         # a traced run's rows are implied by its answers: the count must
         # agree, and a sample of the rows must all be implied; the
@@ -219,9 +266,10 @@ def _validate_output(spec, output, tables):
         sample = _sample_rows(output.rows, ROW_SAMPLE)
         validate_ids(sample, selected)
         mask = implied_rows_mask(
-            pa.table({alias: sample[alias].cast(pa.string())
-                      for alias in selected}),
-            survivors, relations, spec)
+            pa.table({name: sample[name].cast(pa.string())
+                      for name in columns}),
+            survivors, relations, spec,
+            answer_labels(spec, output.classify_answers))
         if not (pc.all(mask).as_py() if sample.num_rows else True):
             raise ValueError("a returned row is not implied by the answers")
     filters = {
@@ -241,6 +289,17 @@ def _validate_output(spec, output, tables):
         validate_ids(table, joins[operator_id].relations)
         if table["answer"].null_count or str(table["answer"].type) != "bool":
             raise ValueError("predicate answers must be non-null booleans")
+    classifies = {operator.id: operator for operator in spec._info.classifies}
+    for operator_id, table in (output.classify_answers or {}).items():
+        if operator_id not in classifies:
+            raise ValueError(f"unknown classify operator {operator_id!r}")
+        operator = classifies[operator_id]
+        validate_ids(table, [operator.relation])
+        validate_labels(
+            table.rename_columns([
+                operator.output if name == "label" else name
+                for name in table.column_names]),
+            [operator.output])
 
 
 def _score(spec, output, suite, gpu_count, gpu_hourly_rate_usd, tokens=None):

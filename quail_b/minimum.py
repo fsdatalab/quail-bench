@@ -371,7 +371,8 @@ def token_metrics(spec, output, corpus_rows, stores=None) -> dict:
     """
     fresh = _fresh_tokens(output.measurements)
     reported_input = _reported_input_tokens(output.measurements)
-    if output.prompt_pieces is None:
+    # prompt pieces are not defined for classifications yet
+    if output.prompt_pieces is None or spec._info.classifies:
         return {"input_tokens": reported_input, "fresh_tokens": fresh,
                 "minimum_tokens": None, "regret_tokens": None,
                 "regret_approximate": False}

@@ -24,3 +24,23 @@ scalar_functions:
           - name: right
             value: string
         return: boolean
+  - name: ai_classify
+    description: >-
+      Return the label the model scores highest for a document, from a fixed
+      list of labels. A label's score is the sum of its tokens' log
+      probabilities after the prompt; the earlier label wins a tie.
+    impls:
+      - args:
+          - name: prompt
+            value: string
+            constant: true
+          - name: document
+            value: string
+          - name: labels
+            value: list<string>
+            constant: true
+          - name: descriptions
+            description: One per label; an empty string means no description.
+            value: list<string>
+            constant: true
+        return: string

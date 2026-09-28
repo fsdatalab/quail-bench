@@ -153,3 +153,115 @@ P_LOC = ("Judge strictly from the policy above whether this service "
 SCENARIO_MATCH = ("Based on the privacy policy in DOCUMENT {0}, could "
                   "the situation described in DOCUMENT {1} happen to a "
                   "user of this service?")
+
+
+
+# Classification templates. Each call also carries its labels and
+# optional descriptions, defined next to it. A template is used with
+# exactly one label list, so a template names one predicate.
+
+IMDB_SENTIMENT = (
+    "Judge strictly from the review above which category best describes "
+    "the overall sentiment it expresses about the movie.\n\n{0}"
+)
+IMDB_SENTIMENT_LABELS = ("positive", "negative", "neutral", "mixed")
+
+# IMDb's own genre list.
+IMDB_GENRE = (
+    "Judge strictly from the review above which genre best describes the "
+    "movie it reviews.\n\n{0}"
+)
+IMDB_GENRE_LABELS = (
+    "action", "adventure", "animation", "biography", "comedy", "crime",
+    "documentary", "drama", "family", "fantasy", "history", "horror",
+    "music", "musical", "mystery", "romance", "sci-fi", "sport", "thriller",
+    "war", "western",
+)
+
+IMDB_COMPLAINT = (
+    "Judge strictly from the review above what it criticizes most about "
+    "the movie.\n\n{0}"
+)
+IMDB_COMPLAINT_LABELS = (
+    "poor acting", "poor writing", "poor visual effects", "slow pacing",
+    "weak ending", "too long", "too violent", "no specific complaint",
+)
+
+# MedDRA's system organ classes, less "product issues", which a
+# reaction term does not describe.
+BIO_ORGAN_CLASS = (
+    "Judge strictly from the reaction above which MedDRA system organ "
+    "class it belongs to.\n\n{0}"
+)
+BIO_ORGAN_CLASS_LABELS = (
+    "cardiac disorders", "vascular disorders", "nervous system disorders",
+    "psychiatric disorders", "eye disorders", "ear and labyrinth disorders",
+    "respiratory, thoracic and mediastinal disorders",
+    "gastrointestinal disorders", "hepatobiliary disorders",
+    "renal and urinary disorders", "skin and subcutaneous tissue disorders",
+    "musculoskeletal and connective tissue disorders",
+    "blood and lymphatic system disorders", "immune system disorders",
+    "endocrine disorders", "metabolism and nutrition disorders",
+    "infections and infestations",
+    "neoplasms benign, malignant and unspecified",
+    "injury, poisoning and procedural complications", "investigations",
+    "general disorders and administration site conditions",
+    "reproductive system and breast disorders",
+    "pregnancy, puerperium and perinatal conditions",
+    "congenital, familial and genetic disorders",
+    "surgical and medical procedures", "social circumstances",
+)
+
+FEV_TOPIC = (
+    "Judge strictly from the claim above which topic it is about.\n\n{0}"
+)
+FEV_TOPIC_LABELS = (
+    "politics", "sports", "film and television", "music", "literature",
+    "science", "history", "geography", "business", "religion", "other",
+)
+
+LEP_AREA = (
+    "Judge strictly from the excerpt above which area of law it "
+    "concerns.\n\n{0}"
+)
+LEP_AREA_LABELS = (
+    "constitutional law", "criminal law", "civil procedure", "civil rights",
+    "contracts", "torts", "property", "administrative law",
+    "employment law", "intellectual property", "tax law", "family law",
+    "immigration law", "bankruptcy", "antitrust",
+)
+
+AGENT_OUTCOME = (
+    "Judge strictly from the agent trace above whether the agent resolved "
+    "the reported issue by the end of the trace.\n\n{0}"
+)
+AGENT_OUTCOME_LABELS = (
+    "resolved", "partially resolved", "not resolved", "gave up",
+)
+AGENT_OUTCOME_DESCRIPTIONS = (
+    "made a change that fixes the reported issue",
+    "fixed part of the issue but not all of it",
+    "finished without a change that fixes the issue",
+    "stopped early and said it could not continue",
+)
+
+AGENT_FAILURE = (
+    "Judge strictly from the agent trace above what most caused the agent "
+    "not to resolve the issue.\n\n{0}"
+)
+AGENT_FAILURE_LABELS = (
+    "misunderstood the issue", "could not reproduce the bug",
+    "could not find the relevant code", "could not run the tests",
+    "made an incorrect fix", "broke existing tests",
+    "environment or tool error", "ran out of steps",
+)
+AGENT_FAILURE_DESCRIPTIONS = (
+    "worked on a different problem than the one reported",
+    "never saw the reported failure happen",
+    "never found the code that causes the issue",
+    "could not get the test suite to run",
+    "changed the right code, but the change does not fix the issue",
+    "fixed the issue but made other tests fail",
+    "a broken setup, missing dependency, or tool failure blocked progress",
+    "reached the step limit while still making progress",
+)

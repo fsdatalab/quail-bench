@@ -1,0 +1,402 @@
+{
+  "extension_urns": [
+    {
+      "extension_urn_anchor": 1,
+      "urn": "extension:org.fsdatalab.quail_b:functions_ai"
+    }
+  ],
+  "extensions": [
+    {
+      "extension_function": {
+        "extension_urn_reference": 1,
+        "function_anchor": 2,
+        "name": "ai_join:str_str_str"
+      }
+    },
+    {
+      "extension_function": {
+        "extension_urn_reference": 1,
+        "function_anchor": 5,
+        "name": "ai_classify:str_str_list_list"
+      }
+    }
+  ],
+  "relations": [
+    {
+      "root": {
+        "input": {
+          "project": {
+            "common": {
+              "emit": {
+                "output_mapping": [
+                  5,
+                  6,
+                  7
+                ]
+              }
+            },
+            "expressions": [
+              {
+                "selection": {
+                  "direct_reference": {
+                    "struct_field": {}
+                  },
+                  "root_reference": {}
+                }
+              },
+              {
+                "selection": {
+                  "direct_reference": {
+                    "struct_field": {
+                      "field": 2
+                    }
+                  },
+                  "root_reference": {}
+                }
+              },
+              {
+                "selection": {
+                  "direct_reference": {
+                    "struct_field": {
+                      "field": 3
+                    }
+                  },
+                  "root_reference": {}
+                }
+              }
+            ],
+            "input": {
+              "join": {
+                "common": {
+                  "direct": {},
+                  "hint": {
+                    "alias": "join-1"
+                  }
+                },
+                "expression": {
+                  "scalar_function": {
+                    "arguments": [
+                      {
+                        "value": {
+                          "literal": {
+                            "string": "Is the passage in DOCUMENT {1} cited by the legal excerpt in DOCUMENT {0}?"
+                          }
+                        }
+                      },
+                      {
+                        "value": {
+                          "selection": {
+                            "direct_reference": {
+                              "struct_field": {
+                                "field": 1
+                              }
+                            },
+                            "root_reference": {}
+                          }
+                        }
+                      },
+                      {
+                        "value": {
+                          "selection": {
+                            "direct_reference": {
+                              "struct_field": {
+                                "field": 4
+                              }
+                            },
+                            "root_reference": {}
+                          }
+                        }
+                      }
+                    ],
+                    "function_reference": 2,
+                    "output_type": {
+                      "bool": {
+                        "nullability": "NULLABILITY_REQUIRED"
+                      }
+                    }
+                  }
+                },
+                "left": {
+                  "filter": {
+                    "common": {
+                      "direct": {},
+                      "hint": {
+                        "alias": "label-filter-1"
+                      }
+                    },
+                    "condition": {
+                      "singular_or_list": {
+                        "options": [
+                          {
+                            "literal": {
+                              "string": "constitutional law"
+                            }
+                          },
+                          {
+                            "literal": {
+                              "string": "criminal law"
+                            }
+                          }
+                        ],
+                        "value": {
+                          "selection": {
+                            "direct_reference": {
+                              "struct_field": {
+                                "field": 2
+                              }
+                            },
+                            "root_reference": {}
+                          }
+                        }
+                      }
+                    },
+                    "input": {
+                      "project": {
+                        "common": {
+                          "direct": {},
+                          "hint": {
+                            "alias": "classify-1",
+                            "output_names": [
+                              "d.id",
+                              "d.destination_context",
+                              "d.area"
+                            ]
+                          }
+                        },
+                        "expressions": [
+                          {
+                            "scalar_function": {
+                              "arguments": [
+                                {
+                                  "value": {
+                                    "literal": {
+                                      "string": "Judge strictly from the excerpt above which area of law it concerns.\n\n{0}"
+                                    }
+                                  }
+                                },
+                                {
+                                  "value": {
+                                    "selection": {
+                                      "direct_reference": {
+                                        "struct_field": {
+                                          "field": 1
+                                        }
+                                      },
+                                      "root_reference": {}
+                                    }
+                                  }
+                                },
+                                {
+                                  "value": {
+                                    "literal": {
+                                      "list": {
+                                        "values": [
+                                          {
+                                            "string": "constitutional law"
+                                          },
+                                          {
+                                            "string": "criminal law"
+                                          },
+                                          {
+                                            "string": "civil procedure"
+                                          },
+                                          {
+                                            "string": "civil rights"
+                                          },
+                                          {
+                                            "string": "contracts"
+                                          },
+                                          {
+                                            "string": "torts"
+                                          },
+                                          {
+                                            "string": "property"
+                                          },
+                                          {
+                                            "string": "administrative law"
+                                          },
+                                          {
+                                            "string": "employment law"
+                                          },
+                                          {
+                                            "string": "intellectual property"
+                                          },
+                                          {
+                                            "string": "tax law"
+                                          },
+                                          {
+                                            "string": "family law"
+                                          },
+                                          {
+                                            "string": "immigration law"
+                                          },
+                                          {
+                                            "string": "bankruptcy"
+                                          },
+                                          {
+                                            "string": "antitrust"
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  }
+                                },
+                                {
+                                  "value": {
+                                    "literal": {
+                                      "list": {
+                                        "values": [
+                                          {
+                                            "string": ""
+                                          },
+                                          {
+                                            "string": ""
+                                          },
+                                          {
+                                            "string": ""
+                                          },
+                                          {
+                                            "string": ""
+                                          },
+                                          {
+                                            "string": ""
+                                          },
+                                          {
+                                            "string": ""
+                                          },
+                                          {
+                                            "string": ""
+                                          },
+                                          {
+                                            "string": ""
+                                          },
+                                          {
+                                            "string": ""
+                                          },
+                                          {
+                                            "string": ""
+                                          },
+                                          {
+                                            "string": ""
+                                          },
+                                          {
+                                            "string": ""
+                                          },
+                                          {
+                                            "string": ""
+                                          },
+                                          {
+                                            "string": ""
+                                          },
+                                          {
+                                            "string": ""
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  }
+                                }
+                              ],
+                              "function_reference": 5,
+                              "output_type": {
+                                "string": {
+                                  "nullability": "NULLABILITY_REQUIRED"
+                                }
+                              }
+                            }
+                          }
+                        ],
+                        "input": {
+                          "read": {
+                            "base_schema": {
+                              "names": [
+                                "id",
+                                "destination_context"
+                              ],
+                              "struct": {
+                                "nullability": "NULLABILITY_REQUIRED",
+                                "types": [
+                                  {
+                                    "string": {
+                                      "nullability": "NULLABILITY_REQUIRED"
+                                    }
+                                  },
+                                  {
+                                    "string": {
+                                      "nullability": "NULLABILITY_REQUIRED"
+                                    }
+                                  }
+                                ]
+                              }
+                            },
+                            "common": {
+                              "direct": {},
+                              "hint": {
+                                "alias": "d"
+                              }
+                            },
+                            "named_table": {
+                              "names": [
+                                "citation_contexts"
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "right": {
+                  "read": {
+                    "base_schema": {
+                      "names": [
+                        "id",
+                        "passage_text"
+                      ],
+                      "struct": {
+                        "nullability": "NULLABILITY_REQUIRED",
+                        "types": [
+                          {
+                            "string": {
+                              "nullability": "NULLABILITY_REQUIRED"
+                            }
+                          },
+                          {
+                            "string": {
+                              "nullability": "NULLABILITY_REQUIRED"
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    "common": {
+                      "direct": {},
+                      "hint": {
+                        "alias": "s"
+                      }
+                    },
+                    "named_table": {
+                      "names": [
+                        "citation_passages"
+                      ]
+                    }
+                  }
+                },
+                "type": "JOIN_TYPE_INNER"
+              }
+            }
+          }
+        },
+        "names": [
+          "d",
+          "area",
+          "s"
+        ]
+      }
+    }
+  ],
+  "version": {
+    "minor_number": 103,
+    "producer": "quail-b"
+  }
+}

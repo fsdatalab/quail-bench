@@ -1,7 +1,8 @@
 """The QUAIL-B predicates and the identity of their reference labels.
 
 A predicate is one TRUE or FALSE question over one table column
-(filter) or two (join). Its version hashes everything that can change
+(filter) or two (join), or one choice among fixed labels over one
+column (classify). Its version hashes everything that can change
 the model's answer; the label-set id hashes the version, the corpus,
 and the judge, so a label file's path says exactly what produced it.
 The pass that writes the labels lives in Quail's repository.
@@ -37,6 +38,8 @@ class PredicateSpec:
     right_table: str | None = None
     right_column: str | None = None
     source_policy: str = "qwen3_32b"
+    labels: tuple[str, ...] = ()
+    descriptions: tuple[str, ...] = ()
 
 
 PREDICATES = (
@@ -142,7 +145,47 @@ PREDICATES = (
         "agent_trace", "agent_traces", "trace"),
 )
 
-PREDICATE_BY_KEY = {p.key: p for p in PREDICATES}
+# Classification predicates. Their labels are not in the published
+# collections yet, so they stay out of PREDICATES, which the labeling
+# pass requires every collection to cover.
+CLASSIFY_PREDICATES = (
+    PredicateSpec(
+        "quailb.imdb.review.sentiment", "imdb", "review_sentiment",
+        "classify", prompts.IMDB_SENTIMENT, "review", "reviews", "body",
+        labels=prompts.IMDB_SENTIMENT_LABELS),
+    PredicateSpec(
+        "quailb.imdb.review.genre", "imdb", "review_genre", "classify",
+        prompts.IMDB_GENRE, "review", "reviews", "body",
+        labels=prompts.IMDB_GENRE_LABELS),
+    PredicateSpec(
+        "quailb.imdb.review.main_complaint", "imdb", "review_main_complaint",
+        "classify", prompts.IMDB_COMPLAINT, "review", "reviews", "body",
+        labels=prompts.IMDB_COMPLAINT_LABELS),
+    PredicateSpec(
+        "quailb.biodex.reaction.organ_class", "biodex",
+        "reaction_organ_class", "classify", prompts.BIO_ORGAN_CLASS,
+        "reaction", "terms", "term", labels=prompts.BIO_ORGAN_CLASS_LABELS),
+    PredicateSpec(
+        "quailb.fever.claim.topic", "fever", "claim_topic", "classify",
+        prompts.FEV_TOPIC, "claim", "claims", "claim",
+        labels=prompts.FEV_TOPIC_LABELS),
+    PredicateSpec(
+        "quailb.lepard.excerpt.area_of_law", "lepard", "excerpt_area_of_law",
+        "classify", prompts.LEP_AREA, "excerpt", "citation_contexts",
+        "destination_context", labels=prompts.LEP_AREA_LABELS),
+    PredicateSpec(
+        "quailb.agent.trace.outcome", "agent", "trace_outcome", "classify",
+        prompts.AGENT_OUTCOME, "agent_trace", "agent_traces", "trace",
+        labels=prompts.AGENT_OUTCOME_LABELS,
+        descriptions=prompts.AGENT_OUTCOME_DESCRIPTIONS),
+    PredicateSpec(
+        "quailb.agent.trace.failure_mode", "agent", "trace_failure_mode",
+        "classify", prompts.AGENT_FAILURE, "agent_trace", "agent_traces",
+        "trace", labels=prompts.AGENT_FAILURE_LABELS,
+        descriptions=prompts.AGENT_FAILURE_DESCRIPTIONS),
+)
+
+PREDICATE_BY_KEY = {p.key: p for p in PREDICATES + CLASSIFY_PREDICATES}
 
 WORKLOADS = tuple(dict.fromkeys(spec.workload for spec in PREDICATES))
 
@@ -168,9 +211,16 @@ def _text_hash(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
+def _descriptions(spec: PredicateSpec) -> tuple[str, ...]:
+    return spec.descriptions or ("",) * len(spec.labels)
+
+
 def predicate_payload(spec: PredicateSpec) -> dict:
-    render = ("filter_document_then_question_v1" if spec.kind == "filter"
-              else "join_arg0_anchor_then_arg1_v1")
+    render = {
+        "filter": "filter_document_then_question_v1",
+        "join": "join_arg0_anchor_then_arg1_v1",
+        "classify": "classify_document_then_categories_v1",
+    }[spec.kind]
     payload = {
         "schema_version": SCHEMA_VERSION,
         "predicate_key": spec.key,
@@ -193,6 +243,16 @@ def predicate_payload(spec: PredicateSpec) -> dict:
         payload["answer_cue"] = rendering.ANSWER_CUE
     if rendering.PROMPT_FORMAT != "raw-v1":
         payload["prompt_format"] = rendering.PROMPT_FORMAT
+    if spec.kind == "classify":
+        payload.pop("task_instruction", None)
+        payload.update(
+            classify_instruction=rendering.CLASSIFY_INSTRUCTION,
+            categories_header=rendering.CATEGORIES_HEADER,
+            label_prefix=rendering.LABEL_PREFIX,
+            answer_cue=rendering.ANSWER_CUE,
+            labels=list(spec.labels),
+            descriptions=list(_descriptions(spec)),
+        )
     return payload
 
 
@@ -218,6 +278,22 @@ JUDGE_SPEC = {
     "seed": data.DATA_SEED,
     "allowed_answers": ["TRUE", "FALSE"],
     "prefix_caching": True,
+    "max_model_len": MAX_MODEL_LEN,
+}
+# The reference answer of a classification: the label with the largest
+# sum of its tokens' log probabilities after the prompt, each normalized
+# over the full vocabulary at temperature 1. It scores no end marker, and
+# the earliest label wins a tie.
+CLASSIFY_JUDGE_SPEC = {
+    "model_repo": MODEL_REPO,
+    "model_revision": MODEL_REVISION,
+    "tokenizer_revision": MODEL_REVISION,
+    "answer": "argmax over labels of the summed label-token log probabilities",
+    "normalization": "full vocabulary, temperature 1",
+    "tie": "earliest label",
+    "tokenization": ("the rendered prompt and LABEL_PREFIX + label, "
+                     "each tokenized alone, then concatenated"),
+    "engine": "vllm==0.26.0, prefix caching, logprob_token_ids",
     "max_model_len": MAX_MODEL_LEN,
 }
 JUDGE_FULL_HASH = _full_hash(JUDGE_SPEC)
@@ -254,6 +330,8 @@ SOURCE_SPECS = {
 def label_sources(spec: PredicateSpec, judge: dict = JUDGE_SPEC) -> list[dict]:
     """The sources of one predicate's labels, the judge first when it has one."""
     sources = []
+    if spec.kind == "classify" and judge is JUDGE_SPEC:
+        judge = CLASSIFY_JUDGE_SPEC
     if "qwen3_32b" in spec.source_policy:
         full = _full_hash(judge)
         sources.append({"id": _named_id("j", full), "full_hash": full,
@@ -303,6 +381,12 @@ def judgment_identity(label_set_id: str, example_full_hash: str) -> str:
 
 def render_filter_prompt(spec: PredicateSpec, document: str) -> str:
     return rendering.render_filter_prompt(spec.template, document)
+
+
+def render_classify_prompt(spec: PredicateSpec, document: str) -> str:
+    """Return the text a classification scores its labels after."""
+    return rendering.render_classify_prompt(
+        spec.template, document, spec.labels, _descriptions(spec))
 
 
 def render_join_prompt(spec: PredicateSpec, left: str, right: str) -> str:

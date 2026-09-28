@@ -36,14 +36,14 @@ from quail_b.substrait import (
 from tools.make_substrait_plans import write_plans
 
 
-def test_catalog_has_the_31_default_queries_and_two_privacy_queries():
-    assert len(QUERIES) == 31
+def test_catalog_has_the_41_default_queries_and_two_privacy_queries():
+    assert len(QUERIES) == 41
     assert QUERY_ORDER == (
-        *(f"IMDB-{i}" for i in range(1, 11)),
-        *(f"BIO-{i}" for i in range(1, 5)),
-        *(f"FEV-{i}" for i in range(1, 11)),
-        *(f"LEP-{i}" for i in range(1, 6)),
-        "AGENT-1", "AGENT-2",
+        *(f"IMDB-{i}" for i in range(1, 15)),
+        *(f"BIO-{i}" for i in range(1, 7)),
+        *(f"FEV-{i}" for i in range(1, 12)),
+        *(f"LEP-{i}" for i in range(1, 7)),
+        *(f"AGENT-{i}" for i in range(1, 5)),
     )
     assert [spec.id for spec in PRIVACY_QUERIES] == ["PRIV-1", "PRIV-2"]
     assert list(queries(include_privacy=True)) == [*QUERY_ORDER, "PRIV-1", "PRIV-2"]
@@ -57,7 +57,8 @@ def test_catalog_has_the_31_default_queries_and_two_privacy_queries():
             join.prompt in JOIN_SELECTIVITY_ESTIMATES
             for join in info.joins
         ), spec.id
-        assert all(name.endswith(".id") for name in info.select), spec.id
+        if not info.classifies:
+            assert all(name.endswith(".id") for name in info.select), spec.id
     for spec in PRIVACY_QUERIES:
         info = _inspect_plan(spec.plan)
         assert any(
@@ -232,7 +233,8 @@ def test_substrait_plans_are_packaged():
     catalog = package.joinpath("plans", "catalog.json")
     entries = json.loads(catalog.read_text())
 
-    assert len(entries) == 33
+    assert len(entries) == 43
+    assert not any(entry.get("labels_pending") for entry in entries)
     assert all(
         package.joinpath("plans", f"{entry['id']}.json").is_file()
         for entry in entries
@@ -253,10 +255,10 @@ def test_checked_in_plans_equal_the_generator_output(tmp_path):
 
 def test_parallel_query_split_matches_stock_vllm():
     assert split_query_ids(QUERY_ORDER, 4) == (
-        QUERY_ORDER[0:8],
-        QUERY_ORDER[8:16],
-        QUERY_ORDER[16:24],
-        QUERY_ORDER[24:31],
+        QUERY_ORDER[0:11],
+        QUERY_ORDER[11:21],
+        QUERY_ORDER[21:31],
+        QUERY_ORDER[31:41],
     )
 
 
@@ -269,13 +271,13 @@ def test_query_family_split_matches_benchmark_catalog():
         "AGENT": "agent",
     }
     assert split_query_families(QUERY_ORDER) == (
-        QUERY_ORDER[0:10],
-        QUERY_ORDER[10:14],
-        QUERY_ORDER[14:24],
-        QUERY_ORDER[24:29],
-        QUERY_ORDER[29:31],
+        QUERY_ORDER[0:14],
+        QUERY_ORDER[14:20],
+        QUERY_ORDER[20:31],
+        QUERY_ORDER[31:37],
+        QUERY_ORDER[37:41],
     )
-    assert query_family_name(QUERY_ORDER[0:10]) == "imdb"
+    assert query_family_name(QUERY_ORDER[0:14]) == "imdb"
 
 
 def test_query_family_rejects_mixed_or_unknown_queries():

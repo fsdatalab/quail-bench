@@ -25,8 +25,8 @@ def select_queries(only=None, *, scale_factor=0.1) -> tuple[QuerySpec, ...]:
     """Validate a scale factor and return the requested query definitions."""
     if scale_factor not in PUBLISHED_CORPORA:
         raise ValueError("scale factor must be 0.1, 0.5, or 1.0")
-    available = queries()
-    ids = list(available) if only is None else (
+    available = queries(include_pending=only is not None)
+    ids = list(queries()) if only is None else (
         [only] if isinstance(only, str) else list(only))
     unknown = set(ids) - available.keys()
     if unknown:
@@ -91,13 +91,13 @@ def load_benchmark(only=None, *, scale_factor=0.1, data_dir=None,
             root, scale_factor=scale_factor, corpus_id=corpus_id,
             collection_id=collection_id, prompt_format=PROMPT_FORMAT, templates={
                 operator.prompt for spec in specs
-                for operator in spec._info.operators})
+                for operator in spec._info.ai_operators})
         if collection_id is not None and truth.collection_id != collection_id:
             raise ValueError("ground truth has the wrong collection ID")
         if truth.corpus_id != corpus_id or truth.scale_factor != scale_factor:
             raise ValueError("ground truth does not match the input corpus")
         for spec in specs:
-            for operator in spec._info.operators:
+            for operator in spec._info.ai_operators:
                 try:
                     truth.key_for_template(operator.prompt)
                 except KeyError as error:

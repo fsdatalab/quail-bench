@@ -1,0 +1,269 @@
+{
+  "extension_urns": [
+    {
+      "extension_urn_anchor": 1,
+      "urn": "extension:org.fsdatalab.quail_b:functions_ai"
+    }
+  ],
+  "extensions": [
+    {
+      "extension_function": {
+        "extension_urn_reference": 1,
+        "function_anchor": 5,
+        "name": "ai_classify:str_str_list_list"
+      }
+    }
+  ],
+  "relations": [
+    {
+      "root": {
+        "input": {
+          "project": {
+            "common": {
+              "emit": {
+                "output_mapping": [
+                  3,
+                  4
+                ]
+              }
+            },
+            "expressions": [
+              {
+                "selection": {
+                  "direct_reference": {
+                    "struct_field": {}
+                  },
+                  "root_reference": {}
+                }
+              },
+              {
+                "selection": {
+                  "direct_reference": {
+                    "struct_field": {
+                      "field": 2
+                    }
+                  },
+                  "root_reference": {}
+                }
+              }
+            ],
+            "input": {
+              "filter": {
+                "common": {
+                  "direct": {},
+                  "hint": {
+                    "alias": "label-filter-1"
+                  }
+                },
+                "condition": {
+                  "singular_or_list": {
+                    "options": [
+                      {
+                        "literal": {
+                          "string": "politics"
+                        }
+                      },
+                      {
+                        "literal": {
+                          "string": "history"
+                        }
+                      }
+                    ],
+                    "value": {
+                      "selection": {
+                        "direct_reference": {
+                          "struct_field": {
+                            "field": 2
+                          }
+                        },
+                        "root_reference": {}
+                      }
+                    }
+                  }
+                },
+                "input": {
+                  "project": {
+                    "common": {
+                      "direct": {},
+                      "hint": {
+                        "alias": "classify-1",
+                        "output_names": [
+                          "c.id",
+                          "c.claim",
+                          "c.topic"
+                        ]
+                      }
+                    },
+                    "expressions": [
+                      {
+                        "scalar_function": {
+                          "arguments": [
+                            {
+                              "value": {
+                                "literal": {
+                                  "string": "Judge strictly from the claim above which topic it is about.\n\n{0}"
+                                }
+                              }
+                            },
+                            {
+                              "value": {
+                                "selection": {
+                                  "direct_reference": {
+                                    "struct_field": {
+                                      "field": 1
+                                    }
+                                  },
+                                  "root_reference": {}
+                                }
+                              }
+                            },
+                            {
+                              "value": {
+                                "literal": {
+                                  "list": {
+                                    "values": [
+                                      {
+                                        "string": "politics"
+                                      },
+                                      {
+                                        "string": "sports"
+                                      },
+                                      {
+                                        "string": "film and television"
+                                      },
+                                      {
+                                        "string": "music"
+                                      },
+                                      {
+                                        "string": "literature"
+                                      },
+                                      {
+                                        "string": "science"
+                                      },
+                                      {
+                                        "string": "history"
+                                      },
+                                      {
+                                        "string": "geography"
+                                      },
+                                      {
+                                        "string": "business"
+                                      },
+                                      {
+                                        "string": "religion"
+                                      },
+                                      {
+                                        "string": "other"
+                                      }
+                                    ]
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "value": {
+                                "literal": {
+                                  "list": {
+                                    "values": [
+                                      {
+                                        "string": ""
+                                      },
+                                      {
+                                        "string": ""
+                                      },
+                                      {
+                                        "string": ""
+                                      },
+                                      {
+                                        "string": ""
+                                      },
+                                      {
+                                        "string": ""
+                                      },
+                                      {
+                                        "string": ""
+                                      },
+                                      {
+                                        "string": ""
+                                      },
+                                      {
+                                        "string": ""
+                                      },
+                                      {
+                                        "string": ""
+                                      },
+                                      {
+                                        "string": ""
+                                      },
+                                      {
+                                        "string": ""
+                                      }
+                                    ]
+                                  }
+                                }
+                              }
+                            }
+                          ],
+                          "function_reference": 5,
+                          "output_type": {
+                            "string": {
+                              "nullability": "NULLABILITY_REQUIRED"
+                            }
+                          }
+                        }
+                      }
+                    ],
+                    "input": {
+                      "read": {
+                        "base_schema": {
+                          "names": [
+                            "id",
+                            "claim"
+                          ],
+                          "struct": {
+                            "nullability": "NULLABILITY_REQUIRED",
+                            "types": [
+                              {
+                                "string": {
+                                  "nullability": "NULLABILITY_REQUIRED"
+                                }
+                              },
+                              {
+                                "string": {
+                                  "nullability": "NULLABILITY_REQUIRED"
+                                }
+                              }
+                            ]
+                          }
+                        },
+                        "common": {
+                          "direct": {},
+                          "hint": {
+                            "alias": "c"
+                          }
+                        },
+                        "named_table": {
+                          "names": [
+                            "claims"
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "names": [
+          "c",
+          "topic"
+        ]
+      }
+    }
+  ],
+  "version": {
+    "minor_number": 103,
+    "producer": "quail-b"
+  }
+}

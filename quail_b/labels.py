@@ -1,4 +1,7 @@
-"""Saved reference labels: one TRUE or FALSE per predicate and row.
+"""Saved reference labels: one answer per predicate and row.
+
+A filter or join answer is TRUE or FALSE. A classification answer is
+one of the predicate's labels, stored in a `label` column.
 
 A label set holds every answer of one predicate over one corpus. A
 collection names one complete label set per predicate for one corpus
@@ -21,15 +24,26 @@ from quail_b.data import GROUND_TRUTH_ROOT, _full_hash
 
 LABEL_COLUMNS = ("left_id", "right_id", "answer")
 LABEL_FILE_COLUMNS = ("predicate_key", "label_set_id", *LABEL_COLUMNS)
+CLASSIFY_LABEL_COLUMNS = ("left_id", "right_id", "label")
+CLASSIFY_LABEL_FILE_COLUMNS = (
+    "predicate_key", "label_set_id", *CLASSIFY_LABEL_COLUMNS)
 
 
-def _answer_table(answers) -> pa.Table:
-    """Return labels as a table of left_id, right_id, and answer.
+def _answer_column(kind: str) -> tuple[str, pa.DataType]:
+    return ("label", pa.string()) if kind == "classify" else (
+        "answer", pa.bool_())
+
+
+def _answer_table(answers, kind: str = "filter") -> pa.Table:
+    """Return labels as a table of left_id, right_id, and the answer.
 
     Args:
         answers: A table with those columns, or a dict of
             (left_id, right_id or None) -> answer.
+        kind: The predicate kind. A classification's answer column is
+            the string `label`; the others' is the boolean `answer`.
     """
+    column, dtype = _answer_column(kind)
     if isinstance(answers, pa.Table):
         table = answers
     else:
@@ -37,14 +51,14 @@ def _answer_table(answers) -> pa.Table:
         table = pa.table({
             "left_id": pa.array([left for left, _ in pairs], pa.string()),
             "right_id": pa.array([right for _, right in pairs], pa.string()),
-            "answer": pa.array(list(answers.values()), pa.bool_()),
+            column: pa.array(list(answers.values()), dtype),
         })
-    if table.column("left_id").null_count or table.column("answer").null_count:
+    if table.column("left_id").null_count or table.column(column).null_count:
         raise ValueError("ground truth needs a left id and an answer per row")
     return pa.table({
         "left_id": pc.cast(table.column("left_id"), pa.string()),
         "right_id": pc.cast(table.column("right_id"), pa.string()),
-        "answer": pc.cast(table.column("answer"), pa.bool_()),
+        column: pc.cast(table.column(column), dtype),
     })
 
 
@@ -56,7 +70,8 @@ class PredicateLabels:
         label_set_id: The label set the answers came from.
         predicate: The predicate as its manifest records it.
         table: One row per labeled document or pair: `left_id`,
-            `right_id` (null for a filter), and the boolean `answer`.
+            `right_id` (null for a filter or classification), and the
+            boolean `answer`, or for a classification the string `label`.
         source_rows: Rows per source the label set was built from.
     """
 
@@ -65,12 +80,13 @@ class PredicateLabels:
         self.key = key
         self.label_set_id = label_set_id
         self.predicate = predicate
-        self.table = _answer_table(answers)
+        self.kind = predicate.get("kind", "filter")
+        self.table = _answer_table(answers, self.kind)
         self.source_rows = source_rows
         self.predicate_payload = predicate_payload
 
     @cached_property
-    def answers(self) -> dict[tuple[str, str | None], bool]:
+    def answers(self) -> dict[tuple[str, str | None], bool | str]:
         """(left_id, right_id or None) -> answer, for one lookup at a time.
 
         Scoring joins `table` instead; this dict is built on first use
@@ -80,14 +96,16 @@ class PredicateLabels:
         return dict(zip(
             zip(self.table.column("left_id").to_pylist(),
                 self.table.column("right_id").to_pylist()),
-            self.table.column("answer").to_pylist()))
+            self.table.column(_answer_column(self.kind)[0]).to_pylist()))
 
     @property
     def true_pairs(self) -> pa.Table:
         """The rows answered TRUE."""
+        if self.kind == "classify":
+            raise TypeError(f"{self.key} answers with labels, not TRUE")
         return self.table.filter(self.table.column("answer"))
 
-    def answer(self, left_id: str, right_id: str | None = None) -> bool:
+    def answer(self, left_id: str, right_id: str | None = None) -> bool | str:
         pair = (str(left_id), None if right_id is None else str(right_id))
         try:
             return self.answers[pair]
@@ -124,7 +142,7 @@ class GroundTruthCollection:
             raise KeyError("the query predicate has no ground truth") from error
 
     def answer(self, predicate_key: str, left_id: str,
-               right_id: str | None = None) -> bool:
+               right_id: str | None = None) -> bool | str:
         try:
             labels = self.predicates[predicate_key]
         except KeyError as error:
@@ -149,6 +167,10 @@ def _read_many(root, paths: list[str], read=_read_bytes) -> dict:
 
 def _read_label_file(root, path: str) -> pa.Table:
     return _read_parquet_columns(root, path, LABEL_FILE_COLUMNS)
+
+
+def _read_classify_label_file(root, path: str) -> pa.Table:
+    return _read_parquet_columns(root, path, CLASSIFY_LABEL_FILE_COLUMNS)
 
 
 def _choose_collection(root, scale_factor: float,
@@ -328,8 +350,10 @@ def _validate_label_set_corpora(root, collection: dict,
 
 
 def _read_label_set(parts: list[pa.Table], key: str, label_set_id: str,
-                    rows: int) -> pa.Table:
+                    rows: int, predicate: dict | None = None) -> pa.Table:
     """Check one label set's Parquet parts as columns."""
+    kind = (predicate or {}).get("kind", "filter")
+    columns = CLASSIFY_LABEL_COLUMNS if kind == "classify" else LABEL_COLUMNS
     table = pa.concat_tables(parts)
     for column, expected in (("predicate_key", key),
                              ("label_set_id", label_set_id)):
@@ -337,7 +361,13 @@ def _read_label_set(parts: list[pa.Table], key: str, label_set_id: str,
         if pc.any(mismatch).as_py():
             raise ValueError(
                 f"a label file of {key} has the wrong {column}")
-    table = _answer_table(table.select(list(LABEL_COLUMNS)))
+    table = _answer_table(table.select(list(columns)), kind)
+    if kind == "classify":
+        unknown = pc.invert(pc.is_in(
+            table.column("label"),
+            value_set=pa.array(predicate["labels"], pa.string())))
+        if pc.any(unknown).as_py():
+            raise ValueError(f"{key} has a label outside its label list")
     distinct = table.group_by(["left_id", "right_id"]).aggregate([]).num_rows
     if distinct != table.num_rows:
         raise ValueError(f"duplicate ground truth for {key}")
@@ -390,9 +420,16 @@ def _load_ground_truth_collection(root, collection: dict, templates=None
         if not part_paths:
             raise FileNotFoundError(f"label set {label_set_id} has no rows")
         data_paths[key] = part_paths
+    classify_keys = {
+        key for key in data_paths
+        if manifests[key]["predicate"]["kind"] == "classify"}
     data_tables = _read_many(
-        root, [path for paths in data_paths.values() for path in paths],
+        root, [path for key, paths in data_paths.items()
+               if key not in classify_keys for path in paths],
         _read_label_file)
+    data_tables.update(_read_many(
+        root, [path for key in classify_keys for path in data_paths[key]],
+        _read_classify_label_file) if classify_keys else {})
     predicates = {}
     for key, label_set_id in sorted(wanted.items()):
         manifest = manifests[key]
@@ -402,7 +439,7 @@ def _load_ground_truth_collection(root, collection: dict, templates=None
             predicate=manifest["predicate"],
             answers=_read_label_set(
                 [data_tables[path] for path in data_paths[key]],
-                key, label_set_id, manifest["rows"]),
+                key, label_set_id, manifest["rows"], manifest["predicate"]),
             source_rows=manifest["source_rows"],
             predicate_payload=manifest.get("predicate_payload"),
         )

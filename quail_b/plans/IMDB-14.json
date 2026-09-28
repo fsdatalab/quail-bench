@@ -1,0 +1,356 @@
+{
+  "extension_urns": [
+    {
+      "extension_urn_anchor": 1,
+      "urn": "extension:org.fsdatalab.quail_b:functions_ai"
+    }
+  ],
+  "extensions": [
+    {
+      "extension_function": {
+        "extension_urn_reference": 1,
+        "function_anchor": 5,
+        "name": "ai_classify:str_str_list_list"
+      }
+    }
+  ],
+  "relations": [
+    {
+      "root": {
+        "input": {
+          "project": {
+            "common": {
+              "emit": {
+                "output_mapping": [
+                  4,
+                  5,
+                  6
+                ]
+              }
+            },
+            "expressions": [
+              {
+                "selection": {
+                  "direct_reference": {
+                    "struct_field": {}
+                  },
+                  "root_reference": {}
+                }
+              },
+              {
+                "selection": {
+                  "direct_reference": {
+                    "struct_field": {
+                      "field": 2
+                    }
+                  },
+                  "root_reference": {}
+                }
+              },
+              {
+                "selection": {
+                  "direct_reference": {
+                    "struct_field": {
+                      "field": 3
+                    }
+                  },
+                  "root_reference": {}
+                }
+              }
+            ],
+            "input": {
+              "project": {
+                "common": {
+                  "direct": {},
+                  "hint": {
+                    "alias": "classify-2",
+                    "output_names": [
+                      "r.id",
+                      "r.body",
+                      "r.sentiment",
+                      "r.complaint"
+                    ]
+                  }
+                },
+                "expressions": [
+                  {
+                    "scalar_function": {
+                      "arguments": [
+                        {
+                          "value": {
+                            "literal": {
+                              "string": "Judge strictly from the review above what it criticizes most about the movie.\n\n{0}"
+                            }
+                          }
+                        },
+                        {
+                          "value": {
+                            "selection": {
+                              "direct_reference": {
+                                "struct_field": {
+                                  "field": 1
+                                }
+                              },
+                              "root_reference": {}
+                            }
+                          }
+                        },
+                        {
+                          "value": {
+                            "literal": {
+                              "list": {
+                                "values": [
+                                  {
+                                    "string": "poor acting"
+                                  },
+                                  {
+                                    "string": "poor writing"
+                                  },
+                                  {
+                                    "string": "poor visual effects"
+                                  },
+                                  {
+                                    "string": "slow pacing"
+                                  },
+                                  {
+                                    "string": "weak ending"
+                                  },
+                                  {
+                                    "string": "too long"
+                                  },
+                                  {
+                                    "string": "too violent"
+                                  },
+                                  {
+                                    "string": "no specific complaint"
+                                  }
+                                ]
+                              }
+                            }
+                          }
+                        },
+                        {
+                          "value": {
+                            "literal": {
+                              "list": {
+                                "values": [
+                                  {
+                                    "string": ""
+                                  },
+                                  {
+                                    "string": ""
+                                  },
+                                  {
+                                    "string": ""
+                                  },
+                                  {
+                                    "string": ""
+                                  },
+                                  {
+                                    "string": ""
+                                  },
+                                  {
+                                    "string": ""
+                                  },
+                                  {
+                                    "string": ""
+                                  },
+                                  {
+                                    "string": ""
+                                  }
+                                ]
+                              }
+                            }
+                          }
+                        }
+                      ],
+                      "function_reference": 5,
+                      "output_type": {
+                        "string": {
+                          "nullability": "NULLABILITY_REQUIRED"
+                        }
+                      }
+                    }
+                  }
+                ],
+                "input": {
+                  "filter": {
+                    "common": {
+                      "direct": {},
+                      "hint": {
+                        "alias": "label-filter-1"
+                      }
+                    },
+                    "condition": {
+                      "singular_or_list": {
+                        "options": [
+                          {
+                            "literal": {
+                              "string": "negative"
+                            }
+                          },
+                          {
+                            "literal": {
+                              "string": "mixed"
+                            }
+                          }
+                        ],
+                        "value": {
+                          "selection": {
+                            "direct_reference": {
+                              "struct_field": {
+                                "field": 2
+                              }
+                            },
+                            "root_reference": {}
+                          }
+                        }
+                      }
+                    },
+                    "input": {
+                      "project": {
+                        "common": {
+                          "direct": {},
+                          "hint": {
+                            "alias": "classify-1",
+                            "output_names": [
+                              "r.id",
+                              "r.body",
+                              "r.sentiment"
+                            ]
+                          }
+                        },
+                        "expressions": [
+                          {
+                            "scalar_function": {
+                              "arguments": [
+                                {
+                                  "value": {
+                                    "literal": {
+                                      "string": "Judge strictly from the review above which category best describes the overall sentiment it expresses about the movie.\n\n{0}"
+                                    }
+                                  }
+                                },
+                                {
+                                  "value": {
+                                    "selection": {
+                                      "direct_reference": {
+                                        "struct_field": {
+                                          "field": 1
+                                        }
+                                      },
+                                      "root_reference": {}
+                                    }
+                                  }
+                                },
+                                {
+                                  "value": {
+                                    "literal": {
+                                      "list": {
+                                        "values": [
+                                          {
+                                            "string": "positive"
+                                          },
+                                          {
+                                            "string": "negative"
+                                          },
+                                          {
+                                            "string": "neutral"
+                                          },
+                                          {
+                                            "string": "mixed"
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  }
+                                },
+                                {
+                                  "value": {
+                                    "literal": {
+                                      "list": {
+                                        "values": [
+                                          {
+                                            "string": ""
+                                          },
+                                          {
+                                            "string": ""
+                                          },
+                                          {
+                                            "string": ""
+                                          },
+                                          {
+                                            "string": ""
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  }
+                                }
+                              ],
+                              "function_reference": 5,
+                              "output_type": {
+                                "string": {
+                                  "nullability": "NULLABILITY_REQUIRED"
+                                }
+                              }
+                            }
+                          }
+                        ],
+                        "input": {
+                          "read": {
+                            "base_schema": {
+                              "names": [
+                                "id",
+                                "body"
+                              ],
+                              "struct": {
+                                "nullability": "NULLABILITY_REQUIRED",
+                                "types": [
+                                  {
+                                    "string": {
+                                      "nullability": "NULLABILITY_REQUIRED"
+                                    }
+                                  },
+                                  {
+                                    "string": {
+                                      "nullability": "NULLABILITY_REQUIRED"
+                                    }
+                                  }
+                                ]
+                              }
+                            },
+                            "common": {
+                              "direct": {},
+                              "hint": {
+                                "alias": "r"
+                              }
+                            },
+                            "named_table": {
+                              "names": [
+                                "reviews"
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "names": [
+          "r",
+          "sentiment",
+          "complaint"
+        ]
+      }
+    }
+  ],
+  "version": {
+    "minor_number": 103,
+    "producer": "quail-b"
+  }
+}

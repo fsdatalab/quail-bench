@@ -13,12 +13,14 @@ BOOLEAN_EXTENSION_URN = "extension:io.substrait:functions_boolean"
 
 AI_FILTER_NAME = "ai_filter:str_str"
 AI_JOIN_NAME = "ai_join:str_str_str"
+AI_CLASSIFY_NAME = "ai_classify:str_str_list_list"
 EQUAL_NAME = "equal:any_any"
 AND_NAME = "and:bool"
 
 _FUNCTION_URNS = {
     AI_FILTER_NAME: AI_EXTENSION_URN,
     AI_JOIN_NAME: AI_EXTENSION_URN,
+    AI_CLASSIFY_NAME: AI_EXTENSION_URN,
     EQUAL_NAME: COMPARISON_EXTENSION_URN,
     AND_NAME: BOOLEAN_EXTENSION_URN,
 }
@@ -46,7 +48,38 @@ class _Join:
     on: tuple[tuple[str, str], ...] = ()
 
 
-type _Operator = _Filter | _Join
+@dataclass(frozen=True)
+class _Classify:
+    """One ai_classify call that adds a label column to one relation.
+
+    Attributes:
+        id: The operator ID.
+        relation: The alias of the classified documents.
+        prompt: The prompt template, with the document as `{0}`.
+        labels: The categories, in the order that breaks ties.
+        descriptions: One description per label; empty means none.
+        output: The name of the added label column.
+    """
+
+    id: str
+    relation: str
+    prompt: str
+    labels: tuple[str, ...]
+    descriptions: tuple[str, ...]
+    output: str
+
+
+@dataclass(frozen=True)
+class _LabelFilter:
+    """Keep the documents whose label is one of the accepted labels."""
+
+    id: str
+    relation: str
+    output: str
+    accepted: tuple[str, ...]
+
+
+type _Operator = _Filter | _Join | _Classify | _LabelFilter
 
 
 @dataclass(frozen=True)
@@ -69,6 +102,37 @@ class _PlanInfo:
             operator
             for operator in self.operators
             if isinstance(operator, _Join)
+        )
+
+    @property
+    def ai_operators(self) -> tuple[_Filter | _Join | _Classify, ...]:
+        """The operators that ask the model, each with its prompt."""
+        return tuple(
+            operator
+            for operator in self.operators
+            if not isinstance(operator, _LabelFilter)
+        )
+
+    @property
+    def classifies(self) -> tuple[_Classify, ...]:
+        return tuple(
+            operator
+            for operator in self.operators
+            if isinstance(operator, _Classify)
+        )
+
+    @property
+    def label_filters(self) -> tuple[_LabelFilter, ...]:
+        return tuple(
+            operator
+            for operator in self.operators
+            if isinstance(operator, _LabelFilter)
+        )
+
+    def classify_output(self, output: str) -> _Classify:
+        return next(
+            operator for operator in self.classifies
+            if operator.output == output
         )
 
     @property
@@ -175,6 +239,34 @@ def _literal_string(expression: algebra_pb2.Expression) -> str:
     return literal.string
 
 
+def _string_list(expression: algebra_pb2.Expression) -> tuple[str, ...]:
+    if (not expression.HasField("literal")
+            or expression.literal.WhichOneof("literal_type") != "list"):
+        raise ValueError("ai_classify labels must be a list literal")
+    values = []
+    for value in expression.literal.list.values:
+        if value.WhichOneof("literal_type") != "string":
+            raise ValueError("ai_classify labels must be strings")
+        values.append(value.string)
+    return tuple(values)
+
+
+def _validate_labels(labels, descriptions) -> None:
+    if len(labels) < 2:
+        raise ValueError("ai_classify needs at least two labels")
+    if len(descriptions) != len(labels):
+        raise ValueError("ai_classify needs one description per label")
+    folded = [" ".join(label.split()).casefold() for label in labels]
+    if any(not label for label in folded) or len(set(folded)) != len(folded):
+        raise ValueError("ai_classify labels must be nonempty and distinct")
+    for label in folded:
+        for other in folded:
+            # the score of a label that continues another is never higher
+            if other != label and other.startswith(label + " "):
+                raise ValueError(
+                    f"ai_classify label {other!r} extends label {label!r}")
+
+
 def _flatten(
     expression: algebra_pb2.Expression,
     functions: dict[int, str],
@@ -208,6 +300,30 @@ def _decode(
         if (alias, "id") not in fields:
             raise ValueError("QUAIL-B reads need an id column")
         return _Decoded(fields, ((alias, read.named_table.names[-1]),), (), ())
+
+    if kind == "project":
+        return _decode_classify(rel.project, functions)
+
+    if kind == "filter" and rel.filter.condition.HasField("singular_or_list"):
+        child = _decode(rel.filter.input, functions)
+        membership = rel.filter.condition.singular_or_list
+        alias, output = _selected(child.fields, membership.value)
+        classify = next(
+            (operator for operator in child.operators
+             if isinstance(operator, _Classify)
+             and (operator.relation, operator.output) == (alias, output)),
+            None)
+        if classify is None:
+            raise ValueError("a label filter must test an ai_classify column")
+        accepted = tuple(_literal_string(option) for option in membership.options)
+        if not accepted or len(set(accepted)) != len(accepted):
+            raise ValueError("a label filter needs distinct accepted labels")
+        if not set(accepted) <= set(classify.labels):
+            raise ValueError("a label filter accepts a label not in its call")
+        operator = _LabelFilter(
+            rel.filter.common.hint.alias, alias, output, accepted)
+        return _Decoded(child.fields, child.tables, child.text_columns,
+                        (*child.operators, operator))
 
     if kind == "filter":
         child = _decode(rel.filter.input, functions)
@@ -293,6 +409,45 @@ def _decode(
     raise ValueError(f"unsupported QUAIL-B Substrait relation {kind!r}")
 
 
+def _decode_classify(project: algebra_pb2.ProjectRel,
+                     functions: dict[int, str]) -> _Decoded:
+    """Decode a ProjectRel that adds one ai_classify label column."""
+    child = _decode(project.input, functions)
+    if len(project.expressions) != 1 or project.common.HasField("emit"):
+        raise ValueError("a classify ProjectRel adds exactly one column")
+    expression = project.expressions[0]
+    function = expression.scalar_function
+    if (not expression.HasField("scalar_function")
+            or functions.get(function.function_reference) != AI_CLASSIFY_NAME):
+        raise ValueError("an inner QUAIL-B ProjectRel must call ai_classify")
+    arguments = _arguments(expression)
+    if len(arguments) != 4:
+        raise ValueError(
+            "ai_classify needs a prompt, document, labels, and descriptions")
+    prompt = _literal_string(arguments[0])
+    field = _selected(child.fields, arguments[1])
+    labels = _string_list(arguments[2])
+    descriptions = _string_list(arguments[3])
+    _validate_labels(labels, descriptions)
+    names = tuple(project.common.hint.output_names)
+    expected = tuple(".".join(name) for name in child.fields)
+    if len(names) != len(expected) + 1 or names[:-1] != expected:
+        raise ValueError("a classify ProjectRel must name every output field")
+    alias, _, output = names[-1].partition(".")
+    if alias != field[0] or not output or "." in output:
+        raise ValueError("a label column must belong to the classified relation")
+    if output == "id" or (alias, output) in child.fields:
+        raise ValueError(f"label column {output!r} is already a field")
+    operator = _Classify(project.common.hint.alias, alias, prompt, labels,
+                         descriptions, output)
+    return _Decoded(
+        (*child.fields, (alias, output)),
+        child.tables,
+        _with_text_column(child.text_columns, field),
+        (*child.operators, operator),
+    )
+
+
 def _field_alias(name: str) -> str:
     alias, separator, column = name.partition(".")
     if not separator or not alias or not column or "." in column:
@@ -324,15 +479,37 @@ def _validate_info(info: _PlanInfo) -> None:
                 first_join[alias] = min(first_join[alias], index)
     for index, operator in enumerate(info.operators):
         if (
-            isinstance(operator, _Filter)
+            isinstance(operator, (_Filter, _Classify, _LabelFilter))
             and index > first_join[operator.relation]
         ):
             raise ValueError(
                 f"filter {operator.id!r} must precede joins on its relation"
             )
+    outputs = [operator.output for operator in info.classifies]
+    if len(set(outputs)) != len(outputs) or set(outputs) & set(aliases):
+        raise ValueError("label column names must be distinct from each "
+                         "other and from relation aliases")
     selected = {_field_alias(name) for name in info.select}
     if not selected or not selected <= set(aliases):
         raise ValueError("QUAIL-B projection uses an unknown relation")
+    selected_ids = {
+        _field_alias(name) for name in info.select if name.endswith(".id")}
+    if selected_ids != selected:
+        raise ValueError("a query selecting a label column must select its "
+                         "relation's id")
+    for name in info.select:
+        alias, column = name.split(".", 1)
+        if column != "id" and not any(
+                (operator.relation, operator.output) == (alias, column)
+                for operator in info.classifies):
+            raise ValueError(f"QUAIL-B projection selects {name!r}; only ids "
+                             "and label columns can be selected")
+    used = {operator.output for operator in info.label_filters}
+    used.update(name.split(".", 1)[1] for name in info.select)
+    for operator in info.classifies:
+        if operator.output not in used:
+            raise ValueError(
+                f"label column {operator.output!r} is never used")
 
 
 def _inspect_plan(plan: plan_pb2.Plan) -> _PlanInfo:
@@ -363,7 +540,9 @@ def _inspect_plan(plan: plan_pb2.Plan) -> _PlanInfo:
     )
     if tuple(project.common.emit.output_mapping) != expected_mapping:
         raise ValueError("QUAIL-B ProjectRel has an invalid output mapping")
-    expected_names = tuple(name.split(".", 1)[0] for name in select)
+    expected_names = tuple(
+        alias if column == "id" else column
+        for alias, column in (name.split(".", 1) for name in select))
     if tuple(root.names) != expected_names:
         raise ValueError("QUAIL-B root names do not match selected relations")
     text_columns = dict(decoded.text_columns)

@@ -50,6 +50,26 @@
     "privacy": false
   },
   {
+    "id": "IMDB-11",
+    "description": "classify: the sentiment of every review",
+    "privacy": false
+  },
+  {
+    "id": "IMDB-12",
+    "description": "F1 -> classify: the IMDb genre of each review's movie",
+    "privacy": false
+  },
+  {
+    "id": "IMDB-13",
+    "description": "negative or mixed reviews -> J1: the aspects critical reviews discuss, with each review's sentiment",
+    "privacy": false
+  },
+  {
+    "id": "IMDB-14",
+    "description": "negative or mixed reviews -> classify: their main complaint, returned with their sentiment",
+    "privacy": false
+  },
+  {
     "id": "BIO-1",
     "description": "filter: serious adverse event",
     "privacy": false
@@ -67,6 +87,16 @@
   {
     "id": "BIO-4",
     "description": "3F + 2J: serious reports with neurological and cardiovascular reactions",
+    "privacy": false
+  },
+  {
+    "id": "BIO-5",
+    "description": "classify: the MedDRA system organ class of every reaction term",
+    "privacy": false
+  },
+  {
+    "id": "BIO-6",
+    "description": "serious adverse event reports x their cardiac or vascular reactions",
     "privacy": false
   },
   {
@@ -120,6 +150,11 @@
     "privacy": false
   },
   {
+    "id": "FEV-11",
+    "description": "classify: claim topic; the political and historical claims, with their topic",
+    "privacy": false
+  },
+  {
     "id": "LEP-1",
     "description": "filter: LEP1 (reasoning does not apply)",
     "privacy": false
@@ -145,6 +180,11 @@
     "privacy": false
   },
   {
+    "id": "LEP-6",
+    "description": "constitutional or criminal law excerpts -> the passages they cite, with each excerpt's area of law",
+    "privacy": false
+  },
+  {
     "id": "AGENT-1",
     "description": "filter: recovered after an unsuccessful approach",
     "privacy": false
@@ -152,6 +192,16 @@
   {
     "id": "AGENT-2",
     "description": "filter: implemented a plausible fix",
+    "privacy": false
+  },
+  {
+    "id": "AGENT-3",
+    "description": "recovered -> classify: whether the agent resolved the issue",
+    "privacy": false
+  },
+  {
+    "id": "AGENT-4",
+    "description": "unresolved traces -> classify: why the agent failed",
     "privacy": false
   },
   {
