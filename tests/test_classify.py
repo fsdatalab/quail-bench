@@ -299,11 +299,11 @@ def test_two_label_columns_and_chained_calls(tmp_path):
         (_classify_predicate(SENTIMENT), [
             ("r0", "negative"), ("r1", "positive"), ("r2", "mixed")]),
         (_classify_predicate(complaint), [
-            ("r0", "pacing"), ("r1", "no specific complaint"),
-            ("r2", "acting")]),
+            ("r0", "slow pacing"), ("r1", "no specific complaint"),
+            ("r2", "poor acting")]),
         (_classify_predicate(outcome), [("t0", "resolved"),
                                         ("t1", "gave up")]),
-        (_classify_predicate(failure), [("t0", "incorrect fix"),
+        (_classify_predicate(failure), [("t0", "made an incorrect fix"),
                                         ("t1", "ran out of steps")]),
         (_classify_predicate(topic), [("c0", "politics"), ("c1", "sports"),
                                       ("c2", "history")]),
@@ -317,12 +317,12 @@ def test_two_label_columns_and_chained_calls(tmp_path):
             return quail_b.RunOutput(
                 {}, {}, pa.table({
                     "r": ["r0", "r2"], "sentiment": ["negative", "mixed"],
-                    "complaint": ["pacing", "plot"]}),
+                    "complaint": ["slow pacing", "poor writing"]}),
                 runtime_s=1.0, classify_answers={
                     "classify-1": labels("r", ["r0", "r1", "r2"],
                                          ["negative", "positive", "mixed"]),
                     "classify-2": labels("r", ["r0", "r2"],
-                                         ["pacing", "plot"])})
+                                         ["slow pacing", "poor writing"])})
         if spec.id == "AGENT-4":
             return quail_b.RunOutput(
                 {}, {}, pa.table({"t": ["t1"], "failure": ["ran out of steps"]}),

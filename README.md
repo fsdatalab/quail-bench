@@ -249,20 +249,21 @@ marked `labels_pending` in the catalog: `queries()` and `quail_b.run` with
 question an analyst would ask of that collection, with a standard label list
 where one exists, such as IMDb's genres or MedDRA's system organ classes.
 Label length follows from the list, from one token for sentiment to eleven
-for an organ class under the Qwen3 tokenizer.
+for an organ class under the Qwen3 tokenizer. IMDB-14, LEP-6, and AGENT-4
+have labels that start with the same words, as category names often do.
 
 | Query | Question | Labels |
 | --- | --- | --- |
 | IMDB-11 | What is the sentiment of each review? | 4, one token each |
 | IMDB-12 | Among reviews that praise something (F1), what genre is each movie? | IMDb's 21 genres |
 | IMDB-13 | Which aspects do negative or mixed reviews discuss? | Sentiment, as a filter before J1, returned per pair |
-| IMDB-14 | What do negative or mixed reviews complain about most? | Sentiment, then 9 complaints; both returned |
+| IMDB-14 | What do negative or mixed reviews complain about most? | Sentiment, then 8 complaints; three start with "poor" and two with "too"; both returned |
 | BIO-5 | Which system organ class does each reaction term belong to? | MedDRA's 26 classes, 1 to 11 tokens |
 | BIO-6 | Which cardiac or vascular reactions do serious reports describe? | Organ class, as a filter on one join input |
 | FEV-11 | Which claims are about politics or history, and which topic? | 11 topics; one call returned and filtered |
 | LEP-6 | Which passages do constitutional or criminal law excerpts cite? | 15 areas of law, as a filter before the join |
 | AGENT-3 | Did agents that recovered from a failed approach resolve the issue? | 4 outcomes with descriptions, after a filter |
-| AGENT-4 | Why did the agents that did not resolve the issue fail? | Outcome, then 8 failure modes with descriptions |
+| AGENT-4 | Why did the agents that did not resolve the issue fail? | Outcome, then 8 failure modes with descriptions; three start with "could not" |
 
 A classification answer is the label with the largest sum of label-token log
 probabilities; the [reference](docs/reference.md#classification) defines the

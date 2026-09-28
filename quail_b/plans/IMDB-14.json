@@ -101,28 +101,25 @@
                               "list": {
                                 "values": [
                                   {
-                                    "string": "acting"
+                                    "string": "poor acting"
                                   },
                                   {
-                                    "string": "plot"
+                                    "string": "poor writing"
                                   },
                                   {
-                                    "string": "pacing"
+                                    "string": "poor visual effects"
                                   },
                                   {
-                                    "string": "dialogue"
+                                    "string": "slow pacing"
                                   },
                                   {
-                                    "string": "visual effects"
+                                    "string": "weak ending"
                                   },
                                   {
-                                    "string": "soundtrack"
+                                    "string": "too long"
                                   },
                                   {
-                                    "string": "ending"
-                                  },
-                                  {
-                                    "string": "direction"
+                                    "string": "too violent"
                                   },
                                   {
                                     "string": "no specific complaint"
@@ -137,9 +134,6 @@
                             "literal": {
                               "list": {
                                 "values": [
-                                  {
-                                    "string": ""
-                                  },
                                   {
                                     "string": ""
                                   },

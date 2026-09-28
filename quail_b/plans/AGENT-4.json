@@ -96,16 +96,16 @@
                                     "string": "could not reproduce the bug"
                                   },
                                   {
-                                    "string": "edited the wrong code"
+                                    "string": "could not find the relevant code"
                                   },
                                   {
-                                    "string": "incorrect fix"
+                                    "string": "could not run the tests"
+                                  },
+                                  {
+                                    "string": "made an incorrect fix"
                                   },
                                   {
                                     "string": "broke existing tests"
-                                  },
-                                  {
-                                    "string": "did not run the tests"
                                   },
                                   {
                                     "string": "environment or tool error"
@@ -130,16 +130,16 @@
                                     "string": "never saw the reported failure happen"
                                   },
                                   {
-                                    "string": "changed files that do not cause the issue"
+                                    "string": "never found the code that causes the issue"
+                                  },
+                                  {
+                                    "string": "could not get the test suite to run"
                                   },
                                   {
                                     "string": "changed the right code, but the change does not fix the issue"
                                   },
                                   {
                                     "string": "fixed the issue but made other tests fail"
-                                  },
-                                  {
-                                    "string": "never checked the change against tests"
                                   },
                                   {
                                     "string": "a broken setup, missing dependency, or tool failure blocked progress"

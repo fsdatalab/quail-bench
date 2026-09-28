@@ -183,8 +183,8 @@ IMDB_COMPLAINT = (
     "the movie.\n\n{0}"
 )
 IMDB_COMPLAINT_LABELS = (
-    "acting", "plot", "pacing", "dialogue", "visual effects", "soundtrack",
-    "ending", "direction", "no specific complaint",
+    "poor acting", "poor writing", "poor visual effects", "slow pacing",
+    "weak ending", "too long", "too violent", "no specific complaint",
 )
 
 # MedDRA's system organ classes, less "product issues", which a
@@ -251,16 +251,17 @@ AGENT_FAILURE = (
 )
 AGENT_FAILURE_LABELS = (
     "misunderstood the issue", "could not reproduce the bug",
-    "edited the wrong code", "incorrect fix", "broke existing tests",
-    "did not run the tests", "environment or tool error", "ran out of steps",
+    "could not find the relevant code", "could not run the tests",
+    "made an incorrect fix", "broke existing tests",
+    "environment or tool error", "ran out of steps",
 )
 AGENT_FAILURE_DESCRIPTIONS = (
     "worked on a different problem than the one reported",
     "never saw the reported failure happen",
-    "changed files that do not cause the issue",
+    "never found the code that causes the issue",
+    "could not get the test suite to run",
     "changed the right code, but the change does not fix the issue",
     "fixed the issue but made other tests fail",
-    "never checked the change against tests",
     "a broken setup, missing dependency, or tool failure blocked progress",
     "reached the step limit while still making progress",
 )
