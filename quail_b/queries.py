@@ -13,8 +13,10 @@ from substrait import plan_pb2
 
 from quail_b.prompts import (
     AGENT_IMPLEMENTED_FIX,
+    AGENT_OUTCOME,
     AGENT_RECOVERED,
     ASPECT_SENTIMENT,
+    BIO_ORGAN_CLASS,
     CARDIOVASCULAR_REACTION,
     DISCUSS_ASPECT,
     F1,
@@ -23,11 +25,14 @@ from quail_b.prompts import (
     F11,
     F12,
     F13,
+    FEV_TOPIC,
+    IMDB_SENTIMENT,
     LEP1,
     LEP2,
     LEP3,
     LEP4,
     LEP5,
+    LEP_AREA,
     LEPJOIN,
     LEPS1,
     NEUROLOGICAL_REACTION,
@@ -71,6 +76,16 @@ JOIN_SELECTIVITY_ESTIMATES = {
     SUPPORT: 311 / 143500,
     REFUTE: 477 / 143500,
     LEPJOIN: 500 / 216500,
+}
+# Label filters, keyed by (classification prompt, accepted labels), from
+# the sf=0.1 reference labels in gt_6d7ca88a74a30b665bfb67dcde76daff.
+LABEL_SELECTIVITY_ESTIMATES = {
+    (IMDB_SENTIMENT, frozenset({"negative", "mixed"})): 2923 / 5000,
+    (BIO_ORGAN_CLASS, frozenset({"cardiac disorders", "vascular disorders"})):
+        109 / 1127,
+    (FEV_TOPIC, frozenset({"politics", "history"})): 46 / 500,
+    (LEP_AREA, frozenset({"constitutional law", "criminal law"})): 159 / 500,
+    (AGENT_OUTCOME, frozenset({"not resolved"})): 1112 / 1772,
 }
 
 
