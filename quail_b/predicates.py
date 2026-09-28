@@ -291,6 +291,9 @@ CLASSIFY_JUDGE_SPEC = {
     "answer": "argmax over labels of the summed label-token log probabilities",
     "normalization": "full vocabulary, temperature 1",
     "tie": "earliest label",
+    "tokenization": ("the rendered prompt and LABEL_PREFIX + label, "
+                     "each tokenized alone, then concatenated"),
+    "engine": "vllm==0.26.0, prefix caching, logprob_token_ids",
     "max_model_len": MAX_MODEL_LEN,
 }
 JUDGE_FULL_HASH = _full_hash(JUDGE_SPEC)
