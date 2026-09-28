@@ -1,9 +1,8 @@
 # QUAIL-B
 
 QUAIL-B is a benchmark for AI functions in SQL, or AI-SQL. It is actively being
-developed. **The published queries use AI-powered filters and joins. Ten
-classification queries are defined and wait for their reference labels; we
-will expand to AI-powered extract, map, and groupby.**
+developed. **The queries use AI-powered filters, joins, and classification;
+we will expand to AI-powered extract, map, and groupby.**
 
 For example, query IMDB-4 finds the movie aspects that each review discusses,
 for reviews that praise the movie and discuss its ending:
@@ -23,7 +22,7 @@ The query is written with BigQuery's
 function, and its prompts are shortened. QUAIL-B publishes each query as a
 Substrait plan with the exact prompt text.
 
-The benchmark contains 31 such queries over five document collections: movie
+The benchmark contains 41 such queries over five document collections: movie
 reviews, adverse drug reaction reports, claims and evidence for fact
 verification, legal citations, and software agent trajectories. Each collection
 comes at three scale factors, with reference answers for every filter and join.
@@ -113,7 +112,7 @@ A full call to `quail_b.run` looks like:
 ```python
 quail_b.run(
     run_query,
-    queries=None,                        # None runs all 31 queries
+    queries=None,                        # None runs all 41 queries
     scale_factor=0.1,                    # 0.1, 0.5, or 1.0
     output_dir="results/vllm_qwen3_4b",  # must be a new directory
     metadata={"engine": "vllm", "model": "Qwen/Qwen3-4B-FP8"},
@@ -129,7 +128,7 @@ it saves the output, scores it, and updates `run.json`. At the end it writes
 | Parameter | Default | Meaning |
 | --- | --- | --- |
 | `run_query` | required | Your adapter |
-| `queries` | `None` | Query IDs to run; `None` runs all 31 |
+| `queries` | `None` | Query IDs to run; `None` runs all 41 |
 | `scale_factor` | `0.1` | Published scale factor: `0.1`, `0.5`, or `1.0` |
 | `output_dir` | required | New directory for this run's results |
 | `metadata` | `None` | JSON object saved with the run: engine, model, settings |
@@ -153,8 +152,8 @@ location. QUAIL-B checks every loaded table against the published corpus
 identity, so local files that differ from the published data fail the run.
 
 Each reference answer takes about 25 bytes in memory. Loading every answer at
-scale factor 0.1, 1.21 million answers, takes about 2 seconds from the cache
-and peaks at 0.62 GiB, input tables included. At scale factor 1.0, 51.8 million
+scale factor 0.1, about 1.2 million answers, takes about 2 seconds from the cache
+and peaks at 0.62 GiB, input tables included. At scale factor 1.0, about 52 million
 answers, budget about 3 GiB.
 
 ### Inspecting queries and tables
@@ -190,11 +189,11 @@ ai_classify(prompt, document, labels, descriptions) -> string
 
 | Dataset | Queries | Tables | Task |
 | --- | --- | --- | --- |
-| IMDB | IMDB-1 to IMDB-10 | `reviews`, `aspects` | Review aspects and sentiment |
-| BioDEX | BIO-1 to BIO-4 | `reports`, `terms` | Adverse drug reactions |
-| FEVER | FEV-1 to FEV-10 | `claims`, `evidence` | Fact verification |
-| LePaRD | LEP-1 to LEP-5 | `citation_contexts`, `citation_passages` | Legal citations |
-| SWE-Next | AGENT-1 to AGENT-2 | `agent_traces` | Software agent trajectories |
+| IMDB | IMDB-1 to IMDB-14 | `reviews`, `aspects` | Review aspects and sentiment |
+| BioDEX | BIO-1 to BIO-6 | `reports`, `terms` | Adverse drug reactions |
+| FEVER | FEV-1 to FEV-11 | `claims`, `evidence` | Fact verification |
+| LePaRD | LEP-1 to LEP-6 | `citation_contexts`, `citation_passages` | Legal citations |
+| SWE-Next | AGENT-1 to AGENT-4 | `agent_traces` | Software agent trajectories |
 
 Within each dataset, the first queries have a single filter or join. Later
 queries chain filters, filter both join inputs, scan one table under two
@@ -225,10 +224,10 @@ following question:", so an engine can reuse a document's KV across questions.
 
 ### Developing an adapter
 
-The 31 queries have several different shapes: how many filters and joins they
+The 41 queries have several different shapes: how many filters and joins they
 have, and how those operators are arranged in the plan. The table below lists
 one query for each distinct shape, from simplest to most complex. Test your
-adapter on these queries first, then run it on all 31.
+adapter on these queries first, then run it on all 41.
 
 | Query | Shape | What it tests |
 | --- | --- | --- |
@@ -243,9 +242,7 @@ adapter on these queries first, then run it on all 31.
 
 ### Classification queries
 
-Ten queries return or filter on a label chosen from a fixed list. They are
-marked `labels_pending` in the catalog: `queries()` and `quail_b.run` with
-`queries=None` leave them out until their labels are published. Each asks a
+Ten queries return or filter on a label chosen from a fixed list. Each asks a
 question an analyst would ask of that collection, with a standard label list
 where one exists, such as IMDb's genres or MedDRA's system organ classes.
 Label length follows from the list, from one token for sentiment to eleven
@@ -291,11 +288,16 @@ same at every scale factor. Use 0.1 while developing an adapter.
 ### Reference answers
 
 QUAIL-B scores every run against reference answers: one TRUE or FALSE label
-for each document or document pair each AI predicate can be asked about.
+for each document or document pair each filter or join can be asked about,
+and one label for each document a classification can be asked about.
 
 **Accuracy is not a focus of this benchmark.** Most labels are the answers of
 one arbitrary model, `Qwen/Qwen3-32B-FP8`, so it is not really meaningful to
 measure accuracy against them. We provide these fake labels anyway.
+
+Filter and join labels are Qwen3 32B's answers through Quail. Classification
+labels are Qwen3 32B's highest-scoring label through stock vLLM 0.26.0, as
+`quail_b.predicates.CLASSIFY_JUDGE_SPEC` records.
 
 Two datasets have real labels for join operations. First, the join that asks
 whether a FEVER passage supports a claim uses the claim annotations from
@@ -318,9 +320,9 @@ to the data or labels produces new IDs. These are the published IDs:
 
 | Scale factor | Corpus ID | Collection ID |
 | --- | --- | --- |
-| 0.1 | `c_1aa2c4f0d0b6c816fd37aa5748c33341` | `gt_cd3ebdb784f64b9e028e50ea73cdedd0` |
-| 0.5 | `c_6773c85b3754908434661c1dadfad0fa` | `gt_68f9ce9439bd7615de92b33d576dff9e` |
-| 1.0 | `c_81a95887a650aaa1a343e0d688b81bef` | `gt_e87691add604b02c4e43f0ff5bf0cc4f` |
+| 0.1 | `c_1aa2c4f0d0b6c816fd37aa5748c33341` | `gt_6d7ca88a74a30b665bfb67dcde76daff` |
+| 0.5 | `c_6773c85b3754908434661c1dadfad0fa` | `gt_52da77e8d146641a01561d5027dc87f8` |
+| 1.0 | `c_81a95887a650aaa1a343e0d688b81bef` | `gt_f5dc4fe012b930645e88d6cc368efecb` |
 
 `quail_b.run` loads the matching collection for you and records both IDs in
 `run.json`. Compare results only across runs with the same IDs.

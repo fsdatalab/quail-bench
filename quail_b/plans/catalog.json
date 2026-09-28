@@ -52,26 +52,22 @@
   {
     "id": "IMDB-11",
     "description": "classify: the sentiment of every review",
-    "privacy": false,
-    "labels_pending": true
+    "privacy": false
   },
   {
     "id": "IMDB-12",
     "description": "F1 -> classify: the IMDb genre of each review's movie",
-    "privacy": false,
-    "labels_pending": true
+    "privacy": false
   },
   {
     "id": "IMDB-13",
     "description": "negative or mixed reviews -> J1: the aspects critical reviews discuss, with each review's sentiment",
-    "privacy": false,
-    "labels_pending": true
+    "privacy": false
   },
   {
     "id": "IMDB-14",
     "description": "negative or mixed reviews -> classify: their main complaint, returned with their sentiment",
-    "privacy": false,
-    "labels_pending": true
+    "privacy": false
   },
   {
     "id": "BIO-1",
@@ -96,14 +92,12 @@
   {
     "id": "BIO-5",
     "description": "classify: the MedDRA system organ class of every reaction term",
-    "privacy": false,
-    "labels_pending": true
+    "privacy": false
   },
   {
     "id": "BIO-6",
     "description": "serious adverse event reports x their cardiac or vascular reactions",
-    "privacy": false,
-    "labels_pending": true
+    "privacy": false
   },
   {
     "id": "FEV-1",
@@ -158,8 +152,7 @@
   {
     "id": "FEV-11",
     "description": "classify: claim topic; the political and historical claims, with their topic",
-    "privacy": false,
-    "labels_pending": true
+    "privacy": false
   },
   {
     "id": "LEP-1",
@@ -189,8 +182,7 @@
   {
     "id": "LEP-6",
     "description": "constitutional or criminal law excerpts -> the passages they cite, with each excerpt's area of law",
-    "privacy": false,
-    "labels_pending": true
+    "privacy": false
   },
   {
     "id": "AGENT-1",
@@ -205,14 +197,12 @@
   {
     "id": "AGENT-3",
     "description": "recovered -> classify: whether the agent resolved the issue",
-    "privacy": false,
-    "labels_pending": true
+    "privacy": false
   },
   {
     "id": "AGENT-4",
     "description": "unresolved traces -> classify: why the agent failed",
-    "privacy": false,
-    "labels_pending": true
+    "privacy": false
   },
   {
     "id": "PRIV-1",

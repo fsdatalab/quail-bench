@@ -24,15 +24,14 @@ from tools.make_substrait_plans import (
     build_plan,
 )
 
-PENDING = ("IMDB-11", "IMDB-12", "IMDB-13", "IMDB-14", "BIO-5", "BIO-6",
-           "FEV-11", "LEP-6", "AGENT-3", "AGENT-4")
+CLASSIFY_QUERIES = ("IMDB-11", "IMDB-12", "IMDB-13", "IMDB-14", "BIO-5",
+                    "BIO-6", "FEV-11", "LEP-6", "AGENT-3", "AGENT-4")
 
 
-def test_classification_queries_wait_for_published_labels():
-    assert pending_query_ids() == PENDING
-    assert not set(PENDING) & set(queries())
-    assert set(PENDING) <= set(queries(include_pending=True))
-    assert quail_b.get_query("IMDB-13").id == "IMDB-13"
+def test_classification_queries_are_published():
+    assert pending_query_ids() == ()
+    assert tuple(query_id for query_id, spec in queries().items()
+                 if spec._info.classifies) == CLASSIFY_QUERIES
 
 
 def test_every_classification_has_one_predicate():
@@ -40,7 +39,7 @@ def test_every_classification_has_one_predicate():
         spec.template: spec for spec in predicates.CLASSIFY_PREDICATES}
     assert len(by_template) == len(predicates.CLASSIFY_PREDICATES)
     used = set()
-    for query_id in PENDING:
+    for query_id in CLASSIFY_QUERIES:
         for operator in quail_b.get_query(query_id)._info.classifies:
             spec = by_template[operator.prompt]
             assert spec.labels == operator.labels
@@ -302,7 +301,7 @@ def test_two_label_columns_and_chained_calls(tmp_path):
             ("r0", "slow pacing"), ("r1", "no specific complaint"),
             ("r2", "poor acting")]),
         (_classify_predicate(outcome), [("t0", "resolved"),
-                                        ("t1", "gave up")]),
+                                        ("t1", "not resolved")]),
         (_classify_predicate(failure), [("t0", "made an incorrect fix"),
                                         ("t1", "ran out of steps")]),
         (_classify_predicate(topic), [("c0", "politics"), ("c1", "sports"),
@@ -328,7 +327,7 @@ def test_two_label_columns_and_chained_calls(tmp_path):
                 {}, {}, pa.table({"t": ["t1"], "failure": ["ran out of steps"]}),
                 runtime_s=1.0, classify_answers={
                     "classify-1": labels("t", ["t0", "t1"],
-                                         ["resolved", "gave up"]),
+                                         ["resolved", "not resolved"]),
                     "classify-2": labels("t", ["t1"], ["ran out of steps"])})
         return quail_b.RunOutput(
             {}, {}, pa.table({"c": ["c0", "c2"],

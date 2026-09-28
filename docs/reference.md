@@ -288,11 +288,10 @@ filter stores its boolean `answer`. Its manifest's predicate lists `labels`.
 
 ### Queries waiting for labels
 
-The ten classification queries are marked `labels_pending` in the catalog.
-`quail_b.queries()` leaves them out until their labels are published;
-`queries(include_pending=True)` and `get_query` return them. Running one needs a
-label collection that includes its predicates, passed with `root` or
-`collection_id`.
+A query marked `labels_pending` in the catalog has no published labels yet.
+`quail_b.queries()` leaves it out; `queries(include_pending=True)` and
+`get_query` return it. Running one needs a label collection that includes its
+predicates, passed with `root` or `collection_id`. No query is pending now.
 
 ## Measurements
 

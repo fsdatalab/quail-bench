@@ -177,11 +177,6 @@
                             "literal": {
                               "string": "not resolved"
                             }
-                          },
-                          {
-                            "literal": {
-                              "string": "gave up"
-                            }
                           }
                         ],
                         "value": {
