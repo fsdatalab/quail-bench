@@ -15,6 +15,7 @@ from quail_b.prompts import (
 from quail_b.queries import (
     FILTER_SELECTIVITY_ESTIMATES,
     JOIN_SELECTIVITY_ESTIMATES,
+    LABEL_SELECTIVITY_ESTIMATES,
     PRIVACY_QUERIES,
     QUERIES,
     QUERY_FAMILY_WORKLOADS,
@@ -56,6 +57,11 @@ def test_catalog_has_the_41_default_queries_and_two_privacy_queries():
         assert all(
             join.prompt in JOIN_SELECTIVITY_ESTIMATES
             for join in info.joins
+        ), spec.id
+        assert all(
+            (info.classify_output(label_filter.output).prompt,
+             frozenset(label_filter.accepted)) in LABEL_SELECTIVITY_ESTIMATES
+            for label_filter in info.label_filters
         ), spec.id
         if not info.classifies:
             assert all(name.endswith(".id") for name in info.select), spec.id
