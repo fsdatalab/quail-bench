@@ -1,7 +1,8 @@
 """Saved reference labels: one answer per predicate and row.
 
 A filter or join answer is TRUE or FALSE. A classification answer is
-one of the predicate's labels, stored in a `label` column.
+one of the predicate's labels, stored in a `label` column; a pair
+classification labels a document pair, like a join.
 
 A label set holds every answer of one predicate over one corpus. A
 collection names one complete label set per predicate for one corpus
@@ -70,8 +71,9 @@ class PredicateLabels:
         label_set_id: The label set the answers came from.
         predicate: The predicate as its manifest records it.
         table: One row per labeled document or pair: `left_id`,
-            `right_id` (null for a filter or classification), and the
-            boolean `answer`, or for a classification the string `label`.
+            `right_id` (null for a filter or a one-document
+            classification), and the boolean `answer`, or for a
+            classification the string `label`.
         source_rows: Rows per source the label set was built from.
     """
 
@@ -265,8 +267,9 @@ def load_ground_truth(root=None, scale_factor: float = 0.1,
 
 
 def _predicate_tables(predicate: dict) -> tuple[str, ...]:
+    """The tables a predicate reads: two for a join or pair classification."""
     tables = {predicate["left_table"]}
-    if predicate["kind"] == "join":
+    if predicate["kind"] == "join" or predicate.get("right_table"):
         tables.add(predicate["right_table"])
     return tuple(sorted(tables))
 

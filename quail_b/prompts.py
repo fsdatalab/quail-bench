@@ -158,13 +158,23 @@ SCENARIO_MATCH = ("Based on the privacy policy in DOCUMENT {0}, could "
 
 # Classification templates. Each call also carries its labels and
 # optional descriptions, defined next to it. A template is used with
-# exactly one label list, so a template names one predicate.
+# exactly one label list, so a template names one predicate. A
+# one-document template takes the document as `{0}`; a pair template
+# takes the anchor as `{0}` and its partner as `{1}`.
 
 IMDB_SENTIMENT = (
     "Judge strictly from the review above which category best describes "
     "the overall sentiment it expresses about the movie.\n\n{0}"
 )
 IMDB_SENTIMENT_LABELS = ("positive", "negative", "neutral", "mixed")
+
+# A pair classification: the review is DOCUMENT {0}, the aspect
+# DOCUMENT {1}, and the label describes the pair.
+IMDB_ASPECT_SENTIMENT = (
+    "Judge strictly from the review in DOCUMENT {0} what sentiment it "
+    "expresses about the movie aspect in DOCUMENT {1}."
+)
+IMDB_ASPECT_SENTIMENT_LABELS = IMDB_SENTIMENT_LABELS
 
 # IMDb's own genre list.
 IMDB_GENRE = (

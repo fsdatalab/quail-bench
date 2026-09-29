@@ -1,4 +1,4 @@
-"""The exact prompt text a predicate asks, for filters and joins.
+"""The exact prompt text a predicate asks, for filters, joins, and labels.
 
 The reference labels answer this text. An engine that runs QUAIL-B
 sends the same text, so the text is defined here and not borrowed
@@ -118,6 +118,29 @@ def render_classify_prompt(template: str, document: str, labels,
     sep = m.group(2)[:len(m.group(2)) - len(content)] or "\n\n"
     return (preamble + document + sep + CLASSIFY_INSTRUCTION + content
             + render_categories(labels, descriptions) + ANSWER_CUE)
+
+
+def render_pair_classify_prompt(template: str, anchor: str, partner: str,
+                                labels, descriptions=None) -> str:
+    """Return the text a pair classification scores its labels after.
+
+    The anchor document comes first with its anchor note, as in a join,
+    then the labeled partner document, the instruction and question,
+    the category list, and the answer cue. The template keeps both
+    placeholders as written, `{0}` for the anchor and `{1}` for the
+    partner.
+
+    Args:
+        template: The question, naming the documents as `{0}` and `{1}`.
+        anchor: The text of document `{0}`.
+        partner: The text of document `{1}`.
+        labels: The categories, in the order that breaks ties.
+        descriptions: One description per label, or None for none.
+    """
+    _check_placeholders(template, 2)
+    return (SHARED_PRE + anchor + JOIN_ANCHOR_NOTE.format(_marker(0))
+            + join_label(1) + partner + "\n\n" + CLASSIFY_INSTRUCTION
+            + template + render_categories(labels, descriptions) + ANSWER_CUE)
 
 
 def join_label(placeholder: int) -> str:

@@ -48,6 +48,7 @@ from quail_b.prompts import (
 )
 from quail_b.substrait import (
     AI_CLASSIFY_NAME,
+    AI_CLASSIFY_PAIR_NAME,
     AI_EXTENSION_URN,
     AI_FILTER_NAME,
     AI_JOIN_NAME,
@@ -73,6 +74,7 @@ _FUNCTIONS = {
     EQUAL_NAME: (3, COMPARISON_EXTENSION_URN),
     AND_NAME: (4, BOOLEAN_EXTENSION_URN),
     AI_CLASSIFY_NAME: (5, AI_EXTENSION_URN),
+    AI_CLASSIFY_PAIR_NAME: (6, AI_EXTENSION_URN),
 }
 
 
@@ -105,19 +107,27 @@ class Filter:
 class Classify:
     """Add one label column to one relation from a fixed list of labels.
 
+    Over a join of two relations, the call labels each pair the join
+    kept: the prompt names the anchor as `{0}` and its partner as `{1}`,
+    and the label column belongs to the anchor.
+
     Attributes:
-        input: The relation's scan, filters, or classifications.
+        input: The relation's scan, filters, or classifications, or a
+            join of two relations for a pair classification.
         prompt: The classification prompt.
         labels: The labels, in tie-breaking order.
         output: The name of the label column.
         descriptions: One description per label, or empty for none.
+        documents: For a pair classification, the anchor alias then the
+            partner alias; None takes the join's aliases in order.
     """
 
-    input: Scan | Filter | Classify | LabelFilter
+    input: Scan | Filter | Classify | LabelFilter | Join
     prompt: str
     labels: tuple[str, ...]
     output: str
     descriptions: tuple[str, ...] = ()
+    documents: tuple[str, str] | None = None
 
 
 @dataclass(frozen=True)
@@ -272,19 +282,25 @@ class _Emitter:
 
         if isinstance(node, Classify):
             rel, fields, text = self.emit(node.input)
-            (alias,) = text
-            self.functions.add(AI_CLASSIFY_NAME)
+            if len(text) == 1:
+                aliases = tuple(text)
+                name = AI_CLASSIFY_NAME
+            else:
+                aliases = node.documents or _join_aliases(node.input)
+                name = AI_CLASSIFY_PAIR_NAME
+            self.functions.add(name)
             descriptions = node.descriptions or ("",) * len(node.labels)
-            output_fields = (*fields, (alias, node.output))
+            output_fields = (*fields, (aliases[0], node.output))
             common = _common(self._operator_id("classify"))
             common.hint.output_names.extend(
                 ".".join(field) for field in output_fields)
             relation = algebra.ProjectRel(
                 common=common,
                 input=rel,
-                expressions=[_call(AI_CLASSIFY_NAME, [
+                expressions=[_call(name, [
                     _literal(node.prompt),
-                    _field(fields.index((alias, text[alias]))),
+                    *(_field(fields.index((alias, text[alias])))
+                      for alias in aliases),
                     _string_list(node.labels),
                     _string_list(descriptions),
                 ], _string_type())],
@@ -293,13 +309,14 @@ class _Emitter:
 
         if isinstance(node, LabelFilter):
             rel, fields, text = self.emit(node.input)
-            (alias,) = text
+            # the label column may belong to any relation the input holds
+            (field,) = [field for field in fields if field[1] == node.output]
             relation = algebra.FilterRel(
                 common=_common(self._operator_id("label-filter")),
                 input=rel,
                 condition=algebra.Expression(
                     singular_or_list=algebra.Expression.SingularOrList(
-                        value=_field(fields.index((alias, node.output))),
+                        value=_field(fields.index(field)),
                         options=[_literal(label) for label in node.accepted],
                     )
                 ),
@@ -349,6 +366,13 @@ class _Emitter:
             type=algebra.JoinRel.JOIN_TYPE_INNER,
         )
         return algebra.Rel(join=relation), fields, text
+
+
+def _join_aliases(node) -> tuple[str, str]:
+    """The aliases of the join under a pair classification, in prompt order."""
+    while not isinstance(node, Join):
+        node = node.input
+    return node.aliases
 
 
 def build_plan(tree, select=None) -> plan_pb2.Plan:
@@ -554,6 +578,14 @@ QUERIES = (
           _classify(_critical(_reviews()), prompts.IMDB_COMPLAINT,
                     prompts.IMDB_COMPLAINT_LABELS, "complaint"),
           select=("r", "r.sentiment", "r.complaint")),
+    Query("IMDB-15", "negative or mixed reviews -> J1 -> classify: each "
+          "review's sentiment toward the aspect it discusses",
+          Classify(Join(_critical(_reviews()), _aspects(), ("r", "a"),
+                        DISCUSS_ASPECT),
+                   prompts.IMDB_ASPECT_SENTIMENT,
+                   prompts.IMDB_ASPECT_SENTIMENT_LABELS, "aspect_sentiment"),
+          select=("r", "r.sentiment", "a", "r.aspect_sentiment"),
+          labels_pending=True),
 
     Query("BIO-1", "filter: serious adverse event",
           _filters(_reports(), SERIOUS_ADVERSE_EVENT)),

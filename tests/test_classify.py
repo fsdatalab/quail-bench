@@ -17,8 +17,10 @@ from quail_b.data import (
 )
 from quail_b.queries import QuerySpec, pending_query_ids, queries
 from quail_b.run import _write_json
+from quail_b.substrait import AI_CLASSIFY_NAME, AI_CLASSIFY_PAIR_NAME
 from tools.make_substrait_plans import (
     Classify,
+    Join,
     LabelFilter,
     Scan,
     build_plan,
@@ -29,9 +31,11 @@ CLASSIFY_QUERIES = ("IMDB-11", "IMDB-12", "IMDB-13", "IMDB-14", "BIO-5",
 
 
 def test_classification_queries_are_published():
-    assert pending_query_ids() == ()
+    # IMDB-15's pair classification labels are not published yet
+    assert pending_query_ids() == ("IMDB-15",)
     assert tuple(query_id for query_id, spec in queries().items()
                  if spec._info.classifies) == CLASSIFY_QUERIES
+    assert "IMDB-15" in queries(include_pending=True)
 
 
 def test_every_classification_has_one_predicate():
@@ -39,7 +43,7 @@ def test_every_classification_has_one_predicate():
         spec.template: spec for spec in predicates.CLASSIFY_PREDICATES}
     assert len(by_template) == len(predicates.CLASSIFY_PREDICATES)
     used = set()
-    for query_id in CLASSIFY_QUERIES:
+    for query_id in CLASSIFY_QUERIES + pending_query_ids():
         for operator in quail_b.get_query(query_id)._info.classifies:
             spec = by_template[operator.prompt]
             assert spec.labels == operator.labels
@@ -66,8 +70,63 @@ def test_plans_carry_label_columns_and_filters():
         ("",) * len(prompts.IMDB_GENRE_LABELS))
 
 
+def test_pair_classification_plan():
+    plan = quail_b.get_query("IMDB-15").plan
+    info = quail_b.get_query("IMDB-15")._info
+    assert [operator.id for operator in info.operators] == [
+        "classify-1", "label-filter-1", "join-1", "classify-2"]
+    one, pair = info.classifies
+    assert (one.relation, one.partner, one.relations) == ("r", None, ("r",))
+    assert (pair.relation, pair.partner) == ("r", "a")
+    assert pair.relations == ("r", "a")
+    assert pair.prompt == prompts.IMDB_ASPECT_SENTIMENT
+    assert pair.labels == prompts.IMDB_SENTIMENT_LABELS
+    assert pair.output == "aspect_sentiment"
+    assert info.pairing_join(pair) is info.joins[0]
+    assert info.select == ("r.id", "r.sentiment", "a.id", "r.aspect_sentiment")
+    assert list(plan.relations[0].root.names) == [
+        "r", "sentiment", "a", "aspect_sentiment"]
+    names = {declaration.extension_function.name
+             for declaration in plan.extensions}
+    assert {AI_CLASSIFY_NAME, AI_CLASSIFY_PAIR_NAME} <= names
+    # the ProjectRel sits directly over the JoinRel, anchor field first
+    project = plan.relations[0].root.input.project.input.project
+    assert project.common.hint.alias == "classify-2"
+    assert project.input.join.common.hint.alias == "join-1"
+    arguments = project.expressions[0].scalar_function.arguments
+    fields = [argument.value.selection.direct_reference.struct_field.field
+              for argument in arguments[1:3]]
+    assert fields == [1, 4]    # r.body, then a.aspect after r's 3 fields
+
+
 def _spec(tree, select):
     return QuerySpec.from_plan("TEST", "test", build_plan(tree, select))
+
+
+def _pair_tree(documents=None):
+    reviews = Scan("reviews", "r", "body")
+    aspects = Scan("aspects", "a", "aspect")
+    return Classify(Join(reviews, aspects, ("r", "a"), "{0} {1}"), "{0} {1}",
+                    ("yes", "no"), "x", documents=documents)
+
+
+def test_pair_classification_rules():
+    info = _spec(_pair_tree(), ("r", "a", "r.x"))._info
+    assert info.classifies[0].relations == ("r", "a")
+    reversed_info = _spec(_pair_tree(("a", "r")), ("r", "a", "a.x"))._info
+    assert reversed_info.classifies[0].relations == ("a", "r")
+    with pytest.raises(ValueError, match="one-document classification"):
+        _spec(LabelFilter(_pair_tree(), "x", ("yes",)), ("r", "a"))
+    with pytest.raises(ValueError, match="both relations' ids"):
+        _spec(_pair_tree(), ("r", "r.x"))
+    # no join pairs exactly the two classified relations
+    three = Classify(
+        Join(Join(Scan("reviews", "r", "body"), Scan("aspects", "a", "aspect"),
+                  ("r", "a"), "{0} {1}"),
+             Scan("aspects", "a2", "aspect"), ("r", "a2"), "{0} {1}"),
+        "{0} {1}", ("yes", "no"), "x", documents=("a", "a2"))
+    with pytest.raises(ValueError, match="must follow the join"):
+        _spec(three, ("r", "a", "a2", "a.x"))
 
 
 @pytest.mark.parametrize(("labels", "message"), [
@@ -108,6 +167,46 @@ def test_classify_prompt_text():
         "- religion\n- other\nANSWER:")
 
 
+def test_pair_classify_prompt_text():
+    text = rendering.render_pair_classify_prompt(
+        prompts.IMDB_ASPECT_SENTIMENT, "The plot dragged on.", "pacing",
+        prompts.IMDB_ASPECT_SENTIMENT_LABELS)
+    expected_text = (
+        "DOCUMENT:\nThe plot dragged on.\n\n"
+        "(The document above is DOCUMENT {0}.)\n\n"
+        "DOCUMENT {1}:\npacing\n\n"
+        "Answer with exactly one of the categories below for the following "
+        "question: Judge strictly from the review in DOCUMENT {0} what "
+        "sentiment it expresses about the movie aspect in DOCUMENT {1}.\n\n"
+        "Categories:\n- positive\n- negative\n- neutral\n- mixed\nANSWER:")
+    assert text == expected_text
+    spec = predicates.PREDICATE_BY_KEY["quailb.imdb.review.aspect_sentiment"]
+    assert predicates.render_classify_prompt(
+        spec, "The plot dragged on.", "pacing") == text
+    with pytest.raises(ValueError, match="pair of documents"):
+        predicates.render_classify_prompt(spec, "The plot dragged on.")
+    with pytest.raises(ValueError, match="one document"):
+        predicates.render_classify_prompt(SENTIMENT, "x", "y")
+    with pytest.raises(ValueError, match="placeholders"):
+        rendering.render_pair_classify_prompt(
+            prompts.IMDB_SENTIMENT, "x", "y", ("a", "b"))
+
+
+def test_pair_classify_label_sets_have_their_own_identity():
+    spec = predicates.PREDICATE_BY_KEY["quailb.imdb.review.aspect_sentiment"]
+    payload = predicates.predicate_payload(spec)
+    assert payload["render"] == "classify_pair_anchor_then_partner_v1"
+    assert payload["anchor_note"] == rendering.JOIN_ANCHOR_NOTE
+    assert payload["partner_label"] == rendering.JOIN_DOC_LABEL
+    assert (payload["right_table"], payload["right_column"]) == (
+        "aspects", "aspect")
+    single = predicates.predicate_payload(SENTIMENT)
+    assert "anchor_note" not in single and "partner_label" not in single
+    # the published one-document label sets keep their identity
+    assert predicates.predicate_version(SENTIMENT)[0] == (
+        "pv_5706c27900253228036d76b0fb339409")
+
+
 def test_classify_label_sets_have_their_own_identity():
     spec = predicates.PREDICATE_BY_KEY["quailb.imdb.review.sentiment"]
     payload = predicates.predicate_payload(spec)
@@ -125,7 +224,8 @@ def _collection(root, tables, label_sets):
         root: Local mirror root.
         tables: Table name to rows.
         label_sets: (predicate, rows) pairs. A classify predicate's rows
-            are (left_id, label); a filter's (left_id, answer); a join's
+            are (left_id, label), or (left_id, right_id, label) for a
+            pair classification; a filter's (left_id, answer); a join's
             (left_id, right_id, answer).
     """
     corpus_id = PUBLISHED_CORPORA[0.1]
@@ -154,8 +254,10 @@ def _collection(root, tables, label_sets):
             "left_id": [row[0] for row in rows],
         }
         if predicate["kind"] == "classify":
-            columns["right_id"] = pa.array([None] * len(rows), pa.string())
-            columns["label"] = [row[1] for row in rows]
+            columns["right_id"] = pa.array(
+                [row[1] if len(row) == 3 else None for row in rows],
+                pa.string())
+            columns["label"] = [row[-1] for row in rows]
         elif predicate["kind"] == "join":
             columns["right_id"] = [row[1] for row in rows]
             columns["answer"] = [row[2] for row in rows]
@@ -176,27 +278,42 @@ def _collection(root, tables, label_sets):
 
 
 def _classify_predicate(spec):
-    return {"kind": "classify", "template": spec.template,
-            "left_table": spec.left_table, "left_column": spec.left_column,
-            "labels": list(spec.labels)}
+    predicate = {"kind": "classify", "template": spec.template,
+                 "left_table": spec.left_table, "left_column": spec.left_column,
+                 "labels": list(spec.labels)}
+    if spec.right_table:
+        predicate.update(right_table=spec.right_table,
+                         right_column=spec.right_column)
+    return predicate
 
 
 SENTIMENT = predicates.PREDICATE_BY_KEY["quailb.imdb.review.sentiment"]
+ASPECT_SENTIMENT = predicates.PREDICATE_BY_KEY[
+    "quailb.imdb.review.aspect_sentiment"]
+IMDB_TABLES = {
+    "reviews": pa.table({"id": ["r0", "r1", "r2"], "body": ["a", "b", "c"]}),
+    "aspects": pa.table({"id": ["a0", "a1"], "aspect": ["x", "y"]}),
+}
+IMDB_LABEL_SETS = [
+    (_classify_predicate(SENTIMENT), [
+        ("r0", "negative"), ("r1", "positive"), ("r2", "mixed")]),
+    ({"kind": "join", "template": prompts.DISCUSS_ASPECT,
+      "left_table": "reviews", "right_table": "aspects"}, [
+        ("r0", "a0", True), ("r0", "a1", True), ("r1", "a0", True),
+        ("r1", "a1", False), ("r2", "a0", False), ("r2", "a1", True)]),
+]
+PAIR_LABELS = [("r0", "a0", "negative"), ("r0", "a1", "mixed"),
+               ("r1", "a0", "positive"), ("r2", "a1", "negative")]
 
 
 def _imdb_13(root):
-    _collection(root, {
-        "reviews": pa.table({"id": ["r0", "r1", "r2"],
-                             "body": ["a", "b", "c"]}),
-        "aspects": pa.table({"id": ["a0", "a1"], "aspect": ["x", "y"]}),
-    }, [
-        (_classify_predicate(SENTIMENT), [
-            ("r0", "negative"), ("r1", "positive"), ("r2", "mixed")]),
-        ({"kind": "join", "template": prompts.DISCUSS_ASPECT,
-          "left_table": "reviews", "right_table": "aspects"}, [
-            ("r0", "a0", True), ("r0", "a1", True), ("r1", "a0", True),
-            ("r1", "a1", False), ("r2", "a0", False), ("r2", "a1", True)]),
-    ])
+    _collection(root, IMDB_TABLES, IMDB_LABEL_SETS)
+
+
+def _imdb_15(root, pair_labels=PAIR_LABELS):
+    """A collection with a pair label set: labels for the joined pairs."""
+    _collection(root, IMDB_TABLES, [
+        *IMDB_LABEL_SETS, (_classify_predicate(ASPECT_SENTIMENT), pair_labels)])
 
 
 def _imdb_13_output(rows=True, wrong_row=False):
@@ -348,3 +465,106 @@ def test_two_label_columns_and_chained_calls(tmp_path):
     assert fever["output_accuracy"]["exact_match"]
     for item in record["queries"]:
         assert item["metrics"]["minimum_tokens"] is None
+
+
+def _imdb_15_output(pair_answers=None, extra_row=False):
+    """An IMDB-15 run: r0 and r1 are critical, and two pairs get a label."""
+    rows = pa.table({
+        "r": ["r0", "r1"] + (["r0"] if extra_row else []),
+        "sentiment": ["negative", "negative"] + (["negative"] if extra_row
+                                                 else []),
+        "a": ["a0", "a0"] + (["a1"] if extra_row else []),
+        "aspect_sentiment": ["negative", "positive"] + (["mixed"] if extra_row
+                                                        else []),
+    })
+    return quail_b.RunOutput(
+        {},
+        {"join-1": pa.table({
+            "r": ["r0", "r0", "r1", "r1"], "a": ["a0", "a1", "a0", "a1"],
+            "answer": [True, True, True, False]})},
+        rows, runtime_s=1.0,
+        classify_answers={
+            "classify-1": pa.table({
+                "r": ["r0", "r1", "r2"],
+                "label": ["negative", "negative", "positive"]}),
+            "classify-2": pair_answers or pa.table({
+                "r": ["r0", "r1"], "a": ["a0", "a0"],
+                "label": ["negative", "positive"]})})
+
+
+def test_pair_classification_run_scores_labels_and_rows(tmp_path):
+    _imdb_15(tmp_path)
+    benchmark = quail_b.load_benchmark(["IMDB-15"], root=tmp_path)
+    expected = quail_b.scoring.expected_rows(
+        benchmark.queries[0], benchmark.ground_truth, benchmark.tables)
+    assert sorted(expected.to_pylist(), key=str) == sorted([
+        {"a": "a0", "r": "r0", "sentiment": "negative",
+         "aspect_sentiment": "negative"},
+        {"a": "a1", "r": "r0", "sentiment": "negative",
+         "aspect_sentiment": "mixed"},
+        {"a": "a1", "r": "r2", "sentiment": "mixed",
+         "aspect_sentiment": "negative"},
+    ], key=str)
+
+    record = quail_b.run(
+        lambda spec, tables: _imdb_15_output(), queries=["IMDB-15"],
+        output_dir=tmp_path / "run", root=tmp_path)
+    item = record["queries"][0]
+    accuracy = item["metrics"]["accuracy"]
+    # r0 is the only correct sentiment; both pair labels agree
+    assert accuracy["label_accuracy"] == {
+        "correct": 3, "evaluated": 5, "accuracy": 0.6}
+    assert accuracy["answer_accuracy"]["correct"] == 4
+    # the pair (r0, a1) answered TRUE but got no label, so it is not a row
+    assert accuracy["output_accuracy"]["predicted_rows"] == 2
+    assert accuracy["output_accuracy"]["expected_rows"] == 3
+    assert accuracy["output_accuracy"]["matching_rows"] == 1
+    pair_item = accuracy["per_predicate"][-1]
+    assert (pair_item["predicate_key"], pair_item["op"], pair_item["alias"]) \
+        == ("predicate_2", "classify", "r")
+    assert item["metrics"]["minimum_tokens"] is None
+    assert item["metrics"]["evaluated_document_pairs"] == 4
+
+    saved = json.loads((tmp_path / "run" / "run.json").read_text())
+    quail_b.report(tmp_path / "run", root=tmp_path)
+    rescored = json.loads((tmp_path / "run" / "run.json").read_text())
+    assert rescored["queries"][0]["metrics"] == saved["queries"][0]["metrics"]
+
+    untraced = quail_b.RunOutput(
+        None, None, _imdb_15_output().rows, runtime_s=1.0)
+    record = quail_b.run(
+        lambda spec, tables: untraced, queries=["IMDB-15"],
+        output_dir=tmp_path / "untraced", root=tmp_path)
+    output = record["queries"][0]["metrics"]["accuracy"]["output_accuracy"]
+    assert (output["predicted_rows"], output["matching_rows"]) == (2, 1)
+    assert record["queries"][0]["metrics"]["accuracy"]["label_accuracy"] is None
+
+
+def test_pair_rows_must_follow_the_pair_labels(tmp_path):
+    _imdb_15(tmp_path)
+    with pytest.raises(ValueError, match="answers imply 2"):
+        quail_b.run(
+            lambda spec, tables: _imdb_15_output(extra_row=True),
+            queries=["IMDB-15"], output_dir=tmp_path / "run", root=tmp_path)
+    # the engine also classified (r1, a1), which has no reference label
+    unlabeled = pa.table({
+        "r": ["r0", "r1", "r0", "r1"], "a": ["a0", "a0", "a1", "a1"],
+        "label": ["negative", "positive", "mixed", "positive"]})
+    with pytest.raises(KeyError, match="predicate_2 and 1 classified"):
+        quail_b.run(
+            lambda spec, tables: _imdb_15_output(unlabeled, extra_row=True),
+            queries=["IMDB-15"], output_dir=tmp_path / "unlabeled",
+            root=tmp_path)
+
+
+def test_reference_pairs_need_a_pair_label(tmp_path):
+    # (r2, a1) is a reference join pair of a critical review without a label
+    _imdb_15(tmp_path, PAIR_LABELS[:3])
+    benchmark = quail_b.load_benchmark(["IMDB-15"], root=tmp_path)
+    with pytest.raises(KeyError, match="predicate_2 and 1 pairs of join-1"):
+        quail_b.scoring.expected_rows(
+            benchmark.queries[0], benchmark.ground_truth, benchmark.tables)
+    with pytest.raises(KeyError, match="1 pairs of join-1"):
+        quail_b.run(
+            lambda spec, tables: _imdb_15_output(), queries=["IMDB-15"],
+            output_dir=tmp_path / "run", root=tmp_path)

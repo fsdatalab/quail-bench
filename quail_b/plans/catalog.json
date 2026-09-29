@@ -70,6 +70,12 @@
     "privacy": false
   },
   {
+    "id": "IMDB-15",
+    "description": "negative or mixed reviews -> J1 -> classify: each review's sentiment toward the aspect it discusses",
+    "privacy": false,
+    "labels_pending": true
+  },
+  {
     "id": "BIO-1",
     "description": "filter: serious adverse event",
     "privacy": false

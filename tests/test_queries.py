@@ -232,6 +232,9 @@ def test_ai_extension_definition_is_packaged():
     assert "urn: extension:org.fsdatalab.quail_b:functions_ai" in extension
     assert "name: ai_filter" in extension
     assert "name: ai_join" in extension
+    assert "name: ai_classify" in extension
+    # one document, and a pair: prompt, two documents, labels, descriptions
+    assert extension.count("- name: document") == 4
 
 
 def test_substrait_plans_are_packaged():
@@ -239,8 +242,9 @@ def test_substrait_plans_are_packaged():
     catalog = package.joinpath("plans", "catalog.json")
     entries = json.loads(catalog.read_text())
 
-    assert len(entries) == 43
-    assert not any(entry.get("labels_pending") for entry in entries)
+    assert len(entries) == 44
+    assert [entry["id"] for entry in entries if entry.get("labels_pending")] \
+        == ["IMDB-15"]
     assert all(
         package.joinpath("plans", f"{entry['id']}.json").is_file()
         for entry in entries
@@ -296,6 +300,8 @@ def test_query_family_rejects_mixed_or_unknown_queries():
 @pytest.mark.parametrize("query_id, expected", [
     ("IMDB-2", "f3b93b898b0d631fb451046b072920cb81f12d5aabb8dc1b853f913030b4f45e"),
     ("LEP-5", "6ca4bd71ae0304b98448d295d35213853c2d52242f8cc5bf23a817b0b9889a88"),
+    # a one-document classification: its hash predates pair classification
+    ("IMDB-14", "8963eabef7d462ee9f9161dcbd75dcb0c63c2f4ba473c69a9e052890bd05384d"),
 ])
 def test_raw_query_hash_matches_before_chat(query_id, expected, monkeypatch):
     import importlib

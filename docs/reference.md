@@ -57,6 +57,7 @@ relational operators and these extension functions:
 ai_filter:str_str
 ai_join:str_str_str
 ai_classify:str_str_list_list
+ai_classify:str_str_str_list_list
 ```
 
 A classification appears as a `ProjectRel` that adds one label column to its
@@ -64,7 +65,10 @@ relation; its hint alias is the operator ID, such as `classify-1`, and its
 hint output names end with `alias.column`, such as `r.sentiment`. A `FilterRel`
 whose condition is a standard `SingularOrList` over that column keeps the
 documents with an accepted label; its ID is `label-filter-N` and it asks the
-model nothing. See [Classification](#classification).
+model nothing. A pair classification, `ai_classify:str_str_str_list_list`,
+sits over the `JoinRel` that pairs its two relations and labels each pair;
+its label column belongs to the first document's relation. See
+[Classification](#classification).
 
 Their declarations and URN are in
 [`quail_b/substrait_extensions.yaml`](../quail_b/substrait_extensions.yaml).
@@ -107,7 +111,9 @@ comes first, an engine can compute a document's KV once and reuse it across
 every question asked of that document.
 
 Classification prompts use `render_classify_prompt(template, document,
-labels, descriptions)`, described under [Classification](#classification).
+labels, descriptions)` and, for a pair, `render_pair_classify_prompt(template,
+anchor, partner, labels, descriptions)`, described under
+[Classification](#classification).
 
 For joins, `documents` follows template placeholder order. `anchor` selects the
 document placed first. Both renderers end with `ANSWER:`, and the model answer
@@ -144,7 +150,8 @@ pa.table({
 
 A query that returns a label column, such as IMDB-13's `r.sentiment`, adds
 one string column named by the query, here `sentiment`, holding one of that
-call's labels.
+call's labels. A pair label column, such as IMDB-15's `r.aspect_sentiment`,
+holds the label of the row's (review, aspect) pair.
 
 The harness rejects:
 
@@ -238,6 +245,12 @@ the list for each document. `descriptions` has one entry per label; an empty
 string means none. Labels are distinct, and no label continues another label
 word for word.
 
+`ai_classify(prompt, document, document, labels, descriptions)` returns one
+label for each pair of documents a join kept. The prompt names the first
+document, the anchor, as `{0}` and the second, its partner, as `{1}`. The
+call follows the join of its two relations, and a label filter cannot test
+its column. IMDB-15 is the one such query.
+
 ### Prompt and reference label
 
 `render_classify_prompt` produces the text the labels are scored after:
@@ -245,6 +258,26 @@ word for word.
 ```text
 DOCUMENT:
 <document>
+
+Answer with exactly one of the categories below for the following question: <question>
+
+Categories:
+- <label 1>: <description 1>
+- <label 2>
+ANSWER:
+```
+
+A pair classification places the anchor first, as a join does, then the
+partner, then the question with both placeholders as written:
+
+```text
+DOCUMENT:
+<anchor>
+
+(The document above is DOCUMENT {0}.)
+
+DOCUMENT {1}:
+<partner>
 
 Answer with exactly one of the categories below for the following question: <question>
 
@@ -278,20 +311,35 @@ classify_answers = {
 }
 ```
 
+A pair classification's table has both alias columns, the anchor's then the
+partner's, one row per pair the engine classified. A pair with no row does not
+appear in the result:
+
+```python
+classify_answers = {
+    "classify-2": pa.table({
+        "r": ["rv17", "rv17"],
+        "a": ["as0", "as6"],
+        "label": ["negative", "mixed"],
+    }),
+}
+```
+
 With answer tables for every operator, `rows` must match the rows the answers
 imply, label columns included.
 
 ### Label files
 
 A classification label set stores `left_id` and a string `label` column where a
-filter stores its boolean `answer`. Its manifest's predicate lists `labels`.
+filter stores its boolean `answer`. A pair classification's rows also fill
+`right_id`, as a join's do. Its manifest's predicate lists `labels`.
 
 ### Queries waiting for labels
 
 A query marked `labels_pending` in the catalog has no published labels yet.
 `quail_b.queries()` leaves it out; `queries(include_pending=True)` and
 `get_query` return it. Running one needs a label collection that includes its
-predicates, passed with `root` or `collection_id`. No query is pending now.
+predicates, passed with `root` or `collection_id`. IMDB-15 is pending.
 
 ## Measurements
 
@@ -400,8 +448,8 @@ each predicate.
 ### Label accuracy
 
 Label accuracy is the share of the engine's classification answers that match
-the reference labels, over the documents the engine classified. It is reported
-beside predicate-level accuracy, not merged into it.
+the reference labels, over the documents, or pairs, the engine classified. It
+is reported beside predicate-level accuracy, not merged into it.
 
 Accuracy is not a focus of this benchmark. See
 [Reference answers](../README.md#reference-answers) for how the labels were

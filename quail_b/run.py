@@ -73,6 +73,10 @@ def _query_hash(spec):
                 "labels": operator.labels,
                 "descriptions": operator.descriptions,
                 "output": operator.output,
+                # only a pair classification names a partner, so the
+                # hashes of the one-document queries stay as published
+                **({"partner": operator.partner}
+                   if operator.partner is not None else {}),
             })
         elif isinstance(operator, _LabelFilter):
             operators.append({
@@ -294,7 +298,7 @@ def _validate_output(spec, output, tables):
         if operator_id not in classifies:
             raise ValueError(f"unknown classify operator {operator_id!r}")
         operator = classifies[operator_id]
-        validate_ids(table, [operator.relation])
+        validate_ids(table, list(operator.relations))
         validate_labels(
             table.rename_columns([
                 operator.output if name == "label" else name

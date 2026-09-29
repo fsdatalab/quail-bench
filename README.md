@@ -185,11 +185,14 @@ projection. The classification queries add a third function, described under
 
 ```text
 ai_classify(prompt, document, labels, descriptions) -> string
+ai_classify(prompt, document, document, labels, descriptions) -> string
 ```
+
+The five-argument form labels a pair of joined documents.
 
 | Dataset | Queries | Tables | Task |
 | --- | --- | --- | --- |
-| IMDB | IMDB-1 to IMDB-14 | `reviews`, `aspects` | Review aspects and sentiment |
+| IMDB | IMDB-1 to IMDB-15 | `reviews`, `aspects` | Review aspects and sentiment |
 | BioDEX | BIO-1 to BIO-6 | `reports`, `terms` | Adverse drug reactions |
 | FEVER | FEV-1 to FEV-11 | `claims`, `evidence` | Fact verification |
 | LePaRD | LEP-1 to LEP-6 | `citation_contexts`, `citation_passages` | Legal citations |
@@ -242,12 +245,15 @@ adapter on these queries first, then run it on all 41.
 
 ### Classification queries
 
-Ten queries return or filter on a label chosen from a fixed list. Each asks a
-question an analyst would ask of that collection, with a standard label list
+Eleven queries return or filter on a label chosen from a fixed list. Each asks
+a question an analyst would ask of that collection, with a standard label list
 where one exists, such as IMDb's genres or MedDRA's system organ classes.
 Label length follows from the list, from one token for sentiment to eleven
 for an organ class under the Qwen3 tokenizer. IMDB-14, LEP-6, and AGENT-4
 have labels that start with the same words, as category names often do.
+IMDB-15 classifies a pair: each joined review and aspect gets one label.
+Its reference labels are not published yet, so `quail_b.queries()` leaves it
+out until they are.
 
 | Query | Question | Labels |
 | --- | --- | --- |
@@ -255,6 +261,7 @@ have labels that start with the same words, as category names often do.
 | IMDB-12 | Among reviews that praise something (F1), what genre is each movie? | IMDb's 21 genres |
 | IMDB-13 | Which aspects do negative or mixed reviews discuss? | Sentiment, as a filter before J1, returned per pair |
 | IMDB-14 | What do negative or mixed reviews complain about most? | Sentiment, then 8 complaints; three start with "poor" and two with "too"; both returned |
+| IMDB-15 | What sentiment does each negative or mixed review express toward each aspect it discusses? | Sentiment, as a filter before J1, then 4 sentiments per (review, aspect) pair; both returned; labels pending |
 | BIO-5 | Which system organ class does each reaction term belong to? | MedDRA's 26 classes, 1 to 11 tokens |
 | BIO-6 | Which cardiac or vascular reactions do serious reports describe? | Organ class, as a filter on one join input |
 | FEV-11 | Which claims are about politics or history, and which topic? | 11 topics; one call returned and filtered |
@@ -289,7 +296,8 @@ same at every scale factor. Use 0.1 while developing an adapter.
 
 QUAIL-B scores every run against reference answers: one TRUE or FALSE label
 for each document or document pair each filter or join can be asked about,
-and one label for each document a classification can be asked about.
+and one label for each document, or document pair, a classification can be
+asked about.
 
 **Accuracy is not a focus of this benchmark.** Most labels are the answers of
 one arbitrary model, `Qwen/Qwen3-32B-FP8`, so it is not really meaningful to
