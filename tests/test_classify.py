@@ -349,7 +349,7 @@ def test_classification_run_scores_labels_and_rows(tmp_path):
         output_dir=tmp_path / "run", root=tmp_path)
     accuracy = record["queries"][0]["metrics"]["accuracy"]
     assert accuracy["label_accuracy"] == {
-        "correct": 1, "evaluated": 3, "accuracy": 0.333333}
+        "correct": 1, "evaluated": 3, "unlabeled": 0, "accuracy": 0.333333}
     assert accuracy["answer_accuracy"]["correct"] == 4
     assert accuracy["output_accuracy"]["predicted_rows"] == 3
     assert accuracy["output_accuracy"]["expected_rows"] == 3
@@ -455,7 +455,7 @@ def test_two_label_columns_and_chained_calls(tmp_path):
     imdb, agent, fever = (
         item["metrics"]["accuracy"] for item in record["queries"])
     assert imdb["label_accuracy"] == {
-        "correct": 4, "evaluated": 5, "accuracy": 0.8}
+        "correct": 4, "evaluated": 5, "unlabeled": 0, "accuracy": 0.8}
     assert imdb["output_accuracy"]["matching_rows"] == 1
     assert agent["label_accuracy"]["correct"] == 3
     assert agent["output_accuracy"]["exact_match"]
@@ -511,7 +511,7 @@ def test_pair_classification_run_scores_labels_and_rows(tmp_path):
     accuracy = item["metrics"]["accuracy"]
     # r0 is the only correct sentiment; both pair labels agree
     assert accuracy["label_accuracy"] == {
-        "correct": 3, "evaluated": 5, "accuracy": 0.6}
+        "correct": 3, "evaluated": 5, "unlabeled": 0, "accuracy": 0.6}
     assert accuracy["answer_accuracy"]["correct"] == 4
     # the pair (r0, a1) answered TRUE but got no label, so it is not a row
     assert accuracy["output_accuracy"]["predicted_rows"] == 2
@@ -544,15 +544,18 @@ def test_pair_rows_must_follow_the_pair_labels(tmp_path):
         quail_b.run(
             lambda spec, tables: _imdb_15_output(extra_row=True),
             queries=["IMDB-15"], output_dir=tmp_path / "run", root=tmp_path)
-    # the engine also classified (r1, a1), which has no reference label
+    # the engine also classified (r1, a1), a pair the reference join does
+    # not keep, so that answer has no reference label and is left out
     unlabeled = pa.table({
         "r": ["r0", "r1", "r0", "r1"], "a": ["a0", "a0", "a1", "a1"],
         "label": ["negative", "positive", "mixed", "positive"]})
-    with pytest.raises(KeyError, match="predicate_2 and 1 classified"):
-        quail_b.run(
-            lambda spec, tables: _imdb_15_output(unlabeled, extra_row=True),
-            queries=["IMDB-15"], output_dir=tmp_path / "unlabeled",
-            root=tmp_path)
+    record = quail_b.run(
+        lambda spec, tables: _imdb_15_output(unlabeled, extra_row=True),
+        queries=["IMDB-15"], output_dir=tmp_path / "unlabeled",
+        root=tmp_path)
+    labels = record["queries"][0]["metrics"]["accuracy"]["label_accuracy"]
+    # three sentiment answers and the three labeled pairs
+    assert (labels["evaluated"], labels["unlabeled"]) == (6, 1)
 
 
 def test_reference_pairs_need_a_pair_label(tmp_path):

@@ -449,7 +449,10 @@ each predicate.
 
 Label accuracy is the share of the engine's classification answers that match
 the reference labels, over the documents, or pairs, the engine classified. It
-is reported beside predicate-level accuracy, not merged into it.
+is reported beside predicate-level accuracy, not merged into it. A pair
+classification is labeled only over the pairs the reference join keeps; an
+engine's answer over any other pair has no reference label and is counted as
+`unlabeled` instead of evaluated.
 
 Accuracy is not a focus of this benchmark. See
 [Reference answers](../README.md#reference-answers) for how the labels were

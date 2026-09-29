@@ -128,17 +128,29 @@ class BinaryCounts:
 
 @dataclass
 class LabelCounts:
+    """Agreement of classification answers with the reference labels.
+
+    Attributes:
+        correct: Answers that match their reference label.
+        evaluated: Answers with a reference label.
+        unlabeled: Answers over pairs the reference join does not keep,
+            which have no reference label and are left out.
+    """
+
     correct: int = 0
     evaluated: int = 0
+    unlabeled: int = 0
 
     def merge(self, other: "LabelCounts") -> None:
         self.correct += other.correct
         self.evaluated += other.evaluated
+        self.unlabeled += other.unlabeled
 
     def as_dict(self) -> dict:
         return {
             "correct": self.correct,
             "evaluated": self.evaluated,
+            "unlabeled": self.unlabeled,
             "accuracy": (round(self.correct / self.evaluated, 6)
                          if self.evaluated else None),
         }
@@ -677,8 +689,12 @@ def label_agreement(table: pa.Table, aliases, labels) -> LabelCounts:
         aliases: The id columns: the anchor, then a pair's partner.
         labels: The `PredicateLabels` of the classification.
 
+    Returns:
+        The counts. A pair the reference join does not keep has no
+        reference label; such a classified pair counts as unlabeled.
+
     Raises:
-        KeyError: A document or pair the engine classified has no label.
+        KeyError: A document the engine classified has no label.
     """
     aliases = list(aliases)
     answers = _label_table(table, aliases, "predicted")
@@ -687,12 +703,17 @@ def label_agreement(table: pa.Table, aliases, labels) -> LabelCounts:
     ).rename_columns([*aliases, "expected"])
     joined = answers.join(reference, keys=aliases, join_type="left outer")
     expected = joined.column("expected")
-    if expected.null_count:
+    unlabeled = expected.null_count
+    if unlabeled and len(aliases) == 1:
         raise KeyError(
-            f"no ground truth for {labels.key} and {expected.null_count} "
+            f"no ground truth for {labels.key} and {unlabeled} "
             "classified rows")
+    if unlabeled:
+        joined = joined.filter(pc.is_valid(expected))
+        expected = joined.column("expected")
     correct = pc.sum(pc.equal(joined.column("predicted"), expected)).as_py()
-    return LabelCounts(correct=correct or 0, evaluated=joined.num_rows)
+    return LabelCounts(correct=correct or 0, evaluated=joined.num_rows,
+                       unlabeled=unlabeled)
 
 
 def agreement(table: pa.Table, aliases, labels) -> BinaryCounts:
