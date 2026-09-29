@@ -54,14 +54,30 @@ equality conditions, and the final projection. It uses the standard Substrait
 relational operators and these extension functions:
 
 ```text
-ai_filter:str_str
-ai_join:str_str_str
-ai_classify:str_str_list_list
-ai_classify:str_str_str_list_list
+ai_filter(prompt: string, document: string) -> boolean
+ai_join(prompt: string, left: string, right: string) -> boolean
+ai_classify(prompt: string, document: string,
+            labels: list<string>, descriptions: list<string>) -> string
+ai_classify(prompt: string, anchor: string, partner: string,
+            labels: list<string>, descriptions: list<string>) -> string
 ```
 
-Their declarations and URN are in
-[`quail_b/substrait_extensions.yaml`](../quail_b/substrait_extensions.yaml).
+The prompt, labels, and descriptions are constants. The functions are declared
+in [`quail_b/substrait_extensions.yaml`](../quail_b/substrait_extensions.yaml)
+under the URN `extension:org.fsdatalab.quail_b:functions_ai`.
+
+A plan names each function by its Substrait
+[signature](https://substrait.io/extensions/#function-signature-compound-names):
+the name, then the short name of each argument type, such as `str` for string.
+A plan reader matches on these names:
+
+| Function | Name in the plan |
+| --- | --- |
+| `ai_filter` | `ai_filter:str_str` |
+| `ai_join` | `ai_join:str_str_str` |
+| `ai_classify`, one document | `ai_classify:str_str_list_list` |
+| `ai_classify`, joined rows | `ai_classify:str_str_str_list_list` |
+
 Each operator that asks the model, and each IN-list filter, has an operator
 ID as its hint alias:
 
