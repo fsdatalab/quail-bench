@@ -39,10 +39,10 @@ def test_classification_queries_are_published():
 def test_agent_5_classifies_each_trace_three_ways():
     info = quail_b.get_query("AGENT-5")._info
     assert [operator.output for operator in info.classifies] == [
-        "outcome", "issue_kind", "check"]
+        "outcome", "domain", "root_cause"]
     assert {operator.relation for operator in info.classifies} == {"t"}
     assert not info.filters and not info.in_lists and not info.joins
-    assert info.select == ("t.id", "t.outcome", "t.issue_kind", "t.check")
+    assert info.select == ("t.id", "t.outcome", "t.domain", "t.root_cause")
 
 
 def test_every_classification_has_one_predicate():

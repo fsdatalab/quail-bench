@@ -276,33 +276,48 @@ AGENT_FAILURE_DESCRIPTIONS = (
     "reached the step limit while still making progress",
 )
 
-AGENT_ISSUE = (
-    "Judge strictly from the issue at the start of the agent trace above "
-    "what kind of problem it reports.\n\n{0}"
+# PyPI's "Topic ::" trove classifiers, https://pypi.org/classifiers/
+AGENT_DOMAIN = (
+    "Judge strictly from the agent trace above which PyPI topic best "
+    "describes the project the issue is filed against.\n\n{0}"
 )
-AGENT_ISSUE_LABELS = (
-    "crash or error", "wrong output", "missing feature", "performance",
-    "other",
-)
-AGENT_ISSUE_DESCRIPTIONS = (
-    "the code raises an exception or fails with an error",
-    "the code runs but returns or prints the wrong result",
-    "asks for behavior or an interface that does not exist yet",
-    "the code is too slow or uses too much memory",
-    "none of the kinds above",
+AGENT_DOMAIN_LABELS = (
+    "Communications", "Database", "Documentation", "File Formats",
+    "Internet :: WWW/HTTP", "Multimedia :: Graphics",
+    "Multimedia :: Sound/Audio", "Multimedia :: Video",
+    "Office/Business :: Financial",
+    "Scientific/Engineering :: Artificial Intelligence",
+    "Scientific/Engineering :: Artificial Life",
+    "Scientific/Engineering :: Bio-Informatics",
+    "Scientific/Engineering :: GIS", "Scientific/Engineering :: Mathematics",
+    "Scientific/Engineering :: Medical Science Apps.", "Security",
+    "Software Development :: Build Tools", "Software Development :: Compilers",
+    "Software Development :: Embedded Systems",
+    "Software Development :: Quality Assurance",
+    "Software Development :: Testing",
+    "Software Development :: User Interfaces",
+    "System :: Distributed Computing", "System :: Networking",
+    "Text Processing :: Linguistic", "Text Processing :: Markup",
+    "Utilities",
 )
 
-AGENT_CHECK = (
-    "Judge strictly from the agent trace above the strongest check the "
-    "agent ran on its change by the end of the trace.\n\n{0}"
+# IBM's Orthogonal Defect Classification defect types (Chillarege et al.,
+# IEEE TSE 1992), named by the change a correct fix makes
+AGENT_ROOT_CAUSE = (
+    "Judge strictly from the agent trace above which kind of defect causes "
+    "the reported issue, by the change a correct fix makes.\n\n{0}"
 )
-AGENT_CHECK_LABELS = (
-    "ran a new test", "ran existing tests", "ran a reproduction script",
-    "no check",
+AGENT_ROOT_CAUSE_LABELS = (
+    "assignment", "checking", "algorithm", "function", "interface",
+    "timing or serialization", "build, package, or merge", "documentation",
 )
-AGENT_CHECK_DESCRIPTIONS = (
-    "wrote a test for the issue and ran it",
-    "ran tests that were already in the repository",
-    "ran a script that shows the reported behavior",
-    "did not run anything to check a change",
+AGENT_ROOT_CAUSE_DESCRIPTIONS = (
+    "a value is set or initialized wrong, fixed in a few lines",
+    "a condition or validation is missing or wrong",
+    "the steps that compute a result are wrong, fixed without new features",
+    "a capability is missing and needs a new function, class, or design",
+    "components pass the wrong arguments, return values, or messages",
+    "shared resources, concurrency, or the order of events are wrong",
+    "a dependency, version, build, or packaging setting is wrong",
+    "documentation, comments, or messages are wrong",
 )

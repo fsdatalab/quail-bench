@@ -79,8 +79,8 @@
                       "t.id",
                       "t.trace",
                       "t.outcome",
-                      "t.issue_kind",
-                      "t.check"
+                      "t.domain",
+                      "t.root_cause"
                     ]
                   }
                 },
@@ -91,7 +91,7 @@
                         {
                           "value": {
                             "literal": {
-                              "string": "Judge strictly from the agent trace above the strongest check the agent ran on its change by the end of the trace.\n\n{0}"
+                              "string": "Judge strictly from the agent trace above which kind of defect causes the reported issue, by the change a correct fix makes.\n\n{0}"
                             }
                           }
                         },
@@ -113,16 +113,28 @@
                               "list": {
                                 "values": [
                                   {
-                                    "string": "ran a new test"
+                                    "string": "assignment"
                                   },
                                   {
-                                    "string": "ran existing tests"
+                                    "string": "checking"
                                   },
                                   {
-                                    "string": "ran a reproduction script"
+                                    "string": "algorithm"
                                   },
                                   {
-                                    "string": "no check"
+                                    "string": "function"
+                                  },
+                                  {
+                                    "string": "interface"
+                                  },
+                                  {
+                                    "string": "timing or serialization"
+                                  },
+                                  {
+                                    "string": "build, package, or merge"
+                                  },
+                                  {
+                                    "string": "documentation"
                                   }
                                 ]
                               }
@@ -135,16 +147,28 @@
                               "list": {
                                 "values": [
                                   {
-                                    "string": "wrote a test for the issue and ran it"
+                                    "string": "a value is set or initialized wrong, fixed in a few lines"
                                   },
                                   {
-                                    "string": "ran tests that were already in the repository"
+                                    "string": "a condition or validation is missing or wrong"
                                   },
                                   {
-                                    "string": "ran a script that shows the reported behavior"
+                                    "string": "the steps that compute a result are wrong, fixed without new features"
                                   },
                                   {
-                                    "string": "did not run anything to check a change"
+                                    "string": "a capability is missing and needs a new function, class, or design"
+                                  },
+                                  {
+                                    "string": "components pass the wrong arguments, return values, or messages"
+                                  },
+                                  {
+                                    "string": "shared resources, concurrency, or the order of events are wrong"
+                                  },
+                                  {
+                                    "string": "a dependency, version, build, or packaging setting is wrong"
+                                  },
+                                  {
+                                    "string": "documentation, comments, or messages are wrong"
                                   }
                                 ]
                               }
@@ -171,7 +195,7 @@
                           "t.id",
                           "t.trace",
                           "t.outcome",
-                          "t.issue_kind"
+                          "t.domain"
                         ]
                       }
                     },
@@ -182,7 +206,7 @@
                             {
                               "value": {
                                 "literal": {
-                                  "string": "Judge strictly from the issue at the start of the agent trace above what kind of problem it reports.\n\n{0}"
+                                  "string": "Judge strictly from the agent trace above which PyPI topic best describes the project the issue is filed against.\n\n{0}"
                                 }
                               }
                             },
@@ -204,19 +228,85 @@
                                   "list": {
                                     "values": [
                                       {
-                                        "string": "crash or error"
+                                        "string": "Communications"
                                       },
                                       {
-                                        "string": "wrong output"
+                                        "string": "Database"
                                       },
                                       {
-                                        "string": "missing feature"
+                                        "string": "Documentation"
                                       },
                                       {
-                                        "string": "performance"
+                                        "string": "File Formats"
                                       },
                                       {
-                                        "string": "other"
+                                        "string": "Internet :: WWW/HTTP"
+                                      },
+                                      {
+                                        "string": "Multimedia :: Graphics"
+                                      },
+                                      {
+                                        "string": "Multimedia :: Sound/Audio"
+                                      },
+                                      {
+                                        "string": "Multimedia :: Video"
+                                      },
+                                      {
+                                        "string": "Office/Business :: Financial"
+                                      },
+                                      {
+                                        "string": "Scientific/Engineering :: Artificial Intelligence"
+                                      },
+                                      {
+                                        "string": "Scientific/Engineering :: Artificial Life"
+                                      },
+                                      {
+                                        "string": "Scientific/Engineering :: Bio-Informatics"
+                                      },
+                                      {
+                                        "string": "Scientific/Engineering :: GIS"
+                                      },
+                                      {
+                                        "string": "Scientific/Engineering :: Mathematics"
+                                      },
+                                      {
+                                        "string": "Scientific/Engineering :: Medical Science Apps."
+                                      },
+                                      {
+                                        "string": "Security"
+                                      },
+                                      {
+                                        "string": "Software Development :: Build Tools"
+                                      },
+                                      {
+                                        "string": "Software Development :: Compilers"
+                                      },
+                                      {
+                                        "string": "Software Development :: Embedded Systems"
+                                      },
+                                      {
+                                        "string": "Software Development :: Quality Assurance"
+                                      },
+                                      {
+                                        "string": "Software Development :: Testing"
+                                      },
+                                      {
+                                        "string": "Software Development :: User Interfaces"
+                                      },
+                                      {
+                                        "string": "System :: Distributed Computing"
+                                      },
+                                      {
+                                        "string": "System :: Networking"
+                                      },
+                                      {
+                                        "string": "Text Processing :: Linguistic"
+                                      },
+                                      {
+                                        "string": "Text Processing :: Markup"
+                                      },
+                                      {
+                                        "string": "Utilities"
                                       }
                                     ]
                                   }
@@ -229,19 +319,85 @@
                                   "list": {
                                     "values": [
                                       {
-                                        "string": "the code raises an exception or fails with an error"
+                                        "string": ""
                                       },
                                       {
-                                        "string": "the code runs but returns or prints the wrong result"
+                                        "string": ""
                                       },
                                       {
-                                        "string": "asks for behavior or an interface that does not exist yet"
+                                        "string": ""
                                       },
                                       {
-                                        "string": "the code is too slow or uses too much memory"
+                                        "string": ""
                                       },
                                       {
-                                        "string": "none of the kinds above"
+                                        "string": ""
+                                      },
+                                      {
+                                        "string": ""
+                                      },
+                                      {
+                                        "string": ""
+                                      },
+                                      {
+                                        "string": ""
+                                      },
+                                      {
+                                        "string": ""
+                                      },
+                                      {
+                                        "string": ""
+                                      },
+                                      {
+                                        "string": ""
+                                      },
+                                      {
+                                        "string": ""
+                                      },
+                                      {
+                                        "string": ""
+                                      },
+                                      {
+                                        "string": ""
+                                      },
+                                      {
+                                        "string": ""
+                                      },
+                                      {
+                                        "string": ""
+                                      },
+                                      {
+                                        "string": ""
+                                      },
+                                      {
+                                        "string": ""
+                                      },
+                                      {
+                                        "string": ""
+                                      },
+                                      {
+                                        "string": ""
+                                      },
+                                      {
+                                        "string": ""
+                                      },
+                                      {
+                                        "string": ""
+                                      },
+                                      {
+                                        "string": ""
+                                      },
+                                      {
+                                        "string": ""
+                                      },
+                                      {
+                                        "string": ""
+                                      },
+                                      {
+                                        "string": ""
+                                      },
+                                      {
+                                        "string": ""
                                       }
                                     ]
                                   }
@@ -395,8 +551,8 @@
         "names": [
           "t",
           "outcome",
-          "issue_kind",
-          "check"
+          "domain",
+          "root_cause"
         ]
       }
     }

@@ -211,7 +211,7 @@
   },
   {
     "id": "AGENT-5",
-    "description": "classify every trace three ways: outcome, issue kind, and the strongest check the agent ran",
+    "description": "classify every trace three ways: outcome, the project's PyPI topic, and the defect type of the bug",
     "privacy": false,
     "labels_pending": true
   },

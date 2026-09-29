@@ -690,14 +690,13 @@ QUERIES = (
                     prompts.AGENT_FAILURE, prompts.AGENT_FAILURE_LABELS,
                     "failure", prompts.AGENT_FAILURE_DESCRIPTIONS),
           select=("t", "t.failure")),
-    Query("AGENT-5", "classify every trace three ways: outcome, issue kind, "
-          "and the strongest check the agent ran",
-          _classify(_classify(_outcome(_traces()), prompts.AGENT_ISSUE,
-                              prompts.AGENT_ISSUE_LABELS, "issue_kind",
-                              prompts.AGENT_ISSUE_DESCRIPTIONS),
-                    prompts.AGENT_CHECK, prompts.AGENT_CHECK_LABELS, "check",
-                    prompts.AGENT_CHECK_DESCRIPTIONS),
-          select=("t", "t.outcome", "t.issue_kind", "t.check"),
+    Query("AGENT-5", "classify every trace three ways: outcome, the "
+          "project's PyPI topic, and the defect type of the bug",
+          _classify(_classify(_outcome(_traces()), prompts.AGENT_DOMAIN,
+                              prompts.AGENT_DOMAIN_LABELS, "domain"),
+                    prompts.AGENT_ROOT_CAUSE, prompts.AGENT_ROOT_CAUSE_LABELS,
+                    "root_cause", prompts.AGENT_ROOT_CAUSE_DESCRIPTIONS),
+          select=("t", "t.outcome", "t.domain", "t.root_cause"),
           labels_pending=True),
 
     # PrivacyPolicies: only when that corpus is available.
