@@ -61,14 +61,19 @@ ai_classify:str_str_str_list_list
 ```
 
 A classification appears as a `ProjectRel` that adds one label column to its
-relation; its hint alias is the operator ID, such as `classify-1`, and its
-hint output names end with `alias.column`, such as `r.sentiment`. A `FilterRel`
-whose condition is a standard `SingularOrList` over that column keeps the
-documents with an accepted label; its ID is `label-filter-N` and it asks the
-model nothing. A pair classification, `ai_classify:str_str_str_list_list`,
-sits over the `JoinRel` that pairs its two relations and labels each pair;
-its label column belongs to the first document's relation. See
-[Classification](#classification).
+relation. Its hint alias is the operator ID, such as `classify-1`. Its hint
+output names end with `alias.column`, such as `r.sentiment`.
+
+A label filter is a `FilterRel` whose condition is a standard `SingularOrList`
+over a label column. It keeps the documents whose label is in the list. It
+asks the model nothing. Its ID is `label-filter-N`.
+
+A pair classification labels pairs of documents instead of single documents.
+It calls `ai_classify:str_str_str_list_list` in a `ProjectRel` that sits above
+the `JoinRel` of its two relations. Its label column belongs to the relation
+of its first document, such as `r.aspect_sentiment` in IMDB-15.
+
+[Classification](#classification) describes both forms.
 
 Their declarations and URN are in
 [`quail_b/substrait_extensions.yaml`](../quail_b/substrait_extensions.yaml).
@@ -110,14 +115,17 @@ Every prompt starts with a document. The question follows it and begins
 comes first, an engine can compute a document's KV once and reuse it across
 every question asked of that document.
 
-Classification prompts use `render_classify_prompt(template, document,
-labels, descriptions)` and, for a pair, `render_pair_classify_prompt(template,
-anchor, partner, labels, descriptions)`, described under
-[Classification](#classification).
-
 For joins, `documents` follows template placeholder order. `anchor` selects the
 document placed first. Both renderers end with `ANSWER:`, and the model answer
 must be read as `TRUE` or `FALSE`.
+
+Classifications have two more renderers, described under
+[Classification](#classification):
+
+- `render_classify_prompt(template, document, labels, descriptions)` for one
+  document;
+- `render_pair_classify_prompt(template, anchor, partner, labels,
+  descriptions)` for a pair.
 
 The published labels use these templates and this rendering. A different
 prompt defines a different predicate, and its results are incomparable with
@@ -148,10 +156,14 @@ pa.table({
 })
 ```
 
-A query that returns a label column, such as IMDB-13's `r.sentiment`, adds
-one string column named by the query, here `sentiment`, holding one of that
-call's labels. A pair label column, such as IMDB-15's `r.aspect_sentiment`,
-holds the label of the row's (review, aspect) pair.
+A query that returns a label column adds one string column for it. The column
+name is the part of the plan's output name after the alias. For example,
+IMDB-13 returns `r.sentiment`, so `rows` has a `sentiment` column. Each row
+holds the label of that row's review.
+
+A pair label column holds the label of the row's pair. For example, IMDB-15
+returns `r.aspect_sentiment`, so `rows` has an `aspect_sentiment` column. Each
+row holds the label of that row's review and aspect.
 
 The harness rejects:
 
@@ -245,11 +257,50 @@ the list for each document. `descriptions` has one entry per label; an empty
 string means none. Labels are distinct, and no label continues another label
 word for word.
 
-`ai_classify(prompt, document, document, labels, descriptions)` returns one
-label for each pair of documents a join kept. The prompt names the first
-document, the anchor, as `{0}` and the second, its partner, as `{1}`. The
-call follows the join of its two relations, and a label filter cannot test
-its column. IMDB-15 is the one such query.
+### Pair classification
+
+A pair classification returns one label for a pair of documents that a join
+kept. The label describes the two documents together.
+
+For example, IMDB-15 joins each negative or mixed review with each movie
+aspect the review discusses, such as "the acting". For each (review, aspect)
+pair, it asks what sentiment the review expresses about that aspect. The
+answer is one of positive, negative, neutral, or mixed.
+
+The two documents of a pair are the anchor and the partner. The anchor is the
+first document argument, and it comes first in the prompt, as a join's anchor
+does. The partner is the second document argument. In IMDB-15, the review is
+the anchor and the aspect is the partner.
+
+The call takes five arguments:
+
+```text
+ai_classify(prompt, anchor, partner, labels, descriptions) -> string
+```
+
+- The prompt names the anchor as `{0}` and the partner as `{1}`.
+- `labels` and `descriptions` follow the rules of the one-document form.
+- The call's `ProjectRel` sits above the `JoinRel` of the same two relations.
+  It sees only the pairs that join kept.
+- The label column belongs to the anchor's relation.
+- A label filter cannot test a pair label column.
+
+IMDB-15 is the only query with a pair classification. Its plan has this
+operator tree:
+
+```text
+Project [r.id, r.sentiment, a.id, r.aspect_sentiment]
+└── Classify aspect sentiment        classify-2
+    └── AI Join J1                   join-1
+        ├── Label filter             label-filter-1
+        │   └── Classify sentiment   classify-1
+        │       └── Scan reviews AS r
+        └── Scan aspects AS a
+```
+
+`classify-1` labels each review's overall sentiment. `label-filter-1` keeps
+the reviews labeled negative or mixed. `join-1` pairs each kept review with
+the aspects it discusses. `classify-2` labels each of those pairs.
 
 ### Prompt and reference label
 
@@ -267,8 +318,10 @@ Categories:
 ANSWER:
 ```
 
-A pair classification places the anchor first, as a join does, then the
-partner, then the question with both placeholders as written:
+`render_pair_classify_prompt` lays out the two documents the way a join prompt
+does. The anchor comes first, then a note that names it `{0}`. The partner
+follows under the heading `DOCUMENT {1}:`. The instruction, question,
+categories, and answer cue come last, as in the one-document prompt:
 
 ```text
 DOCUMENT:
@@ -287,11 +340,18 @@ Categories:
 ANSWER:
 ```
 
-Each label follows as `" " + label`. The reference label is the label with the
-largest sum of its tokens' log probabilities, each normalized over the full
-vocabulary at temperature 1, from `Qwen/Qwen3-32B-FP8`. No end marker is
-scored, and the earlier label wins a tie. `quail_b.predicates.CLASSIFY_JUDGE_SPEC`
-records this definition. An engine may compute it any way, for example by
+The question keeps `{0}` and `{1}` as written. The note and the heading tell
+the model which document each name refers to. For example, IMDB-15's question
+is "Judge strictly from the review in DOCUMENT {0} what sentiment it expresses
+about the movie aspect in DOCUMENT {1}." Because the anchor comes first, an
+engine can compute a review's KV once and reuse it for every aspect paired
+with that review.
+
+In both forms, each label follows as `" " + label`. The reference label is the
+label with the largest sum of its tokens' log probabilities, each normalized
+over the full vocabulary at temperature 1, from `Qwen/Qwen3-32B-FP8`. No end
+marker is scored, and the earlier label wins a tie.
+`quail_b.predicates.CLASSIFY_JUDGE_SPEC` records this definition. An engine may compute it any way, for example by
 scoring only the first token when the first tokens differ, but its answers are
 compared with this definition.
 
@@ -311,9 +371,9 @@ classify_answers = {
 }
 ```
 
-A pair classification's table has both alias columns, the anchor's then the
-partner's, one row per pair the engine classified. A pair with no row does not
-appear in the result:
+A pair classification's table has two ID columns, one named by the anchor's
+alias and one by the partner's, and the `label` column. It has one row per
+pair the engine classified. For IMDB-15:
 
 ```python
 classify_answers = {
@@ -325,14 +385,22 @@ classify_answers = {
 }
 ```
 
+A pair with no row has no label, so it does not appear in the result, even
+when the join kept it.
+
 With answer tables for every operator, `rows` must match the rows the answers
 imply, label columns included.
 
 ### Label files
 
 A classification label set stores `left_id` and a string `label` column where a
-filter stores its boolean `answer`. A pair classification's rows also fill
-`right_id`, as a join's do. Its manifest's predicate lists `labels`.
+filter stores its boolean `answer`. The manifest's predicate lists the
+`labels`.
+
+- For a one-document classification, `right_id` is null.
+- For a pair classification, `left_id` holds the anchor's ID and `right_id`
+  holds the partner's, as in a join's label set. The label set has a row only
+  for the pairs the reference join keeps.
 
 ### Queries waiting for labels
 
@@ -448,11 +516,31 @@ each predicate.
 ### Label accuracy
 
 Label accuracy is the share of the engine's classification answers that match
-the reference labels, over the documents, or pairs, the engine classified. It
-is reported beside predicate-level accuracy, not merged into it. A pair
-classification is labeled only over the pairs the reference join keeps; an
-engine's answer over any other pair has no reference label and is counted as
-`unlabeled` instead of evaluated.
+their reference labels. It is reported beside predicate-level accuracy, not
+merged into it. `run.json` records `correct`, `evaluated`, `unlabeled`, and
+`accuracy` for each classification and in total.
+
+Each answer is counted by whether it has a reference label:
+
+| Answer over | Reference label | Counted as |
+| --- | --- | --- |
+| A document | Present | `evaluated` |
+| A document | Missing | Error |
+| A pair | Present | `evaluated` |
+| A pair | Missing | `unlabeled` |
+
+`correct` counts the evaluated answers that match. Accuracy is `correct`
+divided by `evaluated`, so unlabeled answers do not affect it.
+
+A pair can lack a reference label because reference labels exist only for the
+pairs the reference join keeps. An engine's join can keep other pairs. For
+example, if an engine's join keeps a review paired with "the soundtrack" and
+the reference join does not, the engine's label for that pair is `unlabeled`.
+
+The reference result needs a label for each of its pairs. For IMDB-15, these
+are the pairs the reference join keeps whose review has a negative or mixed
+reference sentiment. If one of them has no reference label, scoring raises an
+error.
 
 Accuracy is not a focus of this benchmark. See
 [Reference answers](../README.md#reference-answers) for how the labels were
