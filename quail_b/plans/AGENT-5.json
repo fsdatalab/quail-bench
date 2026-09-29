@@ -91,7 +91,7 @@
                         {
                           "value": {
                             "literal": {
-                              "string": "Judge strictly from the agent trace above which kind of defect causes the reported issue, by the change a correct fix makes.\n\n{0}"
+                              "string": "Judge strictly from the agent trace above what kind of defect causes the reported issue.\n\n{0}"
                             }
                           }
                         },
@@ -147,16 +147,16 @@
                               "list": {
                                 "values": [
                                   {
-                                    "string": "a value is set or initialized wrong, fixed in a few lines"
+                                    "string": "a value is set or initialized wrong"
                                   },
                                   {
                                     "string": "a condition or validation is missing or wrong"
                                   },
                                   {
-                                    "string": "the steps that compute a result are wrong, fixed without new features"
+                                    "string": "the steps that compute a result are wrong"
                                   },
                                   {
-                                    "string": "a capability is missing and needs a new function, class, or design"
+                                    "string": "a needed function, class, or feature is missing"
                                   },
                                   {
                                     "string": "components pass the wrong arguments, return values, or messages"

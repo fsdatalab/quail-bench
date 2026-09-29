@@ -302,20 +302,20 @@ AGENT_DOMAIN_LABELS = (
 )
 
 # IBM's Orthogonal Defect Classification defect types (Chillarege et al.,
-# IEEE TSE 1992), named by the change a correct fix makes
+# IEEE TSE 1992)
 AGENT_ROOT_CAUSE = (
-    "Judge strictly from the agent trace above which kind of defect causes "
-    "the reported issue, by the change a correct fix makes.\n\n{0}"
+    "Judge strictly from the agent trace above what kind of defect causes "
+    "the reported issue.\n\n{0}"
 )
 AGENT_ROOT_CAUSE_LABELS = (
     "assignment", "checking", "algorithm", "function", "interface",
     "timing or serialization", "build, package, or merge", "documentation",
 )
 AGENT_ROOT_CAUSE_DESCRIPTIONS = (
-    "a value is set or initialized wrong, fixed in a few lines",
+    "a value is set or initialized wrong",
     "a condition or validation is missing or wrong",
-    "the steps that compute a result are wrong, fixed without new features",
-    "a capability is missing and needs a new function, class, or design",
+    "the steps that compute a result are wrong",
+    "a needed function, class, or feature is missing",
     "components pass the wrong arguments, return values, or messages",
     "shared resources, concurrency, or the order of events are wrong",
     "a dependency, version, build, or packaging setting is wrong",
