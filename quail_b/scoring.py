@@ -53,7 +53,7 @@ class RunOutput:
             classification of joined rows, and a string `label`
             column, one row per document or joined row the engine
             classified. A document or joined row with no row cannot
-            pass a label filter or appear with its label.
+            pass an IN-list filter or appear with its label.
     """
 
     filter_answers: dict[str, pa.Table] | None
@@ -321,24 +321,24 @@ def _narrow(survivors: dict, alias: str, passed) -> None:
 
 
 def _apply_labels(spec: QuerySpec, survivors: dict, labels: dict) -> None:
-    """Keep ids that have every used label and pass every label filter.
+    """Keep ids that have every used label and pass every IN-list filter.
 
     A label of joined rows never narrows an alias:
     `_apply_joined_labels` narrows the join's pairs instead.
     """
-    used = {operator.output for operator in spec._info.label_filters}
+    used = {operator.output for operator in spec._info.in_lists}
     used.update(operator.output for operator in _selected_labels(spec))
     for operator in spec._info.classifies:
         if operator.output in used and operator.partner is None:
             table = labels[operator.output]
             _narrow(survivors, operator.relation,
                     table.column(operator.relation).to_pylist())
-    for label_filter in spec._info.label_filters:
-        table = labels[label_filter.output]
-        mask = pc.is_in(table.column(label_filter.output),
-                        value_set=pa.array(label_filter.accepted, pa.string()))
-        _narrow(survivors, label_filter.relation,
-                table.filter(mask).column(label_filter.relation).to_pylist())
+    for in_list in spec._info.in_lists:
+        table = labels[in_list.output]
+        mask = pc.is_in(table.column(in_list.output),
+                        value_set=pa.array(in_list.accepted, pa.string()))
+        _narrow(survivors, in_list.relation,
+                table.filter(mask).column(in_list.relation).to_pylist())
 
 
 def _joined_classifies(spec: QuerySpec, join):
@@ -362,7 +362,7 @@ def answer_relations(spec: QuerySpec, filter_answers, join_answers,
     """Return (survivors, relations) an engine's own answers imply.
 
     survivors maps each alias to the string ids that passed every filter
-    and label filter on it and have every label column the query uses,
+    and IN-list filter on it and have every label column the query uses,
     or None when nothing narrows it. relations holds one table per join,
     in written order, with the pairs that answered TRUE, satisfy the
     join's equality conditions, survived, and have every joined-row label

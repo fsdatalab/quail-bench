@@ -14,8 +14,8 @@ from quail_b.prompts import (
 )
 from quail_b.queries import (
     FILTER_SELECTIVITY_ESTIMATES,
+    IN_LIST_SELECTIVITY_ESTIMATES,
     JOIN_SELECTIVITY_ESTIMATES,
-    LABEL_SELECTIVITY_ESTIMATES,
     PRIVACY_QUERIES,
     QUERIES,
     QUERY_FAMILY_WORKLOADS,
@@ -59,9 +59,9 @@ def test_catalog_has_the_42_default_queries_and_two_privacy_queries():
             for join in info.joins
         ), spec.id
         assert all(
-            (info.classify_output(label_filter.output).prompt,
-             frozenset(label_filter.accepted)) in LABEL_SELECTIVITY_ESTIMATES
-            for label_filter in info.label_filters
+            (info.classify_output(in_list.output).prompt,
+             frozenset(in_list.accepted)) in IN_LIST_SELECTIVITY_ESTIMATES
+            for in_list in info.in_lists
         ), spec.id
         if not info.classifies:
             assert all(name.endswith(".id") for name in info.select), spec.id
@@ -299,8 +299,8 @@ def test_query_family_rejects_mixed_or_unknown_queries():
 @pytest.mark.parametrize("query_id, expected", [
     ("IMDB-2", "f3b93b898b0d631fb451046b072920cb81f12d5aabb8dc1b853f913030b4f45e"),
     ("LEP-5", "6ca4bd71ae0304b98448d295d35213853c2d52242f8cc5bf23a817b0b9889a88"),
-    # a one-document classification: its hash predates joined-row classification
-    ("IMDB-14", "8963eabef7d462ee9f9161dcbd75dcb0c63c2f4ba473c69a9e052890bd05384d"),
+    # a one-document classification with an IN-list filter
+    ("IMDB-14", "80c0d0927d64080e0d03936da550ce7c96ac0fc88bba22f8e0b2b793c35b9de9"),
 ])
 def test_raw_query_hash_matches_before_chat(query_id, expected, monkeypatch):
     import importlib

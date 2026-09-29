@@ -77,9 +77,9 @@ JOIN_SELECTIVITY_ESTIMATES = {
     REFUTE: 477 / 143500,
     LEPJOIN: 500 / 216500,
 }
-# Label filters, keyed by (classification prompt, accepted labels), from
+# IN-list filters, keyed by (classification prompt, accepted labels), from
 # the sf=0.1 reference labels in gt_6d7ca88a74a30b665bfb67dcde76daff.
-LABEL_SELECTIVITY_ESTIMATES = {
+IN_LIST_SELECTIVITY_ESTIMATES = {
     (IMDB_SENTIMENT, frozenset({"negative", "mixed"})): 2923 / 5000,
     (BIO_ORGAN_CLASS, frozenset({"cardiac disorders", "vascular disorders"})):
         109 / 1127,

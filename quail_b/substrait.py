@@ -87,7 +87,7 @@ class _Classify:
 
 
 @dataclass(frozen=True)
-class _LabelFilter:
+class _InList:
     """Keep the documents whose label is one of the accepted labels."""
 
     id: str
@@ -96,7 +96,7 @@ class _LabelFilter:
     accepted: tuple[str, ...]
 
 
-type _Operator = _Filter | _Join | _Classify | _LabelFilter
+type _Operator = _Filter | _Join | _Classify | _InList
 
 
 @dataclass(frozen=True)
@@ -127,7 +127,7 @@ class _PlanInfo:
         return tuple(
             operator
             for operator in self.operators
-            if not isinstance(operator, _LabelFilter)
+            if not isinstance(operator, _InList)
         )
 
     @property
@@ -139,11 +139,11 @@ class _PlanInfo:
         )
 
     @property
-    def label_filters(self) -> tuple[_LabelFilter, ...]:
+    def in_lists(self) -> tuple[_InList, ...]:
         return tuple(
             operator
             for operator in self.operators
-            if isinstance(operator, _LabelFilter)
+            if isinstance(operator, _InList)
         )
 
     def classify_output(self, output: str) -> _Classify:
@@ -338,16 +338,16 @@ def _decode(
              and (operator.relation, operator.output) == (alias, output)),
             None)
         if classify is None:
-            raise ValueError("a label filter must test an ai_classify column")
+            raise ValueError("an IN-list filter must test an ai_classify column")
         if classify.partner is not None:
             raise ValueError(
-                "a label filter tests a one-document classification")
+                "an IN-list filter tests a one-document classification")
         accepted = tuple(_literal_string(option) for option in membership.options)
         if not accepted or len(set(accepted)) != len(accepted):
-            raise ValueError("a label filter needs distinct accepted labels")
+            raise ValueError("an IN-list filter needs distinct accepted labels")
         if not set(accepted) <= set(classify.labels):
-            raise ValueError("a label filter accepts a label not in its call")
-        operator = _LabelFilter(
+            raise ValueError("an IN-list filter accepts a label not in its call")
+        operator = _InList(
             rel.filter.common.hint.alias, alias, output, accepted)
         return _Decoded(child.fields, child.tables, child.text_columns,
                         (*child.operators, operator))
@@ -530,7 +530,7 @@ def _validate_info(info: _PlanInfo) -> None:
                     f"classification {operator.id!r} of joined rows must follow the "
                     "join of its two relations")
         elif (
-            isinstance(operator, (_Filter, _Classify, _LabelFilter))
+            isinstance(operator, (_Filter, _Classify, _InList))
             and index > first_join[operator.relation]
         ):
             raise ValueError(
@@ -562,7 +562,7 @@ def _validate_info(info: _PlanInfo) -> None:
         if not set(operator.relations) <= selected_ids:
             raise ValueError(f"a query selecting the joined-row label {name!r} must "
                              "select both relations' ids")
-    used = {operator.output for operator in info.label_filters}
+    used = {operator.output for operator in info.in_lists}
     used.update(name.split(".", 1)[1] for name in info.select)
     for operator in info.classifies:
         if operator.output not in used:

@@ -64,9 +64,9 @@ A classification appears as a `ProjectRel` that adds one label column to its
 relation. Its hint alias is the operator ID, such as `classify-1`. Its hint
 output names end with `alias.column`, such as `r.sentiment`.
 
-A label filter is a `FilterRel` whose condition is a standard `SingularOrList`
+An IN-list filter is a `FilterRel` whose condition is a standard `SingularOrList`
 over a label column. It keeps the documents whose label is in the list. It
-asks the model nothing. Its ID is `label-filter-N`.
+asks the model nothing. Its ID is `in-list-N`.
 
 A classification can also label the rows of a join instead of single
 documents. It calls `ai_classify:str_str_str_list_list` in a `ProjectRel` that
@@ -286,7 +286,7 @@ ai_classify(prompt, anchor, partner, labels, descriptions) -> string
 - The call's `ProjectRel` sits above the `JoinRel` of the same two relations.
   It sees only the rows that join kept.
 - The label column belongs to the anchor's relation.
-- A label filter cannot test its label column.
+- An IN-list filter cannot test its label column.
 
 IMDB-15 is the only query that classifies joined rows. Its plan has this
 operator tree:
@@ -295,13 +295,13 @@ operator tree:
 Project [r.id, r.sentiment, a.id, r.aspect_sentiment]
 └── Classify aspect sentiment        classify-2
     └── AI Join J1                   join-1
-        ├── Label filter             label-filter-1
+        ├── IN-list filter           in-list-1
         │   └── Classify sentiment   classify-1
         │       └── Scan reviews AS r
         └── Scan aspects AS a
 ```
 
-`classify-1` labels each review's overall sentiment. `label-filter-1` keeps
+`classify-1` labels each review's overall sentiment. `in-list-1` keeps
 the reviews labeled negative or mixed. `join-1` pairs each kept review with
 the aspects it discusses. `classify-2` labels each of those rows.
 
@@ -362,7 +362,7 @@ compared with this definition.
 
 `classify_answers` maps each classify operator ID to a table with the
 relation's alias column and a string `label` column, one row per document the
-engine classified. A document with no row cannot pass a label filter or appear
+engine classified. A document with no row cannot pass an IN-list filter or appear
 with its label. Every label must be one of the call's labels.
 
 ```python

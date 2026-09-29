@@ -20,8 +20,8 @@ from quail_b.run import _write_json
 from quail_b.substrait import AI_CLASSIFY_JOINED_NAME, AI_CLASSIFY_NAME
 from tools.make_substrait_plans import (
     Classify,
+    InList,
     Join,
-    LabelFilter,
     Scan,
     build_plan,
 )
@@ -53,12 +53,12 @@ def test_every_classification_has_one_predicate():
 def test_plans_carry_label_columns_and_filters():
     info = quail_b.get_query("IMDB-13")._info
     assert [operator.id for operator in info.operators] == [
-        "classify-1", "label-filter-1", "join-1"]
+        "classify-1", "in-list-1", "join-1"]
     assert info.select == ("r.id", "r.sentiment", "a.id")
     assert list(quail_b.get_query("IMDB-13").plan.relations[0].root.names) \
         == ["r", "sentiment", "a"]
-    (label_filter,) = info.label_filters
-    assert label_filter.accepted == ("negative", "mixed")
+    (in_list,) = info.in_lists
+    assert in_list.accepted == ("negative", "mixed")
     agent = quail_b.get_query("AGENT-4")._info
     assert [operator.output for operator in agent.classifies] == [
         "outcome", "failure"]
@@ -72,7 +72,7 @@ def test_joined_classification_plan():
     plan = quail_b.get_query("IMDB-15").plan
     info = quail_b.get_query("IMDB-15")._info
     assert [operator.id for operator in info.operators] == [
-        "classify-1", "label-filter-1", "join-1", "classify-2"]
+        "classify-1", "in-list-1", "join-1", "classify-2"]
     one, pair = info.classifies
     assert (one.relation, one.partner, one.relations) == ("r", None, ("r",))
     assert (pair.relation, pair.partner) == ("r", "a")
@@ -114,7 +114,7 @@ def test_joined_classification_rules():
     reversed_info = _spec(_pair_tree(("a", "r")), ("r", "a", "a.x"))._info
     assert reversed_info.classifies[0].relations == ("a", "r")
     with pytest.raises(ValueError, match="one-document classification"):
-        _spec(LabelFilter(_pair_tree(), "x", ("yes",)), ("r", "a"))
+        _spec(InList(_pair_tree(), "x", ("yes",)), ("r", "a"))
     with pytest.raises(ValueError, match="both relations' ids"):
         _spec(_pair_tree(), ("r", "r.x"))
     # no join pairs exactly the two classified relations
@@ -142,7 +142,7 @@ def test_invalid_label_uses_are_rejected():
     scan = Scan("reviews", "r", "body")
     tree = Classify(scan, "{0}", ("yes", "no"), "x")
     with pytest.raises(ValueError, match="not in its call"):
-        _spec(LabelFilter(tree, "x", ("maybe",)), None)
+        _spec(InList(tree, "x", ("maybe",)), None)
     with pytest.raises(ValueError, match="never used"):
         _spec(tree, None)
     with pytest.raises(ValueError, match="relation's id"):

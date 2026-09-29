@@ -99,7 +99,7 @@ class Scan:
 class Filter:
     """Keep the documents of one relation that answer a prompt TRUE."""
 
-    input: Scan | Filter | Classify | LabelFilter
+    input: Scan | Filter | Classify | InList
     prompt: str
 
 
@@ -122,7 +122,7 @@ class Classify:
             alias; None takes the join's aliases in order.
     """
 
-    input: Scan | Filter | Classify | LabelFilter | Join
+    input: Scan | Filter | Classify | InList | Join
     prompt: str
     labels: tuple[str, ...]
     output: str
@@ -131,10 +131,10 @@ class Classify:
 
 
 @dataclass(frozen=True)
-class LabelFilter:
+class InList:
     """Keep the documents whose label column holds an accepted label."""
 
-    input: Classify | LabelFilter
+    input: Classify | InList
     output: str
     accepted: tuple[str, ...]
 
@@ -174,7 +174,7 @@ class Query:
 
     id: str
     description: str
-    tree: Scan | Filter | Join | Classify | LabelFilter
+    tree: Scan | Filter | Join | Classify | InList
     privacy: bool = False
     select: tuple[str, ...] | None = None
     labels_pending: bool = False
@@ -255,7 +255,7 @@ class _Emitter:
 
     def __init__(self):
         self.counts = {"filter": 0, "join": 0, "classify": 0,
-                       "label-filter": 0}
+                       "in-list": 0}
         self.functions = set()
 
     def _operator_id(self, kind):
@@ -307,12 +307,12 @@ class _Emitter:
             )
             return algebra.Rel(project=relation), output_fields, text
 
-        if isinstance(node, LabelFilter):
+        if isinstance(node, InList):
             rel, fields, text = self.emit(node.input)
             # the label column may belong to any relation the input holds
             (field,) = [field for field in fields if field[1] == node.output]
             relation = algebra.FilterRel(
-                common=_common(self._operator_id("label-filter")),
+                common=_common(self._operator_id("in-list")),
                 input=rel,
                 condition=algebra.Expression(
                     singular_or_list=algebra.Expression.SingularOrList(
@@ -502,7 +502,7 @@ def _sentiment(node):
 
 def _critical(node):
     """Reviews whose sentiment is negative or mixed."""
-    return LabelFilter(_sentiment(node), "sentiment", ("negative", "mixed"))
+    return InList(_sentiment(node), "sentiment", ("negative", "mixed"))
 
 
 def _organ_class(node):
@@ -606,8 +606,8 @@ QUERIES = (
     Query("BIO-6", "serious adverse event reports x their cardiac or "
           "vascular reactions",
           Join(_filters(_reports(), SERIOUS_ADVERSE_EVENT),
-               LabelFilter(_organ_class(_terms()), "organ_class",
-                           ("cardiac disorders", "vascular disorders")),
+               InList(_organ_class(_terms()), "organ_class",
+                      ("cardiac disorders", "vascular disorders")),
                ("r", "m"), REACTION)),
 
     Query("FEV-1", "filter: F11 (about a person)", _filters(_claims(), F11)),
@@ -649,9 +649,9 @@ QUERIES = (
                on=(("evidence_wiki_url", "id"),))),
     Query("FEV-11", "classify: claim topic; the political and historical "
           "claims, with their topic",
-          LabelFilter(_classify(_claims(), prompts.FEV_TOPIC,
-                                prompts.FEV_TOPIC_LABELS, "topic"),
-                      "topic", ("politics", "history")),
+          InList(_classify(_claims(), prompts.FEV_TOPIC,
+                           prompts.FEV_TOPIC_LABELS, "topic"),
+                 "topic", ("politics", "history")),
           select=("c", "c.topic")),
 
     Query("LEP-1", "filter: LEP1 (reasoning does not apply)",
@@ -670,7 +670,7 @@ QUERIES = (
                _filters(_passages(), LEPS1), ("d", "s"), LEPJOIN)),
     Query("LEP-6", "constitutional or criminal law excerpts -> the "
           "passages they cite, with each excerpt's area of law",
-          Join(LabelFilter(
+          Join(InList(
                    _classify(_contexts(), prompts.LEP_AREA,
                              prompts.LEP_AREA_LABELS, "area"),
                    "area", ("constitutional law", "criminal law")),
@@ -685,8 +685,8 @@ QUERIES = (
           _outcome(_filters(_traces(), AGENT_RECOVERED)),
           select=("t", "t.outcome")),
     Query("AGENT-4", "unresolved traces -> classify: why the agent failed",
-          _classify(LabelFilter(_outcome(_traces()), "outcome",
-                                ("not resolved",)),
+          _classify(InList(_outcome(_traces()), "outcome",
+                           ("not resolved",)),
                     prompts.AGENT_FAILURE, prompts.AGENT_FAILURE_LABELS,
                     "failure", prompts.AGENT_FAILURE_DESCRIPTIONS),
           select=("t", "t.failure")),

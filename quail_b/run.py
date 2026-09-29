@@ -25,7 +25,7 @@ from quail_b.scoring import (
     output_columns,
     scores_from_answers,
 )
-from quail_b.substrait import _Classify, _Filter, _Join, _LabelFilter
+from quail_b.substrait import _Classify, _Filter, _InList, _Join
 
 RUN_SCHEMA_VERSION = 2
 
@@ -78,9 +78,9 @@ def _query_hash(spec):
                 **({"partner": operator.partner}
                    if operator.partner is not None else {}),
             })
-        elif isinstance(operator, _LabelFilter):
+        elif isinstance(operator, _InList):
             operators.append({
-                "kind": "label_filter",
+                "kind": "in_list",
                 "id": operator.id,
                 "relation": operator.relation,
                 "output": operator.output,
