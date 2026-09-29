@@ -1,8 +1,9 @@
 """The fewest input tokens a run's requests need with unlimited KV.
 
 Every request an engine made is a token sequence: a document prefix
-followed by a filter question, or an anchor prefix and its frame
-followed by a partner label, the partner document, and the answer cue.
+followed by a filter or classification question, or an anchor prefix
+and its frame followed by a partner label, the partner document, and
+the answer cue (a join, or a classification of joined rows).
 With unlimited KV every distinct prefix across the document
 sequences is computed once: each document's text once, and the
 questions and frames after one document once each, sharing the lead
@@ -14,6 +15,10 @@ request's own, so they are never regret. What an engine computed
 beyond the minimum is its regret, whatever the cause: an evicted
 anchor computed again, a set scanned twice under two aliases, or a
 prompt prefix the documents share computed once per document.
+Positions a classification feeds after its answer cue to read labels,
+such as the nodes of a label trie, are the request's own too: the
+engine reports their count as `label_tokens`, and it adds to the
+minimum.
 
 The engine reports the prompt pieces it used as token ids (see
 `validate_prompt_pieces`); the documents are tokenized here with the
@@ -87,6 +92,11 @@ def validate_prompt_pieces(spec, pieces) -> dict:
             `{"id", "anchor", "frame", "label", "tail"}`: the
             anchor alias, the ids after the anchor document, the ids
             before the partner document, and the ids after it).
+            A query with classifications also needs `classifies`: a
+            list of `{"id", "tail"}` for a classification of one
+            document, and of `{"id", "anchor", "frame", "label",
+            "tail"}`, read as for a join, for a classification of
+            joined rows. A tail ends with the answer cue.
 
     Returns:
         The pieces as plain lists, with every stage of the query named.
@@ -96,7 +106,7 @@ def validate_prompt_pieces(spec, pieces) -> dict:
         raise ValueError("prompt pieces need a tokenizer name")
     checked = {"tokenizer": pieces["tokenizer"],
                "preamble": _token_list(pieces.get("preamble", ()), "preamble"),
-               "filters": [], "joins": []}
+               "filters": [], "joins": [], "classifies": []}
     stages = {filter_spec.id for filter_spec in spec._info.filters}
     for item in pieces.get("filters", ()):
         operator_id = item.get("id")
@@ -121,19 +131,43 @@ def validate_prompt_pieces(spec, pieces) -> dict:
                 f"prompt pieces: unknown join operator {operator_id!r}"
             )
         operator_ids.remove(operator_id)
-        if item.get("anchor") not in joins[operator_id].relations:
-            raise ValueError(
-                f"prompt pieces: join {operator_id!r} anchors on an alias it "
-                f"does not join: {item.get('anchor')!r}")
-        checked["joins"].append({
-            "id": operator_id, "anchor": item["anchor"],
-            **{name: _token_list(item.get(name, ()), f"join {name}")
-               for name in ("frame", "label", "tail")}})
+        checked["joins"].append(
+            _pair_piece(item, joins[operator_id].relations, "join"))
     if operator_ids:
         raise ValueError(
             f"prompt pieces: missing join operators {sorted(operator_ids)}"
         )
+    classifies = {operator.id: operator for operator in spec._info.classifies}
+    operator_ids = set(classifies)
+    for item in pieces.get("classifies", ()):
+        operator_id = item.get("id")
+        if operator_id not in operator_ids:
+            raise ValueError(
+                f"prompt pieces: unknown classify operator {operator_id!r}")
+        operator_ids.remove(operator_id)
+        operator = classifies[operator_id]
+        if operator.partner is None:
+            checked["classifies"].append({
+                "id": operator_id,
+                "tail": _token_list(item.get("tail", ()), "classify tail")})
+        else:
+            checked["classifies"].append(
+                _pair_piece(item, operator.relations, "classify"))
+    if operator_ids:
+        raise ValueError(
+            f"prompt pieces: missing classify operators {sorted(operator_ids)}")
     return checked
+
+
+def _pair_piece(item, relations, kind) -> dict:
+    """Check the anchor, frame, label, and tail of a two-document request."""
+    if item.get("anchor") not in relations:
+        raise ValueError(
+            f"prompt pieces: {kind} {item.get('id')!r} anchors on an alias "
+            f"it does not read: {item.get('anchor')!r}")
+    return {"id": item["id"], "anchor": item["anchor"],
+            **{name: _token_list(item.get(name, ()), f"{kind} {name}")
+               for name in ("frame", "label", "tail")}}
 
 
 @lru_cache(maxsize=4)
@@ -196,7 +230,8 @@ def _encoded(column) -> tuple[np.ndarray, pa.Array]:
 
 
 def minimum_input_tokens(spec, pieces, filter_answers, join_answers,
-                         documents: DocumentTokens) -> int:
+                         documents: DocumentTokens,
+                         classify_answers=None) -> int:
     """Return the fewest input tokens the run's requests need.
 
     A join can hold tens of millions of pairs, so the pairs are
@@ -210,6 +245,12 @@ def minimum_input_tokens(spec, pieces, filter_answers, join_answers,
         join_answers: Join operator ID to a table with one ID column per
             relation and answers, one row per evaluated pair.
         documents: The document tokens.
+        classify_answers: Classify operator ID to a table with one ID
+            column per classified alias, one row per document or joined
+            row classified.
+
+    Returns:
+        The token count, without the positions after the answer cue.
     """
     sets = {
         relation.alias: (relation.table, relation.text_column)
@@ -234,15 +275,31 @@ def minimum_input_tokens(spec, pieces, filter_answers, join_answers,
         ids = pc.unique(pc.cast(table.column(alias), pa.string()))
         for row_id in ids.to_pylist():
             record(alias, row_id).suffixes.add(question)
-    joins = {item["id"]: item for item in pieces["joins"]}
-    join_specs = {join.id: join for join in spec._info.joins}
-    # a member key names one distinct partner set of one join: the
-    # sorted partner indices of that join's answer table
+    pairs = {item["id"]: item for item in pieces["joins"]}
+    relations = {join.id: join.relations for join in spec._info.joins}
+    pair_answers = dict(join_answers)
+    classifies = {operator.id: operator for operator in spec._info.classifies}
+    for piece in pieces["classifies"]:
+        table = (classify_answers or {}).get(piece["id"])
+        if table is None:
+            continue
+        operator = classifies[piece["id"]]
+        if operator.partner is not None:
+            pairs[piece["id"]] = piece
+            relations[piece["id"]] = operator.relations
+            pair_answers[piece["id"]] = table
+            continue
+        question = tuple(piece["tail"])
+        ids = pc.unique(pc.cast(table.column(operator.relation), pa.string()))
+        for row_id in ids.to_pylist():
+            record(operator.relation, row_id).suffixes.add(question)
+    # a member key names one distinct partner set of one join or joined-row
+    # classification: the sorted partner indices of its answer table
     members_of: dict = {}
-    for operator_id, table in join_answers.items():
-        piece = joins[operator_id]
+    for operator_id, table in pair_answers.items():
+        piece = pairs[operator_id]
         anchor = piece["anchor"]
-        (partner,) = [alias for alias in join_specs[operator_id].relations
+        (partner,) = [alias for alias in relations[operator_id]
                       if alias != anchor]
         group = (tuple(piece["frame"]), tuple(piece["label"]), tuple(piece["tail"]))
         partner_set = sets[partner]
@@ -300,6 +357,13 @@ def _fresh_tokens(measurements) -> int | None:
     return fresh
 
 
+def _label_tokens(measurements) -> int:
+    label = measurements.get("label_tokens", 0)
+    if isinstance(label, bool) or not isinstance(label, int) or label < 0:
+        raise ValueError("label_tokens must be a nonnegative integer")
+    return label
+
+
 def _reported_input_tokens(measurements) -> int | None:
     if "input_tokens" not in measurements:
         return None
@@ -310,8 +374,13 @@ def _reported_input_tokens(measurements) -> int | None:
 
 
 def input_tokens(spec, pieces, filter_answers, join_answers,
-                 documents: DocumentTokens) -> int | None:
-    """Count full prompt inputs, or return None for missing answer tables."""
+                 documents: DocumentTokens,
+                 classify_answers=None) -> int | None:
+    """Count full prompt inputs, or return None for missing answer tables.
+
+    A prompt ends with its answer cue: positions fed after it to read
+    labels are not input tokens.
+    """
     sets = {
         relation.alias: (relation.table, relation.text_column)
         for relation in spec._info.relations
@@ -344,6 +413,16 @@ def input_tokens(spec, pieces, filter_answers, join_answers,
             len(piece[name]) for name in ("frame", "label", "tail")))
         total += sum(document_tokens(table, alias)
                      for alias in joins[piece["id"]].relations)
+    classifies = {operator.id: operator for operator in spec._info.classifies}
+    for piece in pieces["classifies"]:
+        table = (classify_answers or {}).get(piece["id"])
+        if table is None:
+            return None
+        operator = classifies[piece["id"]]
+        total += len(table) * (preamble + sum(
+            len(piece.get(name, ())) for name in ("frame", "label", "tail")))
+        total += sum(document_tokens(table, alias)
+                     for alias in operator.relations)
     return total
 
 
@@ -361,6 +440,8 @@ def token_metrics(spec, output, corpus_rows, stores=None) -> dict:
       and regret are unavailable because a total does not describe prefixes.
     - A missing answer table makes input tokens unavailable. An empty answer
       table contributes zero input tokens.
+    - An engine-reported `label_tokens` (positions fed after the answer
+      cue to read labels, 0 when absent) adds to the minimum, unscaled.
 
     Args:
         spec: The query.
@@ -371,8 +452,8 @@ def token_metrics(spec, output, corpus_rows, stores=None) -> dict:
     """
     fresh = _fresh_tokens(output.measurements)
     reported_input = _reported_input_tokens(output.measurements)
-    # prompt pieces are not defined for classifications yet
-    if output.prompt_pieces is None or spec._info.classifies:
+    label = _label_tokens(output.measurements)
+    if output.prompt_pieces is None:
         return {"input_tokens": reported_input, "fresh_tokens": fresh,
                 "minimum_tokens": None, "regret_tokens": None,
                 "regret_approximate": False}
@@ -380,22 +461,26 @@ def token_metrics(spec, output, corpus_rows, stores=None) -> dict:
         raise ValueError("prompt pieces need a fresh_tokens measurement")
     if output.filter_answers is None or output.join_answers is None:
         raise ValueError("prompt pieces need filter and join answers")
+    if spec._info.classifies and output.classify_answers is None:
+        raise ValueError("prompt pieces need classify answers")
     pieces = validate_prompt_pieces(spec, output.prompt_pieces)
     stores = {} if stores is None else stores
     name = pieces["tokenizer"]
     if name not in stores:
         stores[name] = DocumentTokens(corpus_rows, load_tokenizer(name))
-    minimum = minimum_input_tokens(
-        spec, pieces, output.filter_answers, output.join_answers, stores[name])
-    piece_input = input_tokens(
-        spec, pieces, output.filter_answers, output.join_answers, stores[name])
+    answers = (output.filter_answers, output.join_answers, stores[name],
+               output.classify_answers)
+    minimum = minimum_input_tokens(spec, pieces, *answers)
+    piece_input = input_tokens(spec, pieces, *answers)
     if reported_input is not None:
         if piece_input:
             minimum = round(minimum * reported_input / piece_input)
+        minimum += label
         return {"input_tokens": reported_input, "fresh_tokens": fresh,
                 "minimum_tokens": minimum,
                 "regret_tokens": max(fresh - minimum, 0),
                 "regret_approximate": True}
+    minimum += label
     if fresh < minimum:
         raise ValueError(
             f"fresh_tokens ({fresh}) is below the minimum the requests need "

@@ -13,11 +13,12 @@ from quail_b.minimum import (
 )
 from quail_b.queries import QuerySpec
 from quail_b.scoring import RunOutput
-from tools.make_substrait_plans import Filter, Join, Scan, build_plan
+from tools.make_substrait_plans import Classify, Filter, Join, Scan, build_plan
 
 
-def _spec(query_id, description, tree):
-    return QuerySpec.from_plan(query_id, description, build_plan(tree))
+def _spec(query_id, description, tree, select=None):
+    return QuerySpec.from_plan(
+        query_id, description, build_plan(tree, select=select))
 
 
 def _encode(texts):
@@ -244,3 +245,140 @@ def test_input_tokens_do_not_count_recomputed_kv(monkeypatch):
             counts[0]["minimum_tokens"] * reported / counts[0]["input_tokens"]),
         "regret_tokens": 0, "regret_approximate": True,
     }
+
+
+CLASSIFY_TAIL = _ids("\n\nwhich tone?\n- A: calm\n- B: angry\nANSWER:")
+
+
+def test_minimum_input_tokens_count_a_classification_as_a_document_suffix():
+    spec = _spec(
+        "TEST-3",
+        "one filter then one classification of the survivors",
+        Classify(Filter(Scan("docs", "d", "body"), "useful {0}"),
+                 "tone of {0}", ("calm", "angry"), "tone"),
+        ("d", "d.tone"),
+    )
+    corpus = {"docs": pa.table({"id": ["a", "b"], "body": ["alpha", "beta"]})}
+    pieces = validate_prompt_pieces(spec, {
+        "tokenizer": "test", "preamble": PRE,
+        "filters": [{"id": "filter-1", "tail": QUESTION}],
+        "classifies": [{"id": "classify-1", "tail": CLASSIFY_TAIL}],
+    })
+    filter_answers = {"filter-1": pa.table({
+        "d": ["a", "b"], "answer": [True, False]})}
+    classify_answers = {"classify-1": pa.table({
+        "d": ["a"], "label": ["calm"]})}
+    tokens = DocumentTokens(corpus, _encode)
+    minimum = minimum_input_tokens(
+        spec, pieces, filter_answers, {}, tokens, classify_answers)
+
+    # both documents share the preamble; "alpha" gets the filter question
+    # and the classification tail, sharing the lead they have in common
+    documents = 2 * len(PRE) + 5 + 4 - len(PRE)
+    alpha = len(QUESTION) + len(CLASSIFY_TAIL) - _lcp(QUESTION, CLASSIFY_TAIL)
+    assert minimum == documents + alpha + len(QUESTION)
+    assert input_tokens(spec, pieces, filter_answers, {}, tokens,
+                        classify_answers) == (
+        2 * (len(PRE) + len(QUESTION)) + 9 + len(PRE) + len(CLASSIFY_TAIL) + 5)
+    assert input_tokens(spec, pieces, filter_answers, {}, tokens) is None
+
+
+def test_minimum_input_tokens_count_joined_rows_as_pairs_after_the_anchor():
+    spec = _spec(
+        "TEST-4",
+        "one join then one classification of the joined rows",
+        Classify(Join(Scan("docs", "d", "body"), Scan("aspects", "a", "name"),
+                      ("d", "a"), "{0} mentions {1}"),
+                 "how {0} treats {1}", ("well", "badly"), "treatment"),
+        ("d", "a", "d.treatment"),
+    )
+    corpus = {
+        "docs": pa.table({"id": ["a"], "body": ["alpha"]}),
+        "aspects": pa.table({"id": ["x", "y"], "name": ["aa", "ab"]}),
+    }
+    classify_frame = _ids("\n\nHow does it treat the aspect?")
+    pieces = validate_prompt_pieces(spec, {
+        "tokenizer": "test", "preamble": PRE,
+        "joins": [{"id": "join-1", "anchor": "d", "frame": FRAME,
+                   "label": LABEL, "tail": TAIL}],
+        "classifies": [{"id": "classify-1", "anchor": "d",
+                        "frame": classify_frame, "label": LABEL,
+                        "tail": CLASSIFY_TAIL}],
+    })
+    join_answers = {"join-1": pa.table({
+        "d": ["a", "a"], "a": ["x", "y"], "answer": [True, False]})}
+    classify_answers = {"classify-1": pa.table({
+        "d": ["a"], "a": ["x"], "label": ["well"]})}
+    tokens = DocumentTokens(corpus, _encode)
+    minimum = minimum_input_tokens(
+        spec, pieces, {}, join_answers, tokens, classify_answers)
+
+    # the anchor is computed once with both frames after it; the join's
+    # two pairs and the classified pair each get their own suffix
+    anchored = (len(FRAME) + len(classify_frame)
+                - _lcp(FRAME, classify_frame))
+    joined = 2 * (len(LABEL) + len(TAIL)) + 4
+    classified = len(LABEL) + len(CLASSIFY_TAIL) + 2
+    assert minimum == len(PRE) + 5 + anchored + joined + classified
+
+
+def test_prompt_pieces_name_every_classification_in_its_form():
+    spec = _spec(
+        "TEST-5",
+        "one classification",
+        Classify(Scan("docs", "d", "body"), "tone of {0}",
+                 ("calm", "angry"), "tone"),
+        ("d", "d.tone"),
+    )
+    with pytest.raises(ValueError, match="missing classify operators"):
+        validate_prompt_pieces(spec, {"tokenizer": "test"})
+    with pytest.raises(ValueError, match="unknown classify operator"):
+        validate_prompt_pieces(spec, {"tokenizer": "test", "classifies": [
+            {"id": "classify-1", "tail": [1]}, {"id": "classify-2"}]})
+    checked = validate_prompt_pieces(spec, {"tokenizer": "test", "classifies": [
+        {"id": "classify-1", "anchor": "d", "frame": [1], "tail": [2]}]})
+    assert checked["classifies"] == [{"id": "classify-1", "tail": [2]}]
+    joined = _spec(
+        "TEST-6",
+        "one classification of joined rows",
+        Classify(Join(Scan("docs", "d", "body"), Scan("aspects", "a", "name"),
+                      ("d", "a"), "{0} mentions {1}"),
+                 "how {0} treats {1}", ("well", "badly"), "treatment"),
+        ("d", "a", "d.treatment"),
+    )
+    join = {"id": "join-1", "anchor": "d"}
+    with pytest.raises(ValueError, match="anchors on an alias"):
+        validate_prompt_pieces(joined, {"tokenizer": "test", "joins": [join],
+                                        "classifies": [{"id": "classify-1"}]})
+
+
+def test_token_metrics_count_label_tokens_as_the_requests_own(monkeypatch):
+    monkeypatch.setattr("quail_b.minimum.load_tokenizer", lambda _: _encode)
+    spec = _spec(
+        "TEST-7",
+        "one classification",
+        Classify(Scan("docs", "d", "body"), "tone of {0}",
+                 ("calm", "angry"), "tone"),
+        ("d", "d.tone"),
+    )
+    corpus = {"docs": pa.table({"id": ["a"], "body": ["alpha"]})}
+    pieces = {"tokenizer": "test", "preamble": PRE,
+              "classifies": [{"id": "classify-1", "tail": CLASSIFY_TAIL}]}
+    answers = {"classify-1": pa.table({"d": ["a"], "label": ["calm"]})}
+    prompt = len(PRE) + 5 + len(CLASSIFY_TAIL)
+
+    def metrics(measurements, classify_answers=answers):
+        return token_metrics(spec, RunOutput(
+            {}, {}, pa.table({"d": ["a"]}), runtime_s=1.0,
+            measurements=measurements, prompt_pieces=pieces,
+            classify_answers=classify_answers), corpus)
+
+    assert metrics({"fresh_tokens": prompt + 3, "label_tokens": 3}) == {
+        "input_tokens": prompt, "fresh_tokens": prompt + 3,
+        "minimum_tokens": prompt + 3, "regret_tokens": 0,
+        "regret_approximate": False}
+    assert metrics({"fresh_tokens": prompt + 3})["regret_tokens"] == 3
+    with pytest.raises(ValueError, match="label_tokens"):
+        metrics({"fresh_tokens": prompt, "label_tokens": -1})
+    with pytest.raises(ValueError, match="classify answers"):
+        metrics({"fresh_tokens": prompt}, classify_answers=None)

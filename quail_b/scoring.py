@@ -41,13 +41,14 @@ class RunOutput:
             - `input_tokens` counts the complete inputs of all evaluated
               prompts, including positions read from KV. Report it when
               `prompt_pieces` is unavailable.
+            - `label_tokens` counts positions fed after classification
+              answer cues to read labels; it adds to the minimum.
             - Other values are optional.
         prompt_pieces: The prompt token ids around each document, as
             `quail_b.minimum.validate_prompt_pieces` describes, or None.
             With the answers and `fresh_tokens`, scoring fills
             `input_tokens`, `input_tokens_per_second`, `minimum_tokens`,
-            and `regret_tokens`. Classification queries do not define
-            prompt pieces yet.
+            and `regret_tokens`.
         classify_answers: Classify operator ID to a table with the
             relation's alias column, the partner's alias column for a
             classification of joined rows, and a string `label`

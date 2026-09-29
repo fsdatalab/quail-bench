@@ -25,7 +25,8 @@ Substrait plan with the exact prompt text.
 The benchmark contains 42 such queries over five document collections: movie
 reviews, adverse drug reaction reports, claims and evidence for fact
 verification, legal citations, and software agent trajectories. Each collection
-comes at three scale factors, with reference answers for every filter and join.
+comes at three scale factors, with reference answers for every filter, join,
+and classification.
 
 To benchmark your engine, you write an adapter: a Python function that receives
 one query and its input tables, runs the query on your engine, and returns the
@@ -171,27 +172,24 @@ print(reviews.num_rows)   # 5000
 
 ## Queries
 
-The queries use two AI functions, declared as Substrait extensions in
+The queries use three AI functions, declared as Substrait extensions in
 [`quail_b/substrait_extensions.yaml`](quail_b/substrait_extensions.yaml):
 
 ```text
 ai_filter(prompt, document) -> boolean
 ai_join(prompt, left_document, right_document) -> boolean
-```
-
-The plans combine them with scans, equality conditions, conjunction, and
-projection. The classification queries add a third function, described under
-[Classification queries](#classification-queries). It has two forms:
-
-```text
 ai_classify(prompt, document, labels, descriptions) -> string
 ai_classify(prompt, anchor, partner, labels, descriptions) -> string
 ```
 
-The first form labels one document. The second form labels the rows of a
-join: each row is the two documents, one from each table, that the join kept,
-such as a review and one aspect it discusses. The anchor is the document
-placed first in the prompt, and the partner follows it.
+The plans combine them with scans, equality conditions, conjunction,
+projection, and IN-list filters on label columns, such as
+`r.sentiment IN ('negative', 'mixed')`. The first form of `ai_classify` labels
+one document. The second labels the rows of a join: each row is the two
+documents, one from each table, that the join kept, such as a review and one
+aspect it discusses. The anchor is the document placed first in the prompt,
+and the partner follows it. [Classification queries](#classification-queries)
+lists the queries that use it.
 
 | Dataset | Queries | Tables | Task |
 | --- | --- | --- | --- |
@@ -375,6 +373,7 @@ reports it as zero.
 | Query time | `runtime_s`, in seconds |
 | Output precision and recall | Returned rows compared with the reference result |
 | Predicate-level accuracy | Share of filter and join answers that match the labels |
+| Label accuracy | Share of classification answers that match the labels |
 | Document throughput | Input documents per second, for queries with zero joins |
 | Join throughput | Evaluated document pairs per second |
 | GPU cost | `runtime_s / 3600 * gpu_count * gpu_hourly_rate_usd` |
@@ -399,6 +398,7 @@ results/vllm_qwen3_4b/
     ├── rows.parquet      # the result rows
     ├── filters-0.parquet # optional filter answers
     ├── joins-0.parquet   # optional join answers
+    ├── classifications-0.parquet  # optional classification answers
     └── prompt_pieces.json
 ```
 
