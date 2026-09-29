@@ -352,7 +352,7 @@ def test_prompt_pieces_name_every_classification_in_its_form():
                                         "classifies": [{"id": "classify-1"}]})
 
 
-def test_token_metrics_count_label_tokens_as_the_requests_own(monkeypatch):
+def test_token_metrics_count_label_reading_as_regret(monkeypatch):
     monkeypatch.setattr("quail_b.minimum.load_tokenizer", lambda _: _encode)
     spec = _spec(
         "TEST-7",
@@ -373,12 +373,10 @@ def test_token_metrics_count_label_tokens_as_the_requests_own(monkeypatch):
             measurements=measurements, prompt_pieces=pieces,
             classify_answers=classify_answers), corpus)
 
-    assert metrics({"fresh_tokens": prompt + 3, "label_tokens": 3}) == {
+    # three label tokens fed after the cue are beyond the minimum
+    assert metrics({"fresh_tokens": prompt + 3}) == {
         "input_tokens": prompt, "fresh_tokens": prompt + 3,
-        "minimum_tokens": prompt + 3, "regret_tokens": 0,
+        "minimum_tokens": prompt, "regret_tokens": 3,
         "regret_approximate": False}
-    assert metrics({"fresh_tokens": prompt + 3})["regret_tokens"] == 3
-    with pytest.raises(ValueError, match="label_tokens"):
-        metrics({"fresh_tokens": prompt, "label_tokens": -1})
     with pytest.raises(ValueError, match="classify answers"):
         metrics({"fresh_tokens": prompt}, classify_answers=None)

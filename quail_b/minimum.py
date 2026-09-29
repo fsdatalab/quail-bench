@@ -15,10 +15,13 @@ request's own, so they are never regret. What an engine computed
 beyond the minimum is its regret, whatever the cause: an evicted
 anchor computed again, a set scanned twice under two aliases, or a
 prompt prefix the documents share computed once per document.
-Positions a classification feeds after its answer cue to read labels,
-such as the nodes of a label trie, are the request's own too: the
-engine reports their count as `label_tokens`, and it adds to the
-minimum.
+
+The minimum does not depend on how an engine reads a label. A
+classification's tail is the reference prompt's: the question, the
+labels by name, and the answer cue. Reading the label takes no position
+after the cue. An engine that lists the labels under letters, or feeds
+label tokens after the cue to score them, computes more than the
+minimum, and the difference is regret.
 
 The engine reports the prompt pieces it used as token ids (see
 `validate_prompt_pieces`); the documents are tokenized here with the
@@ -96,7 +99,9 @@ def validate_prompt_pieces(spec, pieces) -> dict:
             list of `{"id", "tail"}` for a classification of one
             document, and of `{"id", "anchor", "frame", "label",
             "tail"}`, read as for a join, for a classification of
-            joined rows. A tail ends with the answer cue.
+            joined rows. A classification's pieces are those of the
+            reference prompt (`render_classify_prompt`), whatever prompt
+            the engine sent; its tail ends with the answer cue.
 
     Returns:
         The pieces as plain lists, with every stage of the query named.
@@ -250,7 +255,7 @@ def minimum_input_tokens(spec, pieces, filter_answers, join_answers,
             row classified.
 
     Returns:
-        The token count, without the positions after the answer cue.
+        The token count.
     """
     sets = {
         relation.alias: (relation.table, relation.text_column)
@@ -357,13 +362,6 @@ def _fresh_tokens(measurements) -> int | None:
     return fresh
 
 
-def _label_tokens(measurements) -> int:
-    label = measurements.get("label_tokens", 0)
-    if isinstance(label, bool) or not isinstance(label, int) or label < 0:
-        raise ValueError("label_tokens must be a nonnegative integer")
-    return label
-
-
 def _reported_input_tokens(measurements) -> int | None:
     if "input_tokens" not in measurements:
         return None
@@ -376,11 +374,7 @@ def _reported_input_tokens(measurements) -> int | None:
 def input_tokens(spec, pieces, filter_answers, join_answers,
                  documents: DocumentTokens,
                  classify_answers=None) -> int | None:
-    """Count full prompt inputs, or return None for missing answer tables.
-
-    A prompt ends with its answer cue: positions fed after it to read
-    labels are not input tokens.
-    """
+    """Count full prompt inputs, or return None for missing answer tables."""
     sets = {
         relation.alias: (relation.table, relation.text_column)
         for relation in spec._info.relations
@@ -440,8 +434,6 @@ def token_metrics(spec, output, corpus_rows, stores=None) -> dict:
       and regret are unavailable because a total does not describe prefixes.
     - A missing answer table makes input tokens unavailable. An empty answer
       table contributes zero input tokens.
-    - An engine-reported `label_tokens` (positions fed after the answer
-      cue to read labels, 0 when absent) adds to the minimum, unscaled.
 
     Args:
         spec: The query.
@@ -452,7 +444,6 @@ def token_metrics(spec, output, corpus_rows, stores=None) -> dict:
     """
     fresh = _fresh_tokens(output.measurements)
     reported_input = _reported_input_tokens(output.measurements)
-    label = _label_tokens(output.measurements)
     if output.prompt_pieces is None:
         return {"input_tokens": reported_input, "fresh_tokens": fresh,
                 "minimum_tokens": None, "regret_tokens": None,
@@ -475,12 +466,10 @@ def token_metrics(spec, output, corpus_rows, stores=None) -> dict:
     if reported_input is not None:
         if piece_input:
             minimum = round(minimum * reported_input / piece_input)
-        minimum += label
         return {"input_tokens": reported_input, "fresh_tokens": fresh,
                 "minimum_tokens": minimum,
                 "regret_tokens": max(fresh - minimum, 0),
                 "regret_approximate": True}
-    minimum += label
     if fresh < minimum:
         raise ValueError(
             f"fresh_tokens ({fresh}) is below the minimum the requests need "

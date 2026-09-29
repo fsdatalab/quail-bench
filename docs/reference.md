@@ -435,14 +435,13 @@ predicates, passed with `root` or `collection_id`. No query is pending.
 
 ## Measurements
 
-`measurements` holds numbers the engine reports. QUAIL-B recognizes four keys:
+`measurements` holds numbers the engine reports. QUAIL-B recognizes three keys:
 
 | Key | Type | Meaning |
 | --- | --- | --- |
 | `evaluated_document_pairs` | nonnegative `int` | Pairs across all joins |
 | `fresh_tokens` | nonnegative `int` | Positions run through model forward passes |
 | `input_tokens` | nonnegative `int` | Full length of every evaluated prompt |
-| `label_tokens` | nonnegative `int` | Positions fed after classification answer cues |
 
 When every join has an answer table, QUAIL-B uses the sum of their row counts
 in place of `evaluated_document_pairs`.
@@ -451,12 +450,6 @@ in place of `evaluated_document_pairs`.
 positions read from KV. Report it when prompt pieces are unavailable. It
 enables input token throughput and cost per million input tokens. Minimum
 tokens and KV regret require `prompt_pieces`.
-
-`label_tokens` counts the positions an engine runs after a classification's
-answer cue to read labels, summed over every classified document or joined
-row. For example, an engine that feeds the tokens of every label to score
-each one reports them here. An engine that reads one next-token distribution
-at the cue reports zero, which is the default.
 
 **Approximate KV regret.** Some engines, such as vLLM, tokenize each whole
 prompt as one string. Their token count can differ slightly from the count the
@@ -499,13 +492,15 @@ tail: tokens after the partner document
 ```
 
 A classification of one document is described like a filter, with `id` and
-`tail`. Its tail ends with the answer cue, so it holds the question, the
-categories, and the cue. A classification of joined rows is described like a
-join, with `id`, `anchor`, `frame`, `label`, and `tail`.
+`tail`. A classification of joined rows is described like a join, with `id`,
+`anchor`, `frame`, `label`, and `tail`.
 
-For example, an engine that lists AGENT-4's failure modes under letters puts
-that lettered list in the tail of `classify-2`; an engine that lists them by
-name puts the names there. Each engine describes the prompts it ran.
+A classification's pieces come from the reference prompt that
+`render_classify_prompt` produces, whatever prompt the engine sent. Its tail
+holds the question, the labels by name, and the answer cue. For example, an
+engine that lists AGENT-4's failure modes under letters still reports the
+tail that lists them by name, so the minimum is the same for every engine
+that uses one tokenizer.
 
 Prompt pieces require:
 
@@ -611,14 +606,15 @@ tokens are therefore the work a perfect prefix KV cache would have avoided.
 
 A classification's tail counts like a filter question: once per document,
 sharing its lead with the document's other questions. A classification of
-joined rows counts like a join. The minimum adds `label_tokens` whole, since
-the positions after the cue belong to one request each.
+joined rows counts like a join. Reading a label takes no position after the
+answer cue, so the minimum does not depend on how an engine reads labels.
 
 For example, suppose an engine classifies 100 reviews after asking one filter
-question of each. Each review's tokens count once, the filter question and
-the classification tail count once per review, minus the tokens they share at
-their start, and `label_tokens` adds to that. Computing a review twice, or a
-tail twice for one review, is recomputation.
+question of each. Each review's tokens count once, and the filter question
+and the classification tail count once per review, minus the tokens they
+share at their start. Computing a review twice, sending a longer lettered
+category list, or feeding label tokens after the cue to score each label is
+work beyond the minimum, and counts as recomputed tokens.
 
 Input tokens depend on which prompts the plan evaluates. Fresh tokens measure
 model computation. Two engines can therefore have the same input tokens and
