@@ -72,8 +72,7 @@
   {
     "id": "IMDB-15",
     "description": "negative or mixed reviews -> J1 -> classify: each review's sentiment toward the aspect it discusses",
-    "privacy": false,
-    "labels_pending": true
+    "privacy": false
   },
   {
     "id": "BIO-1",

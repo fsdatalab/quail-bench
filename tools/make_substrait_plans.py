@@ -584,8 +584,7 @@ QUERIES = (
                         DISCUSS_ASPECT),
                    prompts.IMDB_ASPECT_SENTIMENT,
                    prompts.IMDB_ASPECT_SENTIMENT_LABELS, "aspect_sentiment"),
-          select=("r", "r.sentiment", "a", "r.aspect_sentiment"),
-          labels_pending=True),
+          select=("r", "r.sentiment", "a", "r.aspect_sentiment")),
 
     Query("BIO-1", "filter: serious adverse event",
           _filters(_reports(), SERIOUS_ADVERSE_EVENT)),

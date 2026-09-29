@@ -26,16 +26,14 @@ from tools.make_substrait_plans import (
     build_plan,
 )
 
-CLASSIFY_QUERIES = ("IMDB-11", "IMDB-12", "IMDB-13", "IMDB-14", "BIO-5",
-                    "BIO-6", "FEV-11", "LEP-6", "AGENT-3", "AGENT-4")
+CLASSIFY_QUERIES = ("IMDB-11", "IMDB-12", "IMDB-13", "IMDB-14", "IMDB-15",
+                    "BIO-5", "BIO-6", "FEV-11", "LEP-6", "AGENT-3", "AGENT-4")
 
 
 def test_classification_queries_are_published():
-    # IMDB-15's pair classification labels are not published yet
-    assert pending_query_ids() == ("IMDB-15",)
+    assert pending_query_ids() == ()
     assert tuple(query_id for query_id, spec in queries().items()
                  if spec._info.classifies) == CLASSIFY_QUERIES
-    assert "IMDB-15" in queries(include_pending=True)
 
 
 def test_every_classification_has_one_predicate():

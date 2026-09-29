@@ -22,7 +22,7 @@ The query is written with BigQuery's
 function, and its prompts are shortened. QUAIL-B publishes each query as a
 Substrait plan with the exact prompt text.
 
-The benchmark contains 41 such queries over five document collections: movie
+The benchmark contains 42 such queries over five document collections: movie
 reviews, adverse drug reaction reports, claims and evidence for fact
 verification, legal citations, and software agent trajectories. Each collection
 comes at three scale factors, with reference answers for every filter and join.
@@ -112,7 +112,7 @@ A full call to `quail_b.run` looks like:
 ```python
 quail_b.run(
     run_query,
-    queries=None,                        # None runs all 41 queries
+    queries=None,                        # None runs all 42 queries
     scale_factor=0.1,                    # 0.1, 0.5, or 1.0
     output_dir="results/vllm_qwen3_4b",  # must be a new directory
     metadata={"engine": "vllm", "model": "Qwen/Qwen3-4B-FP8"},
@@ -128,7 +128,7 @@ it saves the output, scores it, and updates `run.json`. At the end it writes
 | Parameter | Default | Meaning |
 | --- | --- | --- |
 | `run_query` | required | Your adapter |
-| `queries` | `None` | Query IDs to run; `None` runs all 41 |
+| `queries` | `None` | Query IDs to run; `None` runs all 42 |
 | `scale_factor` | `0.1` | Published scale factor: `0.1`, `0.5`, or `1.0` |
 | `output_dir` | required | New directory for this run's results |
 | `metadata` | `None` | JSON object saved with the run: engine, model, settings |
@@ -227,10 +227,10 @@ following question:", so an engine can reuse a document's KV across questions.
 
 ### Developing an adapter
 
-The 41 queries have several different shapes: how many filters and joins they
+The 42 queries have several different shapes: how many filters and joins they
 have, and how those operators are arranged in the plan. The table below lists
 one query for each distinct shape, from simplest to most complex. Test your
-adapter on these queries first, then run it on all 41.
+adapter on these queries first, then run it on all 42.
 
 | Query | Shape | What it tests |
 | --- | --- | --- |
@@ -261,7 +261,7 @@ out until they are.
 | IMDB-12 | Among reviews that praise something (F1), what genre is each movie? | IMDb's 21 genres |
 | IMDB-13 | Which aspects do negative or mixed reviews discuss? | Sentiment, as a filter before J1, returned per pair |
 | IMDB-14 | What do negative or mixed reviews complain about most? | Sentiment, then 8 complaints; three start with "poor" and two with "too"; both returned |
-| IMDB-15 | What sentiment does each negative or mixed review express toward each aspect it discusses? | Sentiment, as a filter before J1, then 4 sentiments per (review, aspect) pair; both returned; labels pending |
+| IMDB-15 | What sentiment does each negative or mixed review express toward each aspect it discusses? | Sentiment, as a filter before J1, then 4 sentiments per (review, aspect) pair; both returned |
 | BIO-5 | Which system organ class does each reaction term belong to? | MedDRA's 26 classes, 1 to 11 tokens |
 | BIO-6 | Which cardiac or vascular reactions do serious reports describe? | Organ class, as a filter on one join input |
 | FEV-11 | Which claims are about politics or history, and which topic? | 11 topics; one call returned and filtered |
@@ -328,9 +328,9 @@ to the data or labels produces new IDs. These are the published IDs:
 
 | Scale factor | Corpus ID | Collection ID |
 | --- | --- | --- |
-| 0.1 | `c_1aa2c4f0d0b6c816fd37aa5748c33341` | `gt_6d7ca88a74a30b665bfb67dcde76daff` |
-| 0.5 | `c_6773c85b3754908434661c1dadfad0fa` | `gt_52da77e8d146641a01561d5027dc87f8` |
-| 1.0 | `c_81a95887a650aaa1a343e0d688b81bef` | `gt_f5dc4fe012b930645e88d6cc368efecb` |
+| 0.1 | `c_1aa2c4f0d0b6c816fd37aa5748c33341` | `gt_93e6532710832f1f11acf22f7baaa455` |
+| 0.5 | `c_6773c85b3754908434661c1dadfad0fa` | `gt_d204ad99618b2d56f584950ab81fc46d` |
+| 1.0 | `c_81a95887a650aaa1a343e0d688b81bef` | `gt_ac3e48c5195c7007f96b35da621f7a2a` |
 
 `quail_b.run` loads the matching collection for you and records both IDs in
 `run.json`. Compare results only across runs with the same IDs.

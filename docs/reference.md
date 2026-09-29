@@ -339,7 +339,7 @@ filter stores its boolean `answer`. A pair classification's rows also fill
 A query marked `labels_pending` in the catalog has no published labels yet.
 `quail_b.queries()` leaves it out; `queries(include_pending=True)` and
 `get_query` return it. Running one needs a label collection that includes its
-predicates, passed with `root` or `collection_id`. IMDB-15 is pending.
+predicates, passed with `root` or `collection_id`. No query is pending.
 
 ## Measurements
 
