@@ -252,8 +252,6 @@ Label length follows from the list, from one token for sentiment to eleven
 for an organ class under the Qwen3 tokenizer. IMDB-14, LEP-6, and AGENT-4
 have labels that start with the same words, as category names often do.
 IMDB-15 classifies a pair: each joined review and aspect gets one label.
-Its reference labels are not published yet, so `quail_b.queries()` leaves it
-out until they are.
 
 | Query | Question | Labels |
 | --- | --- | --- |
