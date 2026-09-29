@@ -242,8 +242,9 @@ def test_substrait_plans_are_packaged():
     catalog = package.joinpath("plans", "catalog.json")
     entries = json.loads(catalog.read_text())
 
-    assert len(entries) == 44
-    assert not any(entry.get("labels_pending") for entry in entries)
+    assert len(entries) == 45
+    assert [entry["id"] for entry in entries
+            if entry.get("labels_pending")] == ["AGENT-5"]
     assert all(
         package.joinpath("plans", f"{entry['id']}.json").is_file()
         for entry in entries

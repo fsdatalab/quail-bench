@@ -1,0 +1,408 @@
+{
+  "extension_urns": [
+    {
+      "extension_urn_anchor": 1,
+      "urn": "extension:org.fsdatalab.quail_b:functions_ai"
+    }
+  ],
+  "extensions": [
+    {
+      "extension_function": {
+        "extension_urn_reference": 1,
+        "function_anchor": 5,
+        "name": "ai_classify:str_str_list_list"
+      }
+    }
+  ],
+  "relations": [
+    {
+      "root": {
+        "input": {
+          "project": {
+            "common": {
+              "emit": {
+                "output_mapping": [
+                  5,
+                  6,
+                  7,
+                  8
+                ]
+              }
+            },
+            "expressions": [
+              {
+                "selection": {
+                  "direct_reference": {
+                    "struct_field": {}
+                  },
+                  "root_reference": {}
+                }
+              },
+              {
+                "selection": {
+                  "direct_reference": {
+                    "struct_field": {
+                      "field": 2
+                    }
+                  },
+                  "root_reference": {}
+                }
+              },
+              {
+                "selection": {
+                  "direct_reference": {
+                    "struct_field": {
+                      "field": 3
+                    }
+                  },
+                  "root_reference": {}
+                }
+              },
+              {
+                "selection": {
+                  "direct_reference": {
+                    "struct_field": {
+                      "field": 4
+                    }
+                  },
+                  "root_reference": {}
+                }
+              }
+            ],
+            "input": {
+              "project": {
+                "common": {
+                  "direct": {},
+                  "hint": {
+                    "alias": "classify-3",
+                    "output_names": [
+                      "t.id",
+                      "t.trace",
+                      "t.outcome",
+                      "t.issue_kind",
+                      "t.check"
+                    ]
+                  }
+                },
+                "expressions": [
+                  {
+                    "scalar_function": {
+                      "arguments": [
+                        {
+                          "value": {
+                            "literal": {
+                              "string": "Judge strictly from the agent trace above the strongest check the agent ran on its change by the end of the trace.\n\n{0}"
+                            }
+                          }
+                        },
+                        {
+                          "value": {
+                            "selection": {
+                              "direct_reference": {
+                                "struct_field": {
+                                  "field": 1
+                                }
+                              },
+                              "root_reference": {}
+                            }
+                          }
+                        },
+                        {
+                          "value": {
+                            "literal": {
+                              "list": {
+                                "values": [
+                                  {
+                                    "string": "ran a new test"
+                                  },
+                                  {
+                                    "string": "ran existing tests"
+                                  },
+                                  {
+                                    "string": "ran a reproduction script"
+                                  },
+                                  {
+                                    "string": "no check"
+                                  }
+                                ]
+                              }
+                            }
+                          }
+                        },
+                        {
+                          "value": {
+                            "literal": {
+                              "list": {
+                                "values": [
+                                  {
+                                    "string": "wrote a test for the issue and ran it"
+                                  },
+                                  {
+                                    "string": "ran tests that were already in the repository"
+                                  },
+                                  {
+                                    "string": "ran a script that shows the reported behavior"
+                                  },
+                                  {
+                                    "string": "did not run anything to check a change"
+                                  }
+                                ]
+                              }
+                            }
+                          }
+                        }
+                      ],
+                      "function_reference": 5,
+                      "output_type": {
+                        "string": {
+                          "nullability": "NULLABILITY_REQUIRED"
+                        }
+                      }
+                    }
+                  }
+                ],
+                "input": {
+                  "project": {
+                    "common": {
+                      "direct": {},
+                      "hint": {
+                        "alias": "classify-2",
+                        "output_names": [
+                          "t.id",
+                          "t.trace",
+                          "t.outcome",
+                          "t.issue_kind"
+                        ]
+                      }
+                    },
+                    "expressions": [
+                      {
+                        "scalar_function": {
+                          "arguments": [
+                            {
+                              "value": {
+                                "literal": {
+                                  "string": "Judge strictly from the issue at the start of the agent trace above what kind of problem it reports.\n\n{0}"
+                                }
+                              }
+                            },
+                            {
+                              "value": {
+                                "selection": {
+                                  "direct_reference": {
+                                    "struct_field": {
+                                      "field": 1
+                                    }
+                                  },
+                                  "root_reference": {}
+                                }
+                              }
+                            },
+                            {
+                              "value": {
+                                "literal": {
+                                  "list": {
+                                    "values": [
+                                      {
+                                        "string": "crash or error"
+                                      },
+                                      {
+                                        "string": "wrong output"
+                                      },
+                                      {
+                                        "string": "missing feature"
+                                      },
+                                      {
+                                        "string": "performance"
+                                      },
+                                      {
+                                        "string": "other"
+                                      }
+                                    ]
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "value": {
+                                "literal": {
+                                  "list": {
+                                    "values": [
+                                      {
+                                        "string": "the code raises an exception or fails with an error"
+                                      },
+                                      {
+                                        "string": "the code runs but returns or prints the wrong result"
+                                      },
+                                      {
+                                        "string": "asks for behavior or an interface that does not exist yet"
+                                      },
+                                      {
+                                        "string": "the code is too slow or uses too much memory"
+                                      },
+                                      {
+                                        "string": "none of the kinds above"
+                                      }
+                                    ]
+                                  }
+                                }
+                              }
+                            }
+                          ],
+                          "function_reference": 5,
+                          "output_type": {
+                            "string": {
+                              "nullability": "NULLABILITY_REQUIRED"
+                            }
+                          }
+                        }
+                      }
+                    ],
+                    "input": {
+                      "project": {
+                        "common": {
+                          "direct": {},
+                          "hint": {
+                            "alias": "classify-1",
+                            "output_names": [
+                              "t.id",
+                              "t.trace",
+                              "t.outcome"
+                            ]
+                          }
+                        },
+                        "expressions": [
+                          {
+                            "scalar_function": {
+                              "arguments": [
+                                {
+                                  "value": {
+                                    "literal": {
+                                      "string": "Judge strictly from the agent trace above whether the agent resolved the reported issue by the end of the trace.\n\n{0}"
+                                    }
+                                  }
+                                },
+                                {
+                                  "value": {
+                                    "selection": {
+                                      "direct_reference": {
+                                        "struct_field": {
+                                          "field": 1
+                                        }
+                                      },
+                                      "root_reference": {}
+                                    }
+                                  }
+                                },
+                                {
+                                  "value": {
+                                    "literal": {
+                                      "list": {
+                                        "values": [
+                                          {
+                                            "string": "resolved"
+                                          },
+                                          {
+                                            "string": "partially resolved"
+                                          },
+                                          {
+                                            "string": "not resolved"
+                                          },
+                                          {
+                                            "string": "gave up"
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  }
+                                },
+                                {
+                                  "value": {
+                                    "literal": {
+                                      "list": {
+                                        "values": [
+                                          {
+                                            "string": "made a change that fixes the reported issue"
+                                          },
+                                          {
+                                            "string": "fixed part of the issue but not all of it"
+                                          },
+                                          {
+                                            "string": "finished without a change that fixes the issue"
+                                          },
+                                          {
+                                            "string": "stopped early and said it could not continue"
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  }
+                                }
+                              ],
+                              "function_reference": 5,
+                              "output_type": {
+                                "string": {
+                                  "nullability": "NULLABILITY_REQUIRED"
+                                }
+                              }
+                            }
+                          }
+                        ],
+                        "input": {
+                          "read": {
+                            "base_schema": {
+                              "names": [
+                                "id",
+                                "trace"
+                              ],
+                              "struct": {
+                                "nullability": "NULLABILITY_REQUIRED",
+                                "types": [
+                                  {
+                                    "string": {
+                                      "nullability": "NULLABILITY_REQUIRED"
+                                    }
+                                  },
+                                  {
+                                    "string": {
+                                      "nullability": "NULLABILITY_REQUIRED"
+                                    }
+                                  }
+                                ]
+                              }
+                            },
+                            "common": {
+                              "direct": {},
+                              "hint": {
+                                "alias": "t"
+                              }
+                            },
+                            "named_table": {
+                              "names": [
+                                "agent_traces"
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "names": [
+          "t",
+          "outcome",
+          "issue_kind",
+          "check"
+        ]
+      }
+    }
+  ],
+  "version": {
+    "minor_number": 103,
+    "producer": "quail-b"
+  }
+}

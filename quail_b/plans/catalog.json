@@ -210,6 +210,12 @@
     "privacy": false
   },
   {
+    "id": "AGENT-5",
+    "description": "classify every trace three ways: outcome, issue kind, and the strongest check the agent ran",
+    "privacy": false,
+    "labels_pending": true
+  },
+  {
     "id": "PRIV-1",
     "description": "2 filters: P_MSG + P_LOC",
     "privacy": true

@@ -275,3 +275,34 @@ AGENT_FAILURE_DESCRIPTIONS = (
     "a broken setup, missing dependency, or tool failure blocked progress",
     "reached the step limit while still making progress",
 )
+
+AGENT_ISSUE = (
+    "Judge strictly from the issue at the start of the agent trace above "
+    "what kind of problem it reports.\n\n{0}"
+)
+AGENT_ISSUE_LABELS = (
+    "crash or error", "wrong output", "missing feature", "performance",
+    "other",
+)
+AGENT_ISSUE_DESCRIPTIONS = (
+    "the code raises an exception or fails with an error",
+    "the code runs but returns or prints the wrong result",
+    "asks for behavior or an interface that does not exist yet",
+    "the code is too slow or uses too much memory",
+    "none of the kinds above",
+)
+
+AGENT_CHECK = (
+    "Judge strictly from the agent trace above the strongest check the "
+    "agent ran on its change by the end of the trace.\n\n{0}"
+)
+AGENT_CHECK_LABELS = (
+    "ran a new test", "ran existing tests", "ran a reproduction script",
+    "no check",
+)
+AGENT_CHECK_DESCRIPTIONS = (
+    "wrote a test for the issue and ran it",
+    "ran tests that were already in the repository",
+    "ran a script that shows the reported behavior",
+    "did not run anything to check a change",
+)

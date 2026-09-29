@@ -188,6 +188,16 @@ CLASSIFY_PREDICATES = (
         "classify", prompts.AGENT_FAILURE, "agent_trace", "agent_traces",
         "trace", labels=prompts.AGENT_FAILURE_LABELS,
         descriptions=prompts.AGENT_FAILURE_DESCRIPTIONS),
+    PredicateSpec(
+        "quailb.agent.trace.issue_kind", "agent", "trace_issue_kind",
+        "classify", prompts.AGENT_ISSUE, "agent_trace", "agent_traces",
+        "trace", labels=prompts.AGENT_ISSUE_LABELS,
+        descriptions=prompts.AGENT_ISSUE_DESCRIPTIONS),
+    PredicateSpec(
+        "quailb.agent.trace.check", "agent", "trace_check", "classify",
+        prompts.AGENT_CHECK, "agent_trace", "agent_traces", "trace",
+        labels=prompts.AGENT_CHECK_LABELS,
+        descriptions=prompts.AGENT_CHECK_DESCRIPTIONS),
 )
 
 PREDICATE_BY_KEY = {p.key: p for p in PREDICATES + CLASSIFY_PREDICATES}

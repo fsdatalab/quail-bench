@@ -690,6 +690,15 @@ QUERIES = (
                     prompts.AGENT_FAILURE, prompts.AGENT_FAILURE_LABELS,
                     "failure", prompts.AGENT_FAILURE_DESCRIPTIONS),
           select=("t", "t.failure")),
+    Query("AGENT-5", "classify every trace three ways: outcome, issue kind, "
+          "and the strongest check the agent ran",
+          _classify(_classify(_outcome(_traces()), prompts.AGENT_ISSUE,
+                              prompts.AGENT_ISSUE_LABELS, "issue_kind",
+                              prompts.AGENT_ISSUE_DESCRIPTIONS),
+                    prompts.AGENT_CHECK, prompts.AGENT_CHECK_LABELS, "check",
+                    prompts.AGENT_CHECK_DESCRIPTIONS),
+          select=("t", "t.outcome", "t.issue_kind", "t.check"),
+          labels_pending=True),
 
     # PrivacyPolicies: only when that corpus is available.
     Query("PRIV-1", "2 filters: P_MSG + P_LOC",
