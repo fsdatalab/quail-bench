@@ -73,7 +73,7 @@ def _query_hash(spec):
                 "labels": operator.labels,
                 "descriptions": operator.descriptions,
                 "output": operator.output,
-                # only a pair classification names a partner, so the
+                # only a classification of joined rows names a partner, so the
                 # hashes of the one-document queries stay as published
                 **({"partner": operator.partner}
                    if operator.partner is not None else {}),

@@ -168,8 +168,8 @@ IMDB_SENTIMENT = (
 )
 IMDB_SENTIMENT_LABELS = ("positive", "negative", "neutral", "mixed")
 
-# A pair classification: the review is DOCUMENT {0}, the aspect
-# DOCUMENT {1}, and the label describes the pair.
+# A classification of joined rows: the review is DOCUMENT {0}, the
+# aspect DOCUMENT {1}, and the label describes the two together.
 IMDB_ASPECT_SENTIMENT = (
     "Judge strictly from the review in DOCUMENT {0} what sentiment it "
     "expresses about the movie aspect in DOCUMENT {1}."

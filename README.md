@@ -188,10 +188,10 @@ ai_classify(prompt, document, labels, descriptions) -> string
 ai_classify(prompt, anchor, partner, labels, descriptions) -> string
 ```
 
-The first form labels one document. The second form, a pair classification,
-labels a pair of documents that a join kept, such as a review and one aspect
-it discusses. The anchor is the document placed first in the prompt, and the
-partner follows it.
+The first form labels one document. The second form labels the rows of a
+join: each row is the two documents, one from each table, that the join kept,
+such as a review and one aspect it discusses. The anchor is the document
+placed first in the prompt, and the partner follows it.
 
 | Dataset | Queries | Tables | Task |
 | --- | --- | --- | --- |
@@ -255,10 +255,10 @@ Label length follows from the list, from one token for sentiment to eleven
 for an organ class under the Qwen3 tokenizer. IMDB-14, LEP-6, and AGENT-4
 have labels that start with the same words, as category names often do.
 
-IMDB-15 is the one query with a pair classification. It joins each negative
+IMDB-15 is the one query that classifies joined rows. It joins each negative
 or mixed review with the movie aspects the review discusses. It then labels
-each (review, aspect) pair with the review's sentiment toward that aspect. For
-example, the pair of a review and the aspect "the acting" gets one of
+each (review, aspect) row with the review's sentiment toward that aspect. For
+example, the row of a review and the aspect "the acting" gets one of
 positive, negative, neutral, or mixed.
 
 | Query | Question | Labels |
@@ -302,8 +302,9 @@ same at every scale factor. Use 0.1 while developing an adapter.
 
 QUAIL-B scores every run against reference answers: one TRUE or FALSE label
 for each document or document pair each filter or join can be asked about,
-and one label for each document a classification can be asked about. A pair
-classification has one label for each pair the reference join keeps.
+and one label for each document a classification can be asked about. A
+classification of joined rows has one label for each row the reference join
+keeps.
 
 **Accuracy is not a focus of this benchmark.** Most labels are the answers of
 one arbitrary model, `Qwen/Qwen3-32B-FP8`, so it is not really meaningful to

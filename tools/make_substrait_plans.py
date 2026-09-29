@@ -47,8 +47,8 @@ from quail_b.prompts import (
     SUPPORT,
 )
 from quail_b.substrait import (
+    AI_CLASSIFY_JOINED_NAME,
     AI_CLASSIFY_NAME,
-    AI_CLASSIFY_PAIR_NAME,
     AI_EXTENSION_URN,
     AI_FILTER_NAME,
     AI_JOIN_NAME,
@@ -74,7 +74,7 @@ _FUNCTIONS = {
     EQUAL_NAME: (3, COMPARISON_EXTENSION_URN),
     AND_NAME: (4, BOOLEAN_EXTENSION_URN),
     AI_CLASSIFY_NAME: (5, AI_EXTENSION_URN),
-    AI_CLASSIFY_PAIR_NAME: (6, AI_EXTENSION_URN),
+    AI_CLASSIFY_JOINED_NAME: (6, AI_EXTENSION_URN),
 }
 
 
@@ -107,19 +107,19 @@ class Filter:
 class Classify:
     """Add one label column to one relation from a fixed list of labels.
 
-    Over a join of two relations, the call labels each pair the join
+    Over a join of two relations, the call labels each row the join
     kept: the prompt names the anchor as `{0}` and its partner as `{1}`,
     and the label column belongs to the anchor.
 
     Attributes:
         input: The relation's scan, filters, or classifications, or a
-            join of two relations for a pair classification.
+            join of two relations to label its rows.
         prompt: The classification prompt.
         labels: The labels, in tie-breaking order.
         output: The name of the label column.
         descriptions: One description per label, or empty for none.
-        documents: For a pair classification, the anchor alias then the
-            partner alias; None takes the join's aliases in order.
+        documents: For joined rows, the anchor alias then the partner
+            alias; None takes the join's aliases in order.
     """
 
     input: Scan | Filter | Classify | LabelFilter | Join
@@ -287,7 +287,7 @@ class _Emitter:
                 name = AI_CLASSIFY_NAME
             else:
                 aliases = node.documents or _join_aliases(node.input)
-                name = AI_CLASSIFY_PAIR_NAME
+                name = AI_CLASSIFY_JOINED_NAME
             self.functions.add(name)
             descriptions = node.descriptions or ("",) * len(node.labels)
             output_fields = (*fields, (aliases[0], node.output))
@@ -369,7 +369,7 @@ class _Emitter:
 
 
 def _join_aliases(node) -> tuple[str, str]:
-    """The aliases of the join under a pair classification, in prompt order."""
+    """The aliases of the join under a classification, in prompt order."""
     while not isinstance(node, Join):
         node = node.input
     return node.aliases

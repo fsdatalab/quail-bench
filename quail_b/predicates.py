@@ -220,8 +220,8 @@ def _descriptions(spec: PredicateSpec) -> tuple[str, ...]:
     return spec.descriptions or ("",) * len(spec.labels)
 
 
-def is_pair_classify(spec: PredicateSpec) -> bool:
-    """Whether the predicate labels a pair of documents, one per table."""
+def is_joined_classify(spec: PredicateSpec) -> bool:
+    """Whether the predicate labels joined rows, one document per table."""
     return spec.kind == "classify" and spec.right_table is not None
 
 
@@ -231,7 +231,8 @@ def predicate_payload(spec: PredicateSpec) -> dict:
         "join": "join_arg0_anchor_then_arg1_v1",
         "classify": "classify_document_then_categories_v1",
     }[spec.kind]
-    if is_pair_classify(spec):
+    if is_joined_classify(spec):
+        # stored in the published label sets' identities; keep as is
         render = "classify_pair_anchor_then_partner_v1"
     payload = {
         "schema_version": SCHEMA_VERSION,
@@ -265,7 +266,7 @@ def predicate_payload(spec: PredicateSpec) -> dict:
             labels=list(spec.labels),
             descriptions=list(_descriptions(spec)),
         )
-    if is_pair_classify(spec):
+    if is_joined_classify(spec):
         payload.update(anchor_note=JOIN_ANCHOR_NOTE,
                        partner_label=JOIN_DOC_LABEL)
     return payload
@@ -404,19 +405,16 @@ def render_classify_prompt(spec: PredicateSpec, document: str,
 
     Args:
         spec: The classify predicate.
-        document: The document, or the anchor of a pair classification.
-        partner: The partner document of a pair classification.
+        document: The document, or the anchor of a joined row.
+        partner: The partner document of a joined row.
     """
-    if is_pair_classify(spec):
-        if partner is None:
-            raise ValueError(f"{spec.key} classifies a pair of documents")
-        return rendering.render_pair_classify_prompt(
-            spec.template, document, partner, spec.labels,
-            _descriptions(spec))
-    if partner is not None:
+    if is_joined_classify(spec) and partner is None:
+        raise ValueError(f"{spec.key} classifies joined rows")
+    if not is_joined_classify(spec) and partner is not None:
         raise ValueError(f"{spec.key} classifies one document")
     return rendering.render_classify_prompt(
-        spec.template, document, spec.labels, _descriptions(spec))
+        spec.template, document, spec.labels, _descriptions(spec),
+        partner=partner)
 
 
 def render_join_prompt(spec: PredicateSpec, left: str, right: str) -> str:

@@ -17,7 +17,7 @@ from quail_b.data import (
 )
 from quail_b.queries import QuerySpec, pending_query_ids, queries
 from quail_b.run import _write_json
-from quail_b.substrait import AI_CLASSIFY_NAME, AI_CLASSIFY_PAIR_NAME
+from quail_b.substrait import AI_CLASSIFY_JOINED_NAME, AI_CLASSIFY_NAME
 from tools.make_substrait_plans import (
     Classify,
     Join,
@@ -68,7 +68,7 @@ def test_plans_carry_label_columns_and_filters():
         ("",) * len(prompts.IMDB_GENRE_LABELS))
 
 
-def test_pair_classification_plan():
+def test_joined_classification_plan():
     plan = quail_b.get_query("IMDB-15").plan
     info = quail_b.get_query("IMDB-15")._info
     assert [operator.id for operator in info.operators] == [
@@ -86,7 +86,7 @@ def test_pair_classification_plan():
         "r", "sentiment", "a", "aspect_sentiment"]
     names = {declaration.extension_function.name
              for declaration in plan.extensions}
-    assert {AI_CLASSIFY_NAME, AI_CLASSIFY_PAIR_NAME} <= names
+    assert {AI_CLASSIFY_NAME, AI_CLASSIFY_JOINED_NAME} <= names
     # the ProjectRel sits directly over the JoinRel, anchor field first
     project = plan.relations[0].root.input.project.input.project
     assert project.common.hint.alias == "classify-2"
@@ -108,7 +108,7 @@ def _pair_tree(documents=None):
                     ("yes", "no"), "x", documents=documents)
 
 
-def test_pair_classification_rules():
+def test_joined_classification_rules():
     info = _spec(_pair_tree(), ("r", "a", "r.x"))._info
     assert info.classifies[0].relations == ("r", "a")
     reversed_info = _spec(_pair_tree(("a", "r")), ("r", "a", "a.x"))._info
@@ -165,10 +165,10 @@ def test_classify_prompt_text():
         "- religion\n- other\nANSWER:")
 
 
-def test_pair_classify_prompt_text():
-    text = rendering.render_pair_classify_prompt(
-        prompts.IMDB_ASPECT_SENTIMENT, "The plot dragged on.", "pacing",
-        prompts.IMDB_ASPECT_SENTIMENT_LABELS)
+def test_joined_classify_prompt_text():
+    text = rendering.render_classify_prompt(
+        prompts.IMDB_ASPECT_SENTIMENT, "The plot dragged on.",
+        prompts.IMDB_ASPECT_SENTIMENT_LABELS, partner="pacing")
     expected_text = (
         "DOCUMENT:\nThe plot dragged on.\n\n"
         "(The document above is DOCUMENT {0}.)\n\n"
@@ -181,16 +181,16 @@ def test_pair_classify_prompt_text():
     spec = predicates.PREDICATE_BY_KEY["quailb.imdb.review.aspect_sentiment"]
     assert predicates.render_classify_prompt(
         spec, "The plot dragged on.", "pacing") == text
-    with pytest.raises(ValueError, match="pair of documents"):
+    with pytest.raises(ValueError, match="joined rows"):
         predicates.render_classify_prompt(spec, "The plot dragged on.")
     with pytest.raises(ValueError, match="one document"):
         predicates.render_classify_prompt(SENTIMENT, "x", "y")
     with pytest.raises(ValueError, match="placeholders"):
-        rendering.render_pair_classify_prompt(
-            prompts.IMDB_SENTIMENT, "x", "y", ("a", "b"))
+        rendering.render_classify_prompt(
+            prompts.IMDB_SENTIMENT, "x", ("a", "b"), partner="y")
 
 
-def test_pair_classify_label_sets_have_their_own_identity():
+def test_joined_classify_label_sets_have_their_own_identity():
     spec = predicates.PREDICATE_BY_KEY["quailb.imdb.review.aspect_sentiment"]
     payload = predicates.predicate_payload(spec)
     assert payload["render"] == "classify_pair_anchor_then_partner_v1"
@@ -223,7 +223,7 @@ def _collection(root, tables, label_sets):
         tables: Table name to rows.
         label_sets: (predicate, rows) pairs. A classify predicate's rows
             are (left_id, label), or (left_id, right_id, label) for a
-            pair classification; a filter's (left_id, answer); a join's
+            classification of joined rows; a filter's (left_id, answer); a join's
             (left_id, right_id, answer).
     """
     corpus_id = PUBLISHED_CORPORA[0.1]
@@ -300,7 +300,7 @@ IMDB_LABEL_SETS = [
         ("r0", "a0", True), ("r0", "a1", True), ("r1", "a0", True),
         ("r1", "a1", False), ("r2", "a0", False), ("r2", "a1", True)]),
 ]
-PAIR_LABELS = [("r0", "a0", "negative"), ("r0", "a1", "mixed"),
+JOINED_LABELS = [("r0", "a0", "negative"), ("r0", "a1", "mixed"),
                ("r1", "a0", "positive"), ("r2", "a1", "negative")]
 
 
@@ -308,10 +308,10 @@ def _imdb_13(root):
     _collection(root, IMDB_TABLES, IMDB_LABEL_SETS)
 
 
-def _imdb_15(root, pair_labels=PAIR_LABELS):
-    """A collection with a pair label set: labels for the joined pairs."""
+def _imdb_15(root, joined_labels=JOINED_LABELS):
+    """A collection with a label set for the join's rows."""
     _collection(root, IMDB_TABLES, [
-        *IMDB_LABEL_SETS, (_classify_predicate(ASPECT_SENTIMENT), pair_labels)])
+        *IMDB_LABEL_SETS, (_classify_predicate(ASPECT_SENTIMENT), joined_labels)])
 
 
 def _imdb_13_output(rows=True, wrong_row=False):
@@ -490,7 +490,7 @@ def _imdb_15_output(pair_answers=None, extra_row=False):
                 "label": ["negative", "positive"]})})
 
 
-def test_pair_classification_run_scores_labels_and_rows(tmp_path):
+def test_joined_classification_run_scores_labels_and_rows(tmp_path):
     _imdb_15(tmp_path)
     benchmark = quail_b.load_benchmark(["IMDB-15"], root=tmp_path)
     expected = quail_b.scoring.expected_rows(
@@ -509,7 +509,7 @@ def test_pair_classification_run_scores_labels_and_rows(tmp_path):
         output_dir=tmp_path / "run", root=tmp_path)
     item = record["queries"][0]
     accuracy = item["metrics"]["accuracy"]
-    # r0 is the only correct sentiment; both pair labels agree
+    # r0 is the only correct sentiment; both joined-row labels agree
     assert accuracy["label_accuracy"] == {
         "correct": 3, "evaluated": 5, "unlabeled": 0, "accuracy": 0.6}
     assert accuracy["answer_accuracy"]["correct"] == 4
@@ -538,7 +538,7 @@ def test_pair_classification_run_scores_labels_and_rows(tmp_path):
     assert record["queries"][0]["metrics"]["accuracy"]["label_accuracy"] is None
 
 
-def test_pair_rows_must_follow_the_pair_labels(tmp_path):
+def test_joined_rows_must_follow_their_labels(tmp_path):
     _imdb_15(tmp_path)
     with pytest.raises(ValueError, match="answers imply 2"):
         quail_b.run(
@@ -558,9 +558,9 @@ def test_pair_rows_must_follow_the_pair_labels(tmp_path):
     assert (labels["evaluated"], labels["unlabeled"]) == (6, 1)
 
 
-def test_reference_pairs_need_a_pair_label(tmp_path):
+def test_reference_joined_rows_need_a_label(tmp_path):
     # (r2, a1) is a reference join pair of a critical review without a label
-    _imdb_15(tmp_path, PAIR_LABELS[:3])
+    _imdb_15(tmp_path, JOINED_LABELS[:3])
     benchmark = quail_b.load_benchmark(["IMDB-15"], root=tmp_path)
     with pytest.raises(KeyError, match="predicate_2 and 1 pairs of join-1"):
         quail_b.scoring.expected_rows(

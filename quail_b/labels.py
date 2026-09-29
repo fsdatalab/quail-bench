@@ -267,7 +267,7 @@ def load_ground_truth(root=None, scale_factor: float = 0.1,
 
 
 def _predicate_tables(predicate: dict) -> tuple[str, ...]:
-    """The tables a predicate reads: two for a join or pair classification."""
+    """The tables a predicate reads: two for a join or joined rows."""
     tables = {predicate["left_table"]}
     if predicate["kind"] == "join" or predicate.get("right_table"):
         tables.add(predicate["right_table"])
