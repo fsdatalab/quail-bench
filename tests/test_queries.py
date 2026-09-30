@@ -37,14 +37,14 @@ from quail_b.substrait import (
 from tools.make_substrait_plans import write_plans
 
 
-def test_catalog_has_the_42_default_queries_and_two_privacy_queries():
-    assert len(QUERIES) == 42
+def test_catalog_has_the_43_default_queries_and_two_privacy_queries():
+    assert len(QUERIES) == 43
     assert QUERY_ORDER == (
         *(f"IMDB-{i}" for i in range(1, 16)),
         *(f"BIO-{i}" for i in range(1, 7)),
         *(f"FEV-{i}" for i in range(1, 12)),
         *(f"LEP-{i}" for i in range(1, 7)),
-        *(f"AGENT-{i}" for i in range(1, 5)),
+        *(f"AGENT-{i}" for i in range(1, 6)),
     )
     assert [spec.id for spec in PRIVACY_QUERIES] == ["PRIV-1", "PRIV-2"]
     assert list(queries(include_privacy=True)) == [*QUERY_ORDER, "PRIV-1", "PRIV-2"]
@@ -243,8 +243,7 @@ def test_substrait_plans_are_packaged():
     entries = json.loads(catalog.read_text())
 
     assert len(entries) == 45
-    assert [entry["id"] for entry in entries
-            if entry.get("labels_pending")] == ["AGENT-5"]
+    assert not any(entry.get("labels_pending") for entry in entries)
     assert all(
         package.joinpath("plans", f"{entry['id']}.json").is_file()
         for entry in entries
@@ -267,8 +266,8 @@ def test_parallel_query_split_matches_stock_vllm():
     assert split_query_ids(QUERY_ORDER, 4) == (
         QUERY_ORDER[0:11],
         QUERY_ORDER[11:22],
-        QUERY_ORDER[22:32],
-        QUERY_ORDER[32:42],
+        QUERY_ORDER[22:33],
+        QUERY_ORDER[33:43],
     )
 
 
@@ -285,7 +284,7 @@ def test_query_family_split_matches_benchmark_catalog():
         QUERY_ORDER[15:21],
         QUERY_ORDER[21:32],
         QUERY_ORDER[32:38],
-        QUERY_ORDER[38:42],
+        QUERY_ORDER[38:43],
     )
     assert query_family_name(QUERY_ORDER[0:15]) == "imdb"
 

@@ -22,7 +22,7 @@ The query is written with BigQuery's
 function, and its prompts are shortened. QUAIL-B publishes each query as a
 Substrait plan with the exact prompt text.
 
-The benchmark contains 42 such queries over five document collections: movie
+The benchmark contains 43 such queries over five document collections: movie
 reviews, adverse drug reaction reports, claims and evidence for fact
 verification, legal citations, and software agent trajectories. Each collection
 comes at three scale factors, with reference answers for every filter, join,
@@ -113,7 +113,7 @@ A full call to `quail_b.run` looks like:
 ```python
 quail_b.run(
     run_query,
-    queries=None,                        # None runs all 42 queries
+    queries=None,                        # None runs all 43 queries
     scale_factor=0.1,                    # 0.1, 0.5, or 1.0
     output_dir="results/vllm_qwen3_4b",  # must be a new directory
     metadata={"engine": "vllm", "model": "Qwen/Qwen3-4B-FP8"},
@@ -129,7 +129,7 @@ it saves the output, scores it, and updates `run.json`. At the end it writes
 | Parameter | Default | Meaning |
 | --- | --- | --- |
 | `run_query` | required | Your adapter |
-| `queries` | `None` | Query IDs to run; `None` runs all 42 |
+| `queries` | `None` | Query IDs to run; `None` runs all 43 |
 | `scale_factor` | `0.1` | Published scale factor: `0.1`, `0.5`, or `1.0` |
 | `output_dir` | required | New directory for this run's results |
 | `metadata` | `None` | JSON object saved with the run: engine, model, settings |
@@ -197,7 +197,7 @@ lists the queries that use it.
 | BioDEX | BIO-1 to BIO-6 | `reports`, `terms` | Adverse drug reactions |
 | FEVER | FEV-1 to FEV-11 | `claims`, `evidence` | Fact verification |
 | LePaRD | LEP-1 to LEP-6 | `citation_contexts`, `citation_passages` | Legal citations |
-| SWE-Next | AGENT-1 to AGENT-4 | `agent_traces` | Software agent trajectories |
+| SWE-Next | AGENT-1 to AGENT-5 | `agent_traces` | Software agent trajectories |
 
 Within each dataset, the first queries have a single filter or join. Later
 queries chain filters, filter both join inputs, scan one table under two
@@ -228,10 +228,10 @@ following question:", so an engine can reuse a document's KV across questions.
 
 ### Developing an adapter
 
-The 42 queries have several different shapes: how many filters and joins they
+The 43 queries have several different shapes: how many filters and joins they
 have, and how those operators are arranged in the plan. The table below lists
 one query for each distinct shape, from simplest to most complex. Test your
-adapter on these queries first, then run it on all 42.
+adapter on these queries first, then run it on all 43.
 
 | Query | Shape | What it tests |
 | --- | --- | --- |
@@ -246,7 +246,7 @@ adapter on these queries first, then run it on all 42.
 
 ### Classification queries
 
-Eleven queries return or filter on a label chosen from a fixed list. Each asks
+Twelve queries return or filter on a label chosen from a fixed list. Each asks
 a question an analyst would ask of that collection, with a standard label list
 where one exists, such as IMDb's genres or MedDRA's system organ classes.
 Label length follows from the list, from one token for sentiment to eleven
@@ -272,6 +272,7 @@ positive, negative, neutral, or mixed.
 | LEP-6 | Which passages do constitutional or criminal law excerpts cite? | 15 areas of law, as a filter before the join |
 | AGENT-3 | Did agents that recovered from a failed approach resolve the issue? | 4 outcomes with descriptions, after a filter |
 | AGENT-4 | Why did the agents that did not resolve the issue fail? | Outcome, then 8 failure modes with descriptions; three start with "could not" |
+| AGENT-5 | For every trace: did the agent resolve the issue, what is the project, and what kind of defect is the bug? | Outcome, 27 PyPI topics, and 8 ODC defect types; three questions of one trace |
 
 A classification answer is the label with the largest sum of label-token log
 probabilities; the [reference](docs/reference.md#classification) defines the
@@ -333,9 +334,9 @@ to the data or labels produces new IDs. These are the published IDs:
 
 | Scale factor | Corpus ID | Collection ID |
 | --- | --- | --- |
-| 0.1 | `c_1aa2c4f0d0b6c816fd37aa5748c33341` | `gt_93e6532710832f1f11acf22f7baaa455` |
-| 0.5 | `c_6773c85b3754908434661c1dadfad0fa` | `gt_d204ad99618b2d56f584950ab81fc46d` |
-| 1.0 | `c_81a95887a650aaa1a343e0d688b81bef` | `gt_ac3e48c5195c7007f96b35da621f7a2a` |
+| 0.1 | `c_1aa2c4f0d0b6c816fd37aa5748c33341` | `gt_9b8e7f5a649d715d64a5fa4646855a4d` |
+| 0.5 | `c_6773c85b3754908434661c1dadfad0fa` | `gt_a0faa81557f0f7c98b6eb4c170ce3716` |
+| 1.0 | `c_81a95887a650aaa1a343e0d688b81bef` | `gt_cc042e13f1a6512ee51882e65d5d3456` |
 
 `quail_b.run` loads the matching collection for you and records both IDs in
 `run.json`. Compare results only across runs with the same IDs.

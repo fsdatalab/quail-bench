@@ -696,8 +696,7 @@ QUERIES = (
                               prompts.AGENT_DOMAIN_LABELS, "domain"),
                     prompts.AGENT_ROOT_CAUSE, prompts.AGENT_ROOT_CAUSE_LABELS,
                     "root_cause", prompts.AGENT_ROOT_CAUSE_DESCRIPTIONS),
-          select=("t", "t.outcome", "t.domain", "t.root_cause"),
-          labels_pending=True),
+          select=("t", "t.outcome", "t.domain", "t.root_cause")),
 
     # PrivacyPolicies: only when that corpus is available.
     Query("PRIV-1", "2 filters: P_MSG + P_LOC",
