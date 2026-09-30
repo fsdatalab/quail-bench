@@ -54,20 +54,48 @@ equality conditions, and the final projection. It uses the standard Substrait
 relational operators and these extension functions:
 
 ```text
-ai_filter:str_str
-ai_join:str_str_str
-ai_classify:str_str_list_list
+ai_filter(prompt: string, document: string) -> boolean
+ai_join(prompt: string, left: string, right: string) -> boolean
+ai_classify(prompt: string, document: string,
+            labels: list<string>, descriptions: list<string>) -> string
+ai_classify(prompt: string, anchor: string, partner: string,
+            labels: list<string>, descriptions: list<string>) -> string
 ```
 
-A classification appears as a `ProjectRel` that adds one label column to its
-relation; its hint alias is the operator ID, such as `classify-1`, and its
-hint output names end with `alias.column`, such as `r.sentiment`. A `FilterRel`
-whose condition is a standard `SingularOrList` over that column keeps the
-documents with an accepted label; its ID is `label-filter-N` and it asks the
-model nothing. See [Classification](#classification).
+The prompt, labels, and descriptions are constants. The functions are declared
+in [`quail_b/substrait_extensions.yaml`](../quail_b/substrait_extensions.yaml)
+under the URN `extension:org.fsdatalab.quail_b:functions_ai`.
 
-Their declarations and URN are in
-[`quail_b/substrait_extensions.yaml`](../quail_b/substrait_extensions.yaml).
+A plan names each function by its Substrait
+[signature](https://substrait.io/extensions/#function-signature-compound-names):
+the name, then the short name of each argument type, such as `str` for string.
+A plan reader matches on these names:
+
+| Function | Name in the plan |
+| --- | --- |
+| `ai_filter` | `ai_filter:str_str` |
+| `ai_join` | `ai_join:str_str_str` |
+| `ai_classify`, one document | `ai_classify:str_str_list_list` |
+| `ai_classify`, joined rows | `ai_classify:str_str_str_list_list` |
+
+Each operator that asks the model, and each IN-list filter, has an operator
+ID as its hint alias:
+
+| Operator | Substrait form | ID |
+| --- | --- | --- |
+| AI filter | `FilterRel` calling `ai_filter` | `filter-N` |
+| AI join | `JoinRel` calling `ai_join` | `join-N` |
+| Classification | `ProjectRel` calling `ai_classify` | `classify-N` |
+| IN-list filter | `FilterRel` with a `SingularOrList` condition | `in-list-N` |
+
+A classification adds one label column to its relation. Its hint output
+names end with `alias.column`, such as `r.sentiment`. The five-argument form
+labels the rows of the join below it instead of single documents;
+[Classification](#classification) describes both forms.
+
+An IN-list filter keeps the documents whose label column holds one of the
+listed labels, as SQL's `r.sentiment IN ('negative', 'mixed')` does. It asks
+the model nothing.
 
 ## Input tables
 
@@ -106,12 +134,18 @@ Every prompt starts with a document. The question follows it and begins
 comes first, an engine can compute a document's KV once and reuse it across
 every question asked of that document.
 
-Classification prompts use `render_classify_prompt(template, document,
-labels, descriptions)`, described under [Classification](#classification).
-
 For joins, `documents` follows template placeholder order. `anchor` selects the
 document placed first. Both renderers end with `ANSWER:`, and the model answer
 must be read as `TRUE` or `FALSE`.
+
+Classifications have one more renderer, described under
+[Classification](#classification):
+
+```python
+classify_text = render_classify_prompt(template, document, labels, descriptions)
+joined_text = render_classify_prompt(template, anchor, labels, descriptions,
+                                     partner=partner)
+```
 
 The published labels use these templates and this rendering. A different
 prompt defines a different predicate, and its results are incomparable with
@@ -127,7 +161,7 @@ the labels.
 | `runtime_s` | `float` | Every run |
 | `measurements` | `dict` | Optional engine measurements |
 | `prompt_pieces` | `dict \| None` | Token and KV metrics |
-| `classify_answers` | `dict[str, pa.Table] \| None` | Label accuracy |
+| `classify_answers` | `dict[str, pa.Table] \| None` | Label accuracy and token metrics |
 
 ### Result rows
 
@@ -142,9 +176,15 @@ pa.table({
 })
 ```
 
-A query that returns a label column, such as IMDB-13's `r.sentiment`, adds
-one string column named by the query, here `sentiment`, holding one of that
-call's labels.
+A query that returns a label column adds one string column for it. The column
+name is the part of the plan's output name after the alias. For example,
+IMDB-13 returns `r.sentiment`, so `rows` has a `sentiment` column. Each row
+holds the label of that row's review.
+
+A label column of joined rows holds the label of the row's two documents.
+For example, IMDB-15 returns `r.aspect_sentiment`, so `rows` has an
+`aspect_sentiment` column. Each row holds the label of that row's review and
+aspect.
 
 The harness rejects:
 
@@ -238,6 +278,52 @@ the list for each document. `descriptions` has one entry per label; an empty
 string means none. Labels are distinct, and no label continues another label
 word for word.
 
+### Classifying joined rows
+
+A classification can label the rows of a join instead of single documents. A
+joined row is the two documents, one from each table, that the join kept. The
+label describes the two documents together.
+
+For example, IMDB-15 joins each negative or mixed review with each movie
+aspect the review discusses, such as "the acting". For each (review, aspect)
+row, it asks what sentiment the review expresses about that aspect. The
+answer is one of positive, negative, neutral, or mixed.
+
+The two documents of a joined row are the anchor and the partner. The anchor
+is the first document argument, and it comes first in the prompt, as a join's
+anchor does. The partner is the second document argument. In IMDB-15, the
+review is the anchor and the aspect is the partner.
+
+The call takes five arguments:
+
+```text
+ai_classify(prompt, anchor, partner, labels, descriptions) -> string
+```
+
+- The prompt names the anchor as `{0}` and the partner as `{1}`.
+- `labels` and `descriptions` follow the rules of the one-document form.
+- The call's `ProjectRel` sits above the `JoinRel` of the same two relations.
+  It sees only the rows that join kept.
+- The label column belongs to the anchor's relation.
+- An IN-list filter cannot test its label column.
+
+IMDB-15 is the only query that classifies joined rows. Its plan has this
+operator tree:
+
+```text
+Project [r.id, r.sentiment, a.id, r.aspect_sentiment]
+└── Classify aspect sentiment        classify-2
+    └── AI Join J1                   join-1
+        ├── IN-list filter           in-list-1
+        │   └── Classify sentiment   classify-1
+        │       └── Scan reviews AS r
+        └── Scan aspects AS a
+```
+
+`classify-1` labels each review's overall sentiment. `in-list-1` keeps
+the reviews labeled negative or mixed. `join-1` pairs each kept review with
+the aspects it discusses. `classify-2` labels each of those rows.
+
 ### Prompt and reference label
 
 `render_classify_prompt` produces the text the labels are scored after:
@@ -254,20 +340,51 @@ Categories:
 ANSWER:
 ```
 
-Each label follows as `" " + label`. The reference label is the label with the
-largest sum of its tokens' log probabilities, each normalized over the full
-vocabulary at temperature 1, from `Qwen/Qwen3-32B-FP8`. No end marker is
-scored, and the earlier label wins a tie. `quail_b.predicates.CLASSIFY_JUDGE_SPEC`
-records this definition. An engine may compute it any way, for example by
-scoring only the first token when the first tokens differ, but its answers are
-compared with this definition.
+With a `partner`, `render_classify_prompt` lays out the two documents the
+way a join prompt does. The anchor comes first, then a note that names it
+`{0}`. The partner follows under the heading `DOCUMENT {1}:`. The instruction,
+question, categories, and answer cue come last, as in the one-document prompt:
+
+```text
+DOCUMENT:
+<anchor>
+
+(The document above is DOCUMENT {0}.)
+
+DOCUMENT {1}:
+<partner>
+
+Answer with exactly one of the categories below for the following question: <question>
+
+Categories:
+- <label 1>: <description 1>
+- <label 2>
+ANSWER:
+```
+
+The question keeps `{0}` and `{1}` as written. The note and the heading tell
+the model which document each name refers to. For example, IMDB-15's question
+is "Judge strictly from the review in DOCUMENT {0} what sentiment it expresses
+about the movie aspect in DOCUMENT {1}." Because the anchor comes first, an
+engine can compute a review's KV once and reuse it for every aspect joined
+with that review.
+
+In both forms, each label follows as `" " + label`. The reference label is the
+label with the largest sum of its tokens' log probabilities, each normalized
+over the full vocabulary at temperature 1, from `Qwen/Qwen3-32B-FP8`. No end
+marker is scored, and the earlier label wins a tie.
+`quail_b.predicates.CLASSIFY_JUDGE_SPEC` records this definition.
+
+An engine may choose labels another way, and its answers are compared with
+this definition. For example, an engine can score only the first token when
+the first tokens differ, or list the labels under letters and read one letter.
 
 ### Answers
 
 `classify_answers` maps each classify operator ID to a table with the
 relation's alias column and a string `label` column, one row per document the
-engine classified. A document with no row cannot pass a label filter or appear
-with its label. Every label must be one of the call's labels.
+engine classified. A document with no row cannot pass an IN-list filter or
+appear with its label. Every label must be one of the call's labels.
 
 ```python
 classify_answers = {
@@ -278,20 +395,43 @@ classify_answers = {
 }
 ```
 
+For joined rows, the table has two ID columns, one named by the anchor's
+alias and one by the partner's, and the `label` column. It has one row per
+joined row the engine classified. For IMDB-15:
+
+```python
+classify_answers = {
+    "classify-2": pa.table({
+        "r": ["rv17", "rv17"],
+        "a": ["as0", "as6"],
+        "label": ["negative", "mixed"],
+    }),
+}
+```
+
+A joined row with no answer has no label, so it does not appear in the
+result, even when the join kept it.
+
 With answer tables for every operator, `rows` must match the rows the answers
 imply, label columns included.
 
 ### Label files
 
 A classification label set stores `left_id` and a string `label` column where a
-filter stores its boolean `answer`. Its manifest's predicate lists `labels`.
+filter stores its boolean `answer`. The manifest's predicate lists the
+`labels`.
+
+- For a one-document classification, `right_id` is null.
+- For joined rows, `left_id` holds the anchor's ID and `right_id` holds the
+  partner's, as in a join's label set. The label set has a row only for the
+  rows the reference join keeps.
 
 ### Queries waiting for labels
 
 A query marked `labels_pending` in the catalog has no published labels yet.
 `quail_b.queries()` leaves it out; `queries(include_pending=True)` and
 `get_query` return it. Running one needs a label collection that includes its
-predicates, passed with `root` or `collection_id`. No query is pending now.
+predicates, passed with `root` or `collection_id`. No query is pending.
 
 ## Measurements
 
@@ -300,7 +440,7 @@ predicates, passed with `root` or `collection_id`. No query is pending now.
 | Key | Type | Meaning |
 | --- | --- | --- |
 | `evaluated_document_pairs` | nonnegative `int` | Pairs across all joins |
-| `fresh_tokens` | nonnegative `int` | Positions processed by model forward passes |
+| `fresh_tokens` | nonnegative `int` | Positions run through model forward passes |
 | `input_tokens` | nonnegative `int` | Full length of every evaluated prompt |
 
 When every join has an answer table, QUAIL-B uses the sum of their row counts
@@ -332,6 +472,7 @@ must compute.
 | `preamble` | `list[int]` | Tokens before each first document |
 | `filters` | `list[dict]` | One `id` and `tail` token list per filter |
 | `joins` | `list[dict]` | One join description per join |
+| `classifies` | `list[dict]` | One description per classification |
 
 Each filter description has:
 
@@ -350,10 +491,21 @@ label: tokens before the partner document
 tail: tokens after the partner document
 ```
 
+A classification of one document is described like a filter, with `id` and
+`tail`. A classification of joined rows is described like a join, with `id`,
+`anchor`, `frame`, `label`, and `tail`.
+
+A classification's pieces come from the reference prompt that
+`render_classify_prompt` produces, whatever prompt the engine sent. Its tail
+holds the question, the labels by name, and the answer cue. For example, an
+engine that lists AGENT-4's failure modes under letters still reports the
+tail that lists them by name, so the minimum is the same for every engine
+that uses one tokenizer.
+
 Prompt pieces require:
 
-- an answer table for every filter and join;
-- every filter and join listed exactly once;
+- an answer table for every filter, join, and classification;
+- every filter, join, and classification listed exactly once;
 - `measurements["fresh_tokens"]`;
 - the same tokenizer and token layout used during execution, or a reported
   `input_tokens` total when the engine tokenized full prompts itself.
@@ -373,7 +525,7 @@ minimum tokens, recomputed tokens, and KV regret.
 | Label accuracy | Classification answers |
 | Fresh tokens | `measurements["fresh_tokens"]` |
 | Input tokens and their throughput | Prompt pieces, or reported input tokens |
-| Minimum tokens and KV regret | All answer tables, prompt pieces, and fresh tokens; not yet defined for classification queries |
+| Minimum tokens and KV regret | All answer tables, prompt pieces, and fresh tokens |
 | GPU cost | `gpu_count` and `gpu_hourly_rate_usd` |
 | Cost per million input tokens | GPU cost and a positive input token count |
 
@@ -400,8 +552,32 @@ each predicate.
 ### Label accuracy
 
 Label accuracy is the share of the engine's classification answers that match
-the reference labels, over the documents the engine classified. It is reported
-beside predicate-level accuracy, not merged into it.
+their reference labels. It is reported beside predicate-level accuracy, not
+merged into it. `run.json` records `correct`, `evaluated`, `unlabeled`, and
+`accuracy` for each classification and in total.
+
+Each answer is counted by whether it has a reference label:
+
+| Answer over | Reference label | Counted as |
+| --- | --- | --- |
+| A document | Present | `evaluated` |
+| A document | Missing | Error |
+| A joined row | Present | `evaluated` |
+| A joined row | Missing | `unlabeled` |
+
+`correct` counts the evaluated answers that match. Accuracy is `correct`
+divided by `evaluated`, so unlabeled answers do not affect it.
+
+A joined row can lack a reference label because reference labels exist only
+for the rows the reference join keeps. An engine's join can keep other rows.
+For example, if an engine's join keeps a review joined with "the soundtrack"
+and the reference join does not, the engine's label for that row is
+`unlabeled`.
+
+The reference result needs a label for each of its joined rows. For IMDB-15,
+these are the rows the reference join keeps whose review has a negative or mixed
+reference sentiment. If one of them has no reference label, scoring raises an
+error.
 
 Accuracy is not a focus of this benchmark. See
 [Reference answers](../README.md#reference-answers) for how the labels were
@@ -427,6 +603,18 @@ The minimum counts each distinct prompt prefix once, so a document's questions
 share the document and any leading tokens they have in common. For joins, each
 pair's label, partner document, and answer cue count once per pair. Recomputed
 tokens are therefore the work a perfect prefix KV cache would have avoided.
+
+A classification's tail counts like a filter question: once per document,
+sharing its lead with the document's other questions. A classification of
+joined rows counts like a join. Reading a label takes no position after the
+answer cue, so the minimum does not depend on how an engine reads labels.
+
+For example, suppose an engine classifies 100 reviews after asking one filter
+question of each. Each review's tokens count once, and the filter question
+and the classification tail count once per review, minus the tokens they
+share at their start. Computing a review twice, sending a longer lettered
+category list, or feeding label tokens after the cue to score each label is
+work beyond the minimum, and counts as recomputed tokens.
 
 Input tokens depend on which prompts the plan evaluates. Fresh tokens measure
 model computation. Two engines can therefore have the same input tokens and

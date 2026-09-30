@@ -178,7 +178,7 @@
                     "common": {
                       "direct": {},
                       "hint": {
-                        "alias": "label-filter-1"
+                        "alias": "in-list-1"
                       }
                     },
                     "condition": {

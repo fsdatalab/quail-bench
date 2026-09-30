@@ -1,4 +1,4 @@
-"""The exact prompt text a predicate asks, for filters and joins.
+"""The exact prompt text a predicate asks, for filters, joins, and labels.
 
 The reference labels answer this text. An engine that runs QUAIL-B
 sends the same text, so the text is defined here and not borrowed
@@ -101,13 +101,33 @@ def render_categories(labels, descriptions=None) -> str:
 
 
 def render_classify_prompt(template: str, document: str, labels,
-                           descriptions=None) -> str:
+                           descriptions=None, partner: str | None = None) -> str:
     """Return the text a classification scores its labels after.
 
     The document comes first, then the instruction and question, the
     category list, and the answer cue. A label's text is
     `LABEL_PREFIX + label`, appended after this text.
+
+    With a partner, the classification labels a joined row and the
+    prompt has the join's layout: the anchor document with its anchor
+    note, then the labeled partner document, then the instruction,
+    the question with `{0}` and `{1}` kept as written, the category
+    list, and the answer cue.
+
+    Args:
+        template: The question with `{0}`, or `{0}` and `{1}` for a
+            joined row.
+        document: The text of document `{0}`, the anchor of a joined row.
+        labels: The categories, in the order that breaks ties.
+        descriptions: One description per label, or None for none.
+        partner: The text of document `{1}` for a joined row, else None.
     """
+    if partner is not None:
+        _check_placeholders(template, 2)
+        return (SHARED_PRE + document + JOIN_ANCHOR_NOTE.format(_marker(0))
+                + join_label(1) + partner + "\n\n" + CLASSIFY_INSTRUCTION
+                + template + render_categories(labels, descriptions)
+                + ANSWER_CUE)
     _check_placeholders(template, 1)
     _frame, canonical = split_frame(template)
     preamble, tail = split_template(canonical)

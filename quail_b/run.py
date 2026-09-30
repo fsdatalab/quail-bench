@@ -25,7 +25,7 @@ from quail_b.scoring import (
     output_columns,
     scores_from_answers,
 )
-from quail_b.substrait import _Classify, _Filter, _Join, _LabelFilter
+from quail_b.substrait import _Classify, _Filter, _InList, _Join
 
 RUN_SCHEMA_VERSION = 2
 
@@ -73,10 +73,14 @@ def _query_hash(spec):
                 "labels": operator.labels,
                 "descriptions": operator.descriptions,
                 "output": operator.output,
+                # only a classification of joined rows names a partner, so the
+                # hashes of the one-document queries stay as published
+                **({"partner": operator.partner}
+                   if operator.partner is not None else {}),
             })
-        elif isinstance(operator, _LabelFilter):
+        elif isinstance(operator, _InList):
             operators.append({
-                "kind": "label_filter",
+                "kind": "in_list",
                 "id": operator.id,
                 "relation": operator.relation,
                 "output": operator.output,
@@ -294,7 +298,7 @@ def _validate_output(spec, output, tables):
         if operator_id not in classifies:
             raise ValueError(f"unknown classify operator {operator_id!r}")
         operator = classifies[operator_id]
-        validate_ids(table, [operator.relation])
+        validate_ids(table, list(operator.relations))
         validate_labels(
             table.rename_columns([
                 operator.output if name == "label" else name

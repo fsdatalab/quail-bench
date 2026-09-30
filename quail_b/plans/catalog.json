@@ -70,6 +70,11 @@
     "privacy": false
   },
   {
+    "id": "IMDB-15",
+    "description": "negative or mixed reviews -> J1 -> classify: each review's sentiment toward the aspect it discusses",
+    "privacy": false
+  },
+  {
     "id": "BIO-1",
     "description": "filter: serious adverse event",
     "privacy": false
@@ -202,6 +207,11 @@
   {
     "id": "AGENT-4",
     "description": "unresolved traces -> classify: why the agent failed",
+    "privacy": false
+  },
+  {
+    "id": "AGENT-5",
+    "description": "classify every trace three ways: outcome, the project's PyPI topic, and the defect type of the bug",
     "privacy": false
   },
   {

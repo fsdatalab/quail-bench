@@ -26,15 +26,35 @@ scalar_functions:
         return: boolean
   - name: ai_classify
     description: >-
-      Return the label the model scores highest for a document, from a fixed
-      list of labels. A label's score is the sum of its tokens' log
-      probabilities after the prompt; the earlier label wins a tie.
+      Return the label the model scores highest for a document, or for a
+      pair of documents, from a fixed list of labels. A label's score is
+      the sum of its tokens' log probabilities after the prompt; the
+      earlier label wins a tie.
     impls:
       - args:
           - name: prompt
             value: string
             constant: true
           - name: document
+            value: string
+          - name: labels
+            value: list<string>
+            constant: true
+          - name: descriptions
+            description: One per label; an empty string means no description.
+            value: list<string>
+            constant: true
+        return: string
+      - args:
+          - name: prompt
+            description: Names the first document as {0} and the second as {1}.
+            value: string
+            constant: true
+          - name: document
+            description: The anchor, placed first in the prompt.
+            value: string
+          - name: document
+            description: The partner, placed after the anchor.
             value: string
           - name: labels
             value: list<string>

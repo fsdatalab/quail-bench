@@ -2,7 +2,7 @@
 
 A predicate is one TRUE or FALSE question over one table column
 (filter) or two (join), or one choice among fixed labels over one
-column (classify). Its version hashes everything that can change
+column or two (classify). Its version hashes everything that can change
 the model's answer; the label-set id hashes the version, the corpus,
 and the judge, so a label file's path says exactly what produced it.
 The pass that writes the labels lives in Quail's repository.
@@ -15,7 +15,7 @@ import json
 from dataclasses import dataclass
 
 from quail_b import data, prompts, rendering
-from quail_b.rendering import SHARED_PRE
+from quail_b.rendering import JOIN_ANCHOR_NOTE, JOIN_DOC_LABEL, SHARED_PRE
 
 SCHEMA_VERSION = 1
 MODEL_REPO = "Qwen/Qwen3-32B-FP8"
@@ -162,6 +162,11 @@ CLASSIFY_PREDICATES = (
         "classify", prompts.IMDB_COMPLAINT, "review", "reviews", "body",
         labels=prompts.IMDB_COMPLAINT_LABELS),
     PredicateSpec(
+        "quailb.imdb.review.aspect_sentiment", "imdb",
+        "review_aspect_sentiment", "classify", prompts.IMDB_ASPECT_SENTIMENT,
+        "review", "reviews", "body", "aspect", "aspects", "aspect",
+        labels=prompts.IMDB_ASPECT_SENTIMENT_LABELS),
+    PredicateSpec(
         "quailb.biodex.reaction.organ_class", "biodex",
         "reaction_organ_class", "classify", prompts.BIO_ORGAN_CLASS,
         "reaction", "terms", "term", labels=prompts.BIO_ORGAN_CLASS_LABELS),
@@ -183,6 +188,15 @@ CLASSIFY_PREDICATES = (
         "classify", prompts.AGENT_FAILURE, "agent_trace", "agent_traces",
         "trace", labels=prompts.AGENT_FAILURE_LABELS,
         descriptions=prompts.AGENT_FAILURE_DESCRIPTIONS),
+    PredicateSpec(
+        "quailb.agent.trace.domain", "agent", "trace_domain", "classify",
+        prompts.AGENT_DOMAIN, "agent_trace", "agent_traces", "trace",
+        labels=prompts.AGENT_DOMAIN_LABELS),
+    PredicateSpec(
+        "quailb.agent.trace.root_cause", "agent", "trace_root_cause",
+        "classify", prompts.AGENT_ROOT_CAUSE, "agent_trace", "agent_traces",
+        "trace", labels=prompts.AGENT_ROOT_CAUSE_LABELS,
+        descriptions=prompts.AGENT_ROOT_CAUSE_DESCRIPTIONS),
 )
 
 PREDICATE_BY_KEY = {p.key: p for p in PREDICATES + CLASSIFY_PREDICATES}
@@ -215,12 +229,20 @@ def _descriptions(spec: PredicateSpec) -> tuple[str, ...]:
     return spec.descriptions or ("",) * len(spec.labels)
 
 
+def is_joined_classify(spec: PredicateSpec) -> bool:
+    """Whether the predicate labels joined rows, one document per table."""
+    return spec.kind == "classify" and spec.right_table is not None
+
+
 def predicate_payload(spec: PredicateSpec) -> dict:
     render = {
         "filter": "filter_document_then_question_v1",
         "join": "join_arg0_anchor_then_arg1_v1",
         "classify": "classify_document_then_categories_v1",
     }[spec.kind]
+    if is_joined_classify(spec):
+        # stored in the published label sets' identities; keep as is
+        render = "classify_pair_anchor_then_partner_v1"
     payload = {
         "schema_version": SCHEMA_VERSION,
         "predicate_key": spec.key,
@@ -253,6 +275,9 @@ def predicate_payload(spec: PredicateSpec) -> dict:
             labels=list(spec.labels),
             descriptions=list(_descriptions(spec)),
         )
+    if is_joined_classify(spec):
+        payload.update(anchor_note=JOIN_ANCHOR_NOTE,
+                       partner_label=JOIN_DOC_LABEL)
     return payload
 
 
@@ -383,10 +408,22 @@ def render_filter_prompt(spec: PredicateSpec, document: str) -> str:
     return rendering.render_filter_prompt(spec.template, document)
 
 
-def render_classify_prompt(spec: PredicateSpec, document: str) -> str:
-    """Return the text a classification scores its labels after."""
+def render_classify_prompt(spec: PredicateSpec, document: str,
+                           partner: str | None = None) -> str:
+    """Return the text a classification scores its labels after.
+
+    Args:
+        spec: The classify predicate.
+        document: The document, or the anchor of a joined row.
+        partner: The partner document of a joined row.
+    """
+    if is_joined_classify(spec) and partner is None:
+        raise ValueError(f"{spec.key} classifies joined rows")
+    if not is_joined_classify(spec) and partner is not None:
+        raise ValueError(f"{spec.key} classifies one document")
     return rendering.render_classify_prompt(
-        spec.template, document, spec.labels, _descriptions(spec))
+        spec.template, document, spec.labels, _descriptions(spec),
+        partner=partner)
 
 
 def render_join_prompt(spec: PredicateSpec, left: str, right: str) -> str:

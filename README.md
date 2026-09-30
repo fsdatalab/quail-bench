@@ -22,10 +22,11 @@ The query is written with BigQuery's
 function, and its prompts are shortened. QUAIL-B publishes each query as a
 Substrait plan with the exact prompt text.
 
-The benchmark contains 41 such queries over five document collections: movie
+The benchmark contains 43 such queries over five document collections: movie
 reviews, adverse drug reaction reports, claims and evidence for fact
 verification, legal citations, and software agent trajectories. Each collection
-comes at three scale factors, with reference answers for every filter and join.
+comes at three scale factors, with reference answers for every filter, join,
+and classification.
 
 To benchmark your engine, you write an adapter: a Python function that receives
 one query and its input tables, runs the query on your engine, and returns the
@@ -112,7 +113,7 @@ A full call to `quail_b.run` looks like:
 ```python
 quail_b.run(
     run_query,
-    queries=None,                        # None runs all 41 queries
+    queries=None,                        # None runs all 43 queries
     scale_factor=0.1,                    # 0.1, 0.5, or 1.0
     output_dir="results/vllm_qwen3_4b",  # must be a new directory
     metadata={"engine": "vllm", "model": "Qwen/Qwen3-4B-FP8"},
@@ -128,7 +129,7 @@ it saves the output, scores it, and updates `run.json`. At the end it writes
 | Parameter | Default | Meaning |
 | --- | --- | --- |
 | `run_query` | required | Your adapter |
-| `queries` | `None` | Query IDs to run; `None` runs all 41 |
+| `queries` | `None` | Query IDs to run; `None` runs all 43 |
 | `scale_factor` | `0.1` | Published scale factor: `0.1`, `0.5`, or `1.0` |
 | `output_dir` | required | New directory for this run's results |
 | `metadata` | `None` | JSON object saved with the run: engine, model, settings |
@@ -171,29 +172,32 @@ print(reviews.num_rows)   # 5000
 
 ## Queries
 
-The queries use two AI functions, declared as Substrait extensions in
+The queries use three AI functions, declared as Substrait extensions in
 [`quail_b/substrait_extensions.yaml`](quail_b/substrait_extensions.yaml):
 
 ```text
 ai_filter(prompt, document) -> boolean
 ai_join(prompt, left_document, right_document) -> boolean
-```
-
-The plans combine them with scans, equality conditions, conjunction, and
-projection. The classification queries add a third function, described under
-[Classification queries](#classification-queries):
-
-```text
 ai_classify(prompt, document, labels, descriptions) -> string
+ai_classify(prompt, anchor, partner, labels, descriptions) -> string
 ```
+
+The plans combine them with scans, equality conditions, conjunction,
+projection, and IN-list filters on label columns, such as
+`r.sentiment IN ('negative', 'mixed')`. The first form of `ai_classify` labels
+one document. The second labels the rows of a join: each row is the two
+documents, one from each table, that the join kept, such as a review and one
+aspect it discusses. The anchor is the document placed first in the prompt,
+and the partner follows it. [Classification queries](#classification-queries)
+lists the queries that use it.
 
 | Dataset | Queries | Tables | Task |
 | --- | --- | --- | --- |
-| IMDB | IMDB-1 to IMDB-14 | `reviews`, `aspects` | Review aspects and sentiment |
+| IMDB | IMDB-1 to IMDB-15 | `reviews`, `aspects` | Review aspects and sentiment |
 | BioDEX | BIO-1 to BIO-6 | `reports`, `terms` | Adverse drug reactions |
 | FEVER | FEV-1 to FEV-11 | `claims`, `evidence` | Fact verification |
 | LePaRD | LEP-1 to LEP-6 | `citation_contexts`, `citation_passages` | Legal citations |
-| SWE-Next | AGENT-1 to AGENT-4 | `agent_traces` | Software agent trajectories |
+| SWE-Next | AGENT-1 to AGENT-5 | `agent_traces` | Software agent trajectories |
 
 Within each dataset, the first queries have a single filter or join. Later
 queries chain filters, filter both join inputs, scan one table under two
@@ -224,10 +228,10 @@ following question:", so an engine can reuse a document's KV across questions.
 
 ### Developing an adapter
 
-The 41 queries have several different shapes: how many filters and joins they
+The 43 queries have several different shapes: how many filters and joins they
 have, and how those operators are arranged in the plan. The table below lists
 one query for each distinct shape, from simplest to most complex. Test your
-adapter on these queries first, then run it on all 41.
+adapter on these queries first, then run it on all 43.
 
 | Query | Shape | What it tests |
 | --- | --- | --- |
@@ -242,12 +246,18 @@ adapter on these queries first, then run it on all 41.
 
 ### Classification queries
 
-Ten queries return or filter on a label chosen from a fixed list. Each asks a
-question an analyst would ask of that collection, with a standard label list
+Twelve queries return or filter on a label chosen from a fixed list. Each asks
+a question an analyst would ask of that collection, with a standard label list
 where one exists, such as IMDb's genres or MedDRA's system organ classes.
 Label length follows from the list, from one token for sentiment to eleven
 for an organ class under the Qwen3 tokenizer. IMDB-14, LEP-6, and AGENT-4
 have labels that start with the same words, as category names often do.
+
+IMDB-15 is the one query that classifies joined rows. It joins each negative
+or mixed review with the movie aspects the review discusses. It then labels
+each (review, aspect) row with the review's sentiment toward that aspect. For
+example, the row of a review and the aspect "the acting" gets one of
+positive, negative, neutral, or mixed.
 
 | Query | Question | Labels |
 | --- | --- | --- |
@@ -255,12 +265,14 @@ have labels that start with the same words, as category names often do.
 | IMDB-12 | Among reviews that praise something (F1), what genre is each movie? | IMDb's 21 genres |
 | IMDB-13 | Which aspects do negative or mixed reviews discuss? | Sentiment, as a filter before J1, returned per pair |
 | IMDB-14 | What do negative or mixed reviews complain about most? | Sentiment, then 8 complaints; three start with "poor" and two with "too"; both returned |
+| IMDB-15 | What sentiment does each negative or mixed review express toward each aspect it discusses? | Sentiment, as a filter before J1, then 4 sentiments per pair; both returned |
 | BIO-5 | Which system organ class does each reaction term belong to? | MedDRA's 26 classes, 1 to 11 tokens |
 | BIO-6 | Which cardiac or vascular reactions do serious reports describe? | Organ class, as a filter on one join input |
 | FEV-11 | Which claims are about politics or history, and which topic? | 11 topics; one call returned and filtered |
 | LEP-6 | Which passages do constitutional or criminal law excerpts cite? | 15 areas of law, as a filter before the join |
 | AGENT-3 | Did agents that recovered from a failed approach resolve the issue? | 4 outcomes with descriptions, after a filter |
 | AGENT-4 | Why did the agents that did not resolve the issue fail? | Outcome, then 8 failure modes with descriptions; three start with "could not" |
+| AGENT-5 | For every trace: did the agent resolve the issue, what is the project, and what kind of defect is the bug? | Outcome, 27 PyPI topics, and 8 ODC defect types; three questions of one trace |
 
 A classification answer is the label with the largest sum of label-token log
 probabilities; the [reference](docs/reference.md#classification) defines the
@@ -289,7 +301,9 @@ same at every scale factor. Use 0.1 while developing an adapter.
 
 QUAIL-B scores every run against reference answers: one TRUE or FALSE label
 for each document or document pair each filter or join can be asked about,
-and one label for each document a classification can be asked about.
+and one label for each document a classification can be asked about. A
+classification of joined rows has one label for each row the reference join
+keeps.
 
 **Accuracy is not a focus of this benchmark.** Most labels are the answers of
 one arbitrary model, `Qwen/Qwen3-32B-FP8`, so it is not really meaningful to
@@ -320,9 +334,9 @@ to the data or labels produces new IDs. These are the published IDs:
 
 | Scale factor | Corpus ID | Collection ID |
 | --- | --- | --- |
-| 0.1 | `c_1aa2c4f0d0b6c816fd37aa5748c33341` | `gt_6d7ca88a74a30b665bfb67dcde76daff` |
-| 0.5 | `c_6773c85b3754908434661c1dadfad0fa` | `gt_52da77e8d146641a01561d5027dc87f8` |
-| 1.0 | `c_81a95887a650aaa1a343e0d688b81bef` | `gt_f5dc4fe012b930645e88d6cc368efecb` |
+| 0.1 | `c_1aa2c4f0d0b6c816fd37aa5748c33341` | `gt_9b8e7f5a649d715d64a5fa4646855a4d` |
+| 0.5 | `c_6773c85b3754908434661c1dadfad0fa` | `gt_a0faa81557f0f7c98b6eb4c170ce3716` |
+| 1.0 | `c_81a95887a650aaa1a343e0d688b81bef` | `gt_cc042e13f1a6512ee51882e65d5d3456` |
 
 `quail_b.run` loads the matching collection for you and records both IDs in
 `run.json`. Compare results only across runs with the same IDs.
@@ -360,6 +374,7 @@ reports it as zero.
 | Query time | `runtime_s`, in seconds |
 | Output precision and recall | Returned rows compared with the reference result |
 | Predicate-level accuracy | Share of filter and join answers that match the labels |
+| Label accuracy | Share of classification answers that match the labels |
 | Document throughput | Input documents per second, for queries with zero joins |
 | Join throughput | Evaluated document pairs per second |
 | GPU cost | `runtime_s / 3600 * gpu_count * gpu_hourly_rate_usd` |
@@ -384,6 +399,7 @@ results/vllm_qwen3_4b/
     ├── rows.parquet      # the result rows
     ├── filters-0.parquet # optional filter answers
     ├── joins-0.parquet   # optional join answers
+    ├── classifications-0.parquet  # optional classification answers
     └── prompt_pieces.json
 ```
 

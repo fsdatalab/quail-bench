@@ -47,6 +47,7 @@ from quail_b.prompts import (
     SUPPORT,
 )
 from quail_b.substrait import (
+    AI_CLASSIFY_JOINED_NAME,
     AI_CLASSIFY_NAME,
     AI_EXTENSION_URN,
     AI_FILTER_NAME,
@@ -73,6 +74,7 @@ _FUNCTIONS = {
     EQUAL_NAME: (3, COMPARISON_EXTENSION_URN),
     AND_NAME: (4, BOOLEAN_EXTENSION_URN),
     AI_CLASSIFY_NAME: (5, AI_EXTENSION_URN),
+    AI_CLASSIFY_JOINED_NAME: (6, AI_EXTENSION_URN),
 }
 
 
@@ -97,7 +99,7 @@ class Scan:
 class Filter:
     """Keep the documents of one relation that answer a prompt TRUE."""
 
-    input: Scan | Filter | Classify | LabelFilter
+    input: Scan | Filter | Classify | InList
     prompt: str
 
 
@@ -105,26 +107,34 @@ class Filter:
 class Classify:
     """Add one label column to one relation from a fixed list of labels.
 
+    Over a join of two relations, the call labels each row the join
+    kept: the prompt names the anchor as `{0}` and its partner as `{1}`,
+    and the label column belongs to the anchor.
+
     Attributes:
-        input: The relation's scan, filters, or classifications.
+        input: The relation's scan, filters, or classifications, or a
+            join of two relations to label its rows.
         prompt: The classification prompt.
         labels: The labels, in tie-breaking order.
         output: The name of the label column.
         descriptions: One description per label, or empty for none.
+        documents: For joined rows, the anchor alias then the partner
+            alias; None takes the join's aliases in order.
     """
 
-    input: Scan | Filter | Classify | LabelFilter
+    input: Scan | Filter | Classify | InList | Join
     prompt: str
     labels: tuple[str, ...]
     output: str
     descriptions: tuple[str, ...] = ()
+    documents: tuple[str, str] | None = None
 
 
 @dataclass(frozen=True)
-class LabelFilter:
+class InList:
     """Keep the documents whose label column holds an accepted label."""
 
-    input: Classify | LabelFilter
+    input: Classify | InList
     output: str
     accepted: tuple[str, ...]
 
@@ -164,7 +174,7 @@ class Query:
 
     id: str
     description: str
-    tree: Scan | Filter | Join | Classify | LabelFilter
+    tree: Scan | Filter | Join | Classify | InList
     privacy: bool = False
     select: tuple[str, ...] | None = None
     labels_pending: bool = False
@@ -245,7 +255,7 @@ class _Emitter:
 
     def __init__(self):
         self.counts = {"filter": 0, "join": 0, "classify": 0,
-                       "label-filter": 0}
+                       "in-list": 0}
         self.functions = set()
 
     def _operator_id(self, kind):
@@ -272,34 +282,41 @@ class _Emitter:
 
         if isinstance(node, Classify):
             rel, fields, text = self.emit(node.input)
-            (alias,) = text
-            self.functions.add(AI_CLASSIFY_NAME)
+            if len(text) == 1:
+                aliases = tuple(text)
+                name = AI_CLASSIFY_NAME
+            else:
+                aliases = node.documents or _join_aliases(node.input)
+                name = AI_CLASSIFY_JOINED_NAME
+            self.functions.add(name)
             descriptions = node.descriptions or ("",) * len(node.labels)
-            output_fields = (*fields, (alias, node.output))
+            output_fields = (*fields, (aliases[0], node.output))
             common = _common(self._operator_id("classify"))
             common.hint.output_names.extend(
                 ".".join(field) for field in output_fields)
             relation = algebra.ProjectRel(
                 common=common,
                 input=rel,
-                expressions=[_call(AI_CLASSIFY_NAME, [
+                expressions=[_call(name, [
                     _literal(node.prompt),
-                    _field(fields.index((alias, text[alias]))),
+                    *(_field(fields.index((alias, text[alias])))
+                      for alias in aliases),
                     _string_list(node.labels),
                     _string_list(descriptions),
                 ], _string_type())],
             )
             return algebra.Rel(project=relation), output_fields, text
 
-        if isinstance(node, LabelFilter):
+        if isinstance(node, InList):
             rel, fields, text = self.emit(node.input)
-            (alias,) = text
+            # the label column may belong to any relation the input holds
+            (field,) = [field for field in fields if field[1] == node.output]
             relation = algebra.FilterRel(
-                common=_common(self._operator_id("label-filter")),
+                common=_common(self._operator_id("in-list")),
                 input=rel,
                 condition=algebra.Expression(
                     singular_or_list=algebra.Expression.SingularOrList(
-                        value=_field(fields.index((alias, node.output))),
+                        value=_field(fields.index(field)),
                         options=[_literal(label) for label in node.accepted],
                     )
                 ),
@@ -349,6 +366,13 @@ class _Emitter:
             type=algebra.JoinRel.JOIN_TYPE_INNER,
         )
         return algebra.Rel(join=relation), fields, text
+
+
+def _join_aliases(node) -> tuple[str, str]:
+    """The aliases of the join under a classification, in prompt order."""
+    while not isinstance(node, Join):
+        node = node.input
+    return node.aliases
 
 
 def build_plan(tree, select=None) -> plan_pb2.Plan:
@@ -478,7 +502,7 @@ def _sentiment(node):
 
 def _critical(node):
     """Reviews whose sentiment is negative or mixed."""
-    return LabelFilter(_sentiment(node), "sentiment", ("negative", "mixed"))
+    return InList(_sentiment(node), "sentiment", ("negative", "mixed"))
 
 
 def _organ_class(node):
@@ -554,6 +578,13 @@ QUERIES = (
           _classify(_critical(_reviews()), prompts.IMDB_COMPLAINT,
                     prompts.IMDB_COMPLAINT_LABELS, "complaint"),
           select=("r", "r.sentiment", "r.complaint")),
+    Query("IMDB-15", "negative or mixed reviews -> J1 -> classify: each "
+          "review's sentiment toward the aspect it discusses",
+          Classify(Join(_critical(_reviews()), _aspects(), ("r", "a"),
+                        DISCUSS_ASPECT),
+                   prompts.IMDB_ASPECT_SENTIMENT,
+                   prompts.IMDB_ASPECT_SENTIMENT_LABELS, "aspect_sentiment"),
+          select=("r", "r.sentiment", "a", "r.aspect_sentiment")),
 
     Query("BIO-1", "filter: serious adverse event",
           _filters(_reports(), SERIOUS_ADVERSE_EVENT)),
@@ -575,8 +606,8 @@ QUERIES = (
     Query("BIO-6", "serious adverse event reports x their cardiac or "
           "vascular reactions",
           Join(_filters(_reports(), SERIOUS_ADVERSE_EVENT),
-               LabelFilter(_organ_class(_terms()), "organ_class",
-                           ("cardiac disorders", "vascular disorders")),
+               InList(_organ_class(_terms()), "organ_class",
+                      ("cardiac disorders", "vascular disorders")),
                ("r", "m"), REACTION)),
 
     Query("FEV-1", "filter: F11 (about a person)", _filters(_claims(), F11)),
@@ -618,9 +649,9 @@ QUERIES = (
                on=(("evidence_wiki_url", "id"),))),
     Query("FEV-11", "classify: claim topic; the political and historical "
           "claims, with their topic",
-          LabelFilter(_classify(_claims(), prompts.FEV_TOPIC,
-                                prompts.FEV_TOPIC_LABELS, "topic"),
-                      "topic", ("politics", "history")),
+          InList(_classify(_claims(), prompts.FEV_TOPIC,
+                           prompts.FEV_TOPIC_LABELS, "topic"),
+                 "topic", ("politics", "history")),
           select=("c", "c.topic")),
 
     Query("LEP-1", "filter: LEP1 (reasoning does not apply)",
@@ -639,7 +670,7 @@ QUERIES = (
                _filters(_passages(), LEPS1), ("d", "s"), LEPJOIN)),
     Query("LEP-6", "constitutional or criminal law excerpts -> the "
           "passages they cite, with each excerpt's area of law",
-          Join(LabelFilter(
+          Join(InList(
                    _classify(_contexts(), prompts.LEP_AREA,
                              prompts.LEP_AREA_LABELS, "area"),
                    "area", ("constitutional law", "criminal law")),
@@ -654,11 +685,18 @@ QUERIES = (
           _outcome(_filters(_traces(), AGENT_RECOVERED)),
           select=("t", "t.outcome")),
     Query("AGENT-4", "unresolved traces -> classify: why the agent failed",
-          _classify(LabelFilter(_outcome(_traces()), "outcome",
-                                ("not resolved",)),
+          _classify(InList(_outcome(_traces()), "outcome",
+                           ("not resolved",)),
                     prompts.AGENT_FAILURE, prompts.AGENT_FAILURE_LABELS,
                     "failure", prompts.AGENT_FAILURE_DESCRIPTIONS),
           select=("t", "t.failure")),
+    Query("AGENT-5", "classify every trace three ways: outcome, the "
+          "project's PyPI topic, and the defect type of the bug",
+          _classify(_classify(_outcome(_traces()), prompts.AGENT_DOMAIN,
+                              prompts.AGENT_DOMAIN_LABELS, "domain"),
+                    prompts.AGENT_ROOT_CAUSE, prompts.AGENT_ROOT_CAUSE_LABELS,
+                    "root_cause", prompts.AGENT_ROOT_CAUSE_DESCRIPTIONS),
+          select=("t", "t.outcome", "t.domain", "t.root_cause")),
 
     # PrivacyPolicies: only when that corpus is available.
     Query("PRIV-1", "2 filters: P_MSG + P_LOC",

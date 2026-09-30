@@ -158,13 +158,23 @@ SCENARIO_MATCH = ("Based on the privacy policy in DOCUMENT {0}, could "
 
 # Classification templates. Each call also carries its labels and
 # optional descriptions, defined next to it. A template is used with
-# exactly one label list, so a template names one predicate.
+# exactly one label list, so a template names one predicate. A
+# one-document template takes the document as `{0}`; a pair template
+# takes the anchor as `{0}` and its partner as `{1}`.
 
 IMDB_SENTIMENT = (
     "Judge strictly from the review above which category best describes "
     "the overall sentiment it expresses about the movie.\n\n{0}"
 )
 IMDB_SENTIMENT_LABELS = ("positive", "negative", "neutral", "mixed")
+
+# A classification of joined rows: the review is DOCUMENT {0}, the
+# aspect DOCUMENT {1}, and the label describes the two together.
+IMDB_ASPECT_SENTIMENT = (
+    "Judge strictly from the review in DOCUMENT {0} what sentiment it "
+    "expresses about the movie aspect in DOCUMENT {1}."
+)
+IMDB_ASPECT_SENTIMENT_LABELS = IMDB_SENTIMENT_LABELS
 
 # IMDb's own genre list.
 IMDB_GENRE = (
@@ -264,4 +274,50 @@ AGENT_FAILURE_DESCRIPTIONS = (
     "fixed the issue but made other tests fail",
     "a broken setup, missing dependency, or tool failure blocked progress",
     "reached the step limit while still making progress",
+)
+
+# PyPI's "Topic ::" trove classifiers, https://pypi.org/classifiers/
+AGENT_DOMAIN = (
+    "Judge strictly from the agent trace above which PyPI topic best "
+    "describes the project the issue is filed against.\n\n{0}"
+)
+AGENT_DOMAIN_LABELS = (
+    "Communications", "Database", "Documentation", "File Formats",
+    "Internet :: WWW/HTTP", "Multimedia :: Graphics",
+    "Multimedia :: Sound/Audio", "Multimedia :: Video",
+    "Office/Business :: Financial",
+    "Scientific/Engineering :: Artificial Intelligence",
+    "Scientific/Engineering :: Artificial Life",
+    "Scientific/Engineering :: Bio-Informatics",
+    "Scientific/Engineering :: GIS", "Scientific/Engineering :: Mathematics",
+    "Scientific/Engineering :: Medical Science Apps.", "Security",
+    "Software Development :: Build Tools", "Software Development :: Compilers",
+    "Software Development :: Embedded Systems",
+    "Software Development :: Quality Assurance",
+    "Software Development :: Testing",
+    "Software Development :: User Interfaces",
+    "System :: Distributed Computing", "System :: Networking",
+    "Text Processing :: Linguistic", "Text Processing :: Markup",
+    "Utilities",
+)
+
+# IBM's Orthogonal Defect Classification defect types (Chillarege et al.,
+# IEEE TSE 1992)
+AGENT_ROOT_CAUSE = (
+    "Judge strictly from the agent trace above what kind of defect causes "
+    "the reported issue.\n\n{0}"
+)
+AGENT_ROOT_CAUSE_LABELS = (
+    "assignment", "checking", "algorithm", "function", "interface",
+    "timing or serialization", "build, package, or merge", "documentation",
+)
+AGENT_ROOT_CAUSE_DESCRIPTIONS = (
+    "a value is set or initialized wrong",
+    "a condition or validation is missing or wrong",
+    "the steps that compute a result are wrong",
+    "a needed function, class, or feature is missing",
+    "components pass the wrong arguments, return values, or messages",
+    "shared resources, concurrency, or the order of events are wrong",
+    "a dependency, version, build, or packaging setting is wrong",
+    "documentation, comments, or messages are wrong",
 )

@@ -14,6 +14,7 @@ BOOLEAN_EXTENSION_URN = "extension:io.substrait:functions_boolean"
 AI_FILTER_NAME = "ai_filter:str_str"
 AI_JOIN_NAME = "ai_join:str_str_str"
 AI_CLASSIFY_NAME = "ai_classify:str_str_list_list"
+AI_CLASSIFY_JOINED_NAME = "ai_classify:str_str_str_list_list"
 EQUAL_NAME = "equal:any_any"
 AND_NAME = "and:bool"
 
@@ -21,6 +22,7 @@ _FUNCTION_URNS = {
     AI_FILTER_NAME: AI_EXTENSION_URN,
     AI_JOIN_NAME: AI_EXTENSION_URN,
     AI_CLASSIFY_NAME: AI_EXTENSION_URN,
+    AI_CLASSIFY_JOINED_NAME: AI_EXTENSION_URN,
     EQUAL_NAME: COMPARISON_EXTENSION_URN,
     AND_NAME: BOOLEAN_EXTENSION_URN,
 }
@@ -52,13 +54,20 @@ class _Join:
 class _Classify:
     """One ai_classify call that adds a label column to one relation.
 
+    A one-document classification labels each document of `relation`.
+    A classification of joined rows labels each row of the join of
+    `relation` and `partner`; its label column still belongs to
+    `relation`.
+
     Attributes:
         id: The operator ID.
-        relation: The alias of the classified documents.
-        prompt: The prompt template, with the document as `{0}`.
+        relation: The alias of the classified documents, `{0}`.
+        prompt: The prompt template, with the document as `{0}` and,
+            for joined rows, the partner as `{1}`.
         labels: The categories, in the order that breaks ties.
         descriptions: One description per label; empty means none.
         output: The name of the added label column.
+        partner: The alias of the partner documents, `{1}`, or None.
     """
 
     id: str
@@ -67,10 +76,18 @@ class _Classify:
     labels: tuple[str, ...]
     descriptions: tuple[str, ...]
     output: str
+    partner: str | None = None
+
+    @property
+    def relations(self) -> tuple[str, ...]:
+        """The classified aliases: the anchor, then the partner if any."""
+        if self.partner is None:
+            return (self.relation,)
+        return (self.relation, self.partner)
 
 
 @dataclass(frozen=True)
-class _LabelFilter:
+class _InList:
     """Keep the documents whose label is one of the accepted labels."""
 
     id: str
@@ -79,7 +96,7 @@ class _LabelFilter:
     accepted: tuple[str, ...]
 
 
-type _Operator = _Filter | _Join | _Classify | _LabelFilter
+type _Operator = _Filter | _Join | _Classify | _InList
 
 
 @dataclass(frozen=True)
@@ -110,7 +127,7 @@ class _PlanInfo:
         return tuple(
             operator
             for operator in self.operators
-            if not isinstance(operator, _LabelFilter)
+            if not isinstance(operator, _InList)
         )
 
     @property
@@ -122,11 +139,11 @@ class _PlanInfo:
         )
 
     @property
-    def label_filters(self) -> tuple[_LabelFilter, ...]:
+    def in_lists(self) -> tuple[_InList, ...]:
         return tuple(
             operator
             for operator in self.operators
-            if isinstance(operator, _LabelFilter)
+            if isinstance(operator, _InList)
         )
 
     def classify_output(self, output: str) -> _Classify:
@@ -134,6 +151,13 @@ class _PlanInfo:
             operator for operator in self.classifies
             if operator.output == output
         )
+
+    def pairing_join(self, operator: _Classify) -> _Join | None:
+        """The join of exactly the two relations whose rows the call labels."""
+        return next(
+            (join for join in self.joins
+             if set(join.relations) == set(operator.relations)),
+            None)
 
     @property
     def base_alias(self) -> str:
@@ -314,13 +338,16 @@ def _decode(
              and (operator.relation, operator.output) == (alias, output)),
             None)
         if classify is None:
-            raise ValueError("a label filter must test an ai_classify column")
+            raise ValueError("an IN-list filter must test an ai_classify column")
+        if classify.partner is not None:
+            raise ValueError(
+                "an IN-list filter tests a one-document classification")
         accepted = tuple(_literal_string(option) for option in membership.options)
         if not accepted or len(set(accepted)) != len(accepted):
-            raise ValueError("a label filter needs distinct accepted labels")
+            raise ValueError("an IN-list filter needs distinct accepted labels")
         if not set(accepted) <= set(classify.labels):
-            raise ValueError("a label filter accepts a label not in its call")
-        operator = _LabelFilter(
+            raise ValueError("an IN-list filter accepts a label not in its call")
+        operator = _InList(
             rel.filter.common.hint.alias, alias, output, accepted)
         return _Decoded(child.fields, child.tables, child.text_columns,
                         (*child.operators, operator))
@@ -411,39 +438,54 @@ def _decode(
 
 def _decode_classify(project: algebra_pb2.ProjectRel,
                      functions: dict[int, str]) -> _Decoded:
-    """Decode a ProjectRel that adds one ai_classify label column."""
+    """Decode a ProjectRel that adds one ai_classify label column.
+
+    The four-argument call labels one document; the five-argument call
+    labels a joined row, the anchor document then its partner, and
+    needs a child whose fields hold both relations.
+    """
     child = _decode(project.input, functions)
     if len(project.expressions) != 1 or project.common.HasField("emit"):
         raise ValueError("a classify ProjectRel adds exactly one column")
     expression = project.expressions[0]
     function = expression.scalar_function
-    if (not expression.HasField("scalar_function")
-            or functions.get(function.function_reference) != AI_CLASSIFY_NAME):
+    name = (functions.get(function.function_reference)
+            if expression.HasField("scalar_function") else None)
+    if name not in (AI_CLASSIFY_NAME, AI_CLASSIFY_JOINED_NAME):
         raise ValueError("an inner QUAIL-B ProjectRel must call ai_classify")
     arguments = _arguments(expression)
-    if len(arguments) != 4:
+    documents = 2 if name == AI_CLASSIFY_JOINED_NAME else 1
+    if len(arguments) != documents + 3:
         raise ValueError(
-            "ai_classify needs a prompt, document, labels, and descriptions")
+            f"{name} needs a prompt, {documents} document field(s), labels, "
+            "and descriptions")
     prompt = _literal_string(arguments[0])
-    field = _selected(child.fields, arguments[1])
-    labels = _string_list(arguments[2])
-    descriptions = _string_list(arguments[3])
+    fields = tuple(_selected(child.fields, argument)
+                   for argument in arguments[1:1 + documents])
+    labels = _string_list(arguments[1 + documents])
+    descriptions = _string_list(arguments[2 + documents])
     _validate_labels(labels, descriptions)
+    if len({field[0] for field in fields}) != documents:
+        raise ValueError("a classification of joined rows reads two relations")
     names = tuple(project.common.hint.output_names)
     expected = tuple(".".join(name) for name in child.fields)
     if len(names) != len(expected) + 1 or names[:-1] != expected:
         raise ValueError("a classify ProjectRel must name every output field")
     alias, _, output = names[-1].partition(".")
-    if alias != field[0] or not output or "." in output:
+    if alias != fields[0][0] or not output or "." in output:
         raise ValueError("a label column must belong to the classified relation")
     if output == "id" or (alias, output) in child.fields:
         raise ValueError(f"label column {output!r} is already a field")
+    partner = fields[1][0] if documents == 2 else None
     operator = _Classify(project.common.hint.alias, alias, prompt, labels,
-                         descriptions, output)
+                         descriptions, output, partner)
+    text_columns = child.text_columns
+    for field in fields:
+        text_columns = _with_text_column(text_columns, field)
     return _Decoded(
         (*child.fields, (alias, output)),
         child.tables,
-        _with_text_column(child.text_columns, field),
+        text_columns,
         (*child.operators, operator),
     )
 
@@ -477,9 +519,18 @@ def _validate_info(info: _PlanInfo) -> None:
         if isinstance(operator, _Join):
             for alias in operator.relations:
                 first_join[alias] = min(first_join[alias], index)
+    join_index = {join.id: index for index, join in enumerate(info.operators)
+                  if isinstance(join, _Join)}
     for index, operator in enumerate(info.operators):
-        if (
-            isinstance(operator, (_Filter, _Classify, _LabelFilter))
+        if isinstance(operator, _Classify) and operator.partner is not None:
+            # a classification of joined rows labels the rows a join kept
+            join = info.pairing_join(operator)
+            if join is None or index < join_index[join.id]:
+                raise ValueError(
+                    f"classification {operator.id!r} of joined rows must follow the "
+                    "join of its two relations")
+        elif (
+            isinstance(operator, (_Filter, _Classify, _InList))
             and index > first_join[operator.relation]
         ):
             raise ValueError(
@@ -499,12 +550,19 @@ def _validate_info(info: _PlanInfo) -> None:
                          "relation's id")
     for name in info.select:
         alias, column = name.split(".", 1)
-        if column != "id" and not any(
-                (operator.relation, operator.output) == (alias, column)
-                for operator in info.classifies):
+        if column == "id":
+            continue
+        operator = next(
+            (operator for operator in info.classifies
+             if (operator.relation, operator.output) == (alias, column)),
+            None)
+        if operator is None:
             raise ValueError(f"QUAIL-B projection selects {name!r}; only ids "
                              "and label columns can be selected")
-    used = {operator.output for operator in info.label_filters}
+        if not set(operator.relations) <= selected_ids:
+            raise ValueError(f"a query selecting the joined-row label {name!r} must "
+                             "select both relations' ids")
+    used = {operator.output for operator in info.in_lists}
     used.update(name.split(".", 1)[1] for name in info.select)
     for operator in info.classifies:
         if operator.output not in used:

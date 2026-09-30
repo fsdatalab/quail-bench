@@ -11,9 +11,11 @@ from __future__ import annotations
 import tempfile
 from dataclasses import dataclass, field
 
+import numpy as np
 import pyarrow as pa
 import pyarrow.compute as pc
 
+from quail_b._keys import lookup, tuple_keys
 from quail_b.data import _ids
 from quail_b.queries import QuerySpec
 
@@ -46,12 +48,13 @@ class RunOutput:
             `quail_b.minimum.validate_prompt_pieces` describes, or None.
             With the answers and `fresh_tokens`, scoring fills
             `input_tokens`, `input_tokens_per_second`, `minimum_tokens`,
-            and `regret_tokens`. Classification queries do not define
-            prompt pieces yet.
+            and `regret_tokens`.
         classify_answers: Classify operator ID to a table with the
-            relation's alias column and a string `label` column, one row
-            per document the engine classified. A document with no row
-            cannot pass a label filter or appear with its label.
+            relation's alias column, the partner's alias column for a
+            classification of joined rows, and a string `label`
+            column, one row per document or joined row the engine
+            classified. A document or joined row with no row cannot
+            pass an IN-list filter or appear with its label.
     """
 
     filter_answers: dict[str, pa.Table] | None
@@ -126,17 +129,29 @@ class BinaryCounts:
 
 @dataclass
 class LabelCounts:
+    """Agreement of classification answers with the reference labels.
+
+    Attributes:
+        correct: Answers that match their reference label.
+        evaluated: Answers with a reference label.
+        unlabeled: Answers over pairs the reference join does not keep,
+            which have no reference label and are left out.
+    """
+
     correct: int = 0
     evaluated: int = 0
+    unlabeled: int = 0
 
     def merge(self, other: "LabelCounts") -> None:
         self.correct += other.correct
         self.evaluated += other.evaluated
+        self.unlabeled += other.unlabeled
 
     def as_dict(self) -> dict:
         return {
             "correct": self.correct,
             "evaluated": self.evaluated,
+            "unlabeled": self.unlabeled,
             "accuracy": (round(self.correct / self.evaluated, 6)
                          if self.evaluated else None),
         }
@@ -278,16 +293,17 @@ def _apply_conditions(table: pa.Table, join, spec: QuerySpec,
     return table.filter(mask)
 
 
-def _label_table(table: pa.Table, alias: str, output: str) -> pa.Table:
-    """Return an answer table as distinct string (alias, output) rows."""
+def _label_table(table: pa.Table, aliases, output: str) -> pa.Table:
+    """Return an answer table as distinct string (aliases..., output) rows."""
     return _distinct(pa.table({
-        alias: pc.cast(table.column(alias), pa.string()),
+        **{alias: pc.cast(table.column(alias), pa.string())
+           for alias in aliases},
         output: pc.cast(table.column("label"), pa.string()),
     }))
 
 
 def answer_labels(spec: QuerySpec, classify_answers) -> dict | None:
-    """Return label column name to the engine's (alias, label) rows."""
+    """Return label column name to the engine's (aliases..., label) rows."""
     if spec._info.classifies and classify_answers is None:
         return None
     labels = {}
@@ -296,7 +312,7 @@ def answer_labels(spec: QuerySpec, classify_answers) -> dict | None:
         if table is None:
             return None
         labels[operator.output] = _label_table(
-            table, operator.relation, operator.output)
+            table, operator.relations, operator.output)
     return labels
 
 
@@ -306,20 +322,40 @@ def _narrow(survivors: dict, alias: str, passed) -> None:
 
 
 def _apply_labels(spec: QuerySpec, survivors: dict, labels: dict) -> None:
-    """Keep ids that have every used label and pass every label filter."""
-    used = {operator.output for operator in spec._info.label_filters}
+    """Keep ids that have every used label and pass every IN-list filter.
+
+    A label of joined rows never narrows an alias:
+    `_apply_joined_labels` narrows the join's pairs instead.
+    """
+    used = {operator.output for operator in spec._info.in_lists}
     used.update(operator.output for operator in _selected_labels(spec))
     for operator in spec._info.classifies:
-        if operator.output in used:
+        if operator.output in used and operator.partner is None:
             table = labels[operator.output]
             _narrow(survivors, operator.relation,
                     table.column(operator.relation).to_pylist())
-    for label_filter in spec._info.label_filters:
-        table = labels[label_filter.output]
-        mask = pc.is_in(table.column(label_filter.output),
-                        value_set=pa.array(label_filter.accepted, pa.string()))
-        _narrow(survivors, label_filter.relation,
-                table.filter(mask).column(label_filter.relation).to_pylist())
+    for in_list in spec._info.in_lists:
+        table = labels[in_list.output]
+        mask = pc.is_in(table.column(in_list.output),
+                        value_set=pa.array(in_list.accepted, pa.string()))
+        _narrow(survivors, in_list.relation,
+                table.filter(mask).column(in_list.relation).to_pylist())
+
+
+def _joined_classifies(spec: QuerySpec, join):
+    """Return the classifications of the rows of one join."""
+    return [operator for operator in spec._info.classifies
+            if operator.partner is not None
+            and spec._info.pairing_join(operator) is join]
+
+
+def _apply_joined_labels(spec: QuerySpec, join, pairs: pa.Table,
+                       labels: dict) -> pa.Table:
+    """Keep the join's pairs that have every joined-row label the query returns."""
+    for operator in _joined_classifies(spec, join):
+        pairs = pairs.join(labels[operator.output],
+                           keys=list(operator.relations), join_type="left semi")
+    return pairs
 
 
 def answer_relations(spec: QuerySpec, filter_answers, join_answers,
@@ -327,10 +363,11 @@ def answer_relations(spec: QuerySpec, filter_answers, join_answers,
     """Return (survivors, relations) an engine's own answers imply.
 
     survivors maps each alias to the string ids that passed every filter
-    and label filter on it and have every label column the query uses,
+    and IN-list filter on it and have every label column the query uses,
     or None when nothing narrows it. relations holds one table per join,
     in written order, with the pairs that answered TRUE, satisfy the
-    join's equality conditions, and survived. corpus_rows is needed only
+    join's equality conditions, survived, and have every joined-row label
+    the query returns. corpus_rows is needed only
     when a join has equality conditions. Returns None when the answers
     are missing.
     """
@@ -369,15 +406,15 @@ def answer_relations(spec: QuerySpec, filter_answers, join_answers,
                 true_pairs = true_pairs.filter(pc.is_in(
                     true_pairs.column(alias),
                     value_set=pa.array(sorted(survivors[alias]), pa.string())))
-        relations.append(true_pairs)
+        relations.append(_apply_joined_labels(spec, join, true_pairs, labels))
     return survivors, relations
 
 
 def _with_labels(rows: pa.Table, spec: QuerySpec, labels: dict) -> pa.Table:
     """Add the returned label columns to id rows and keep output columns."""
     for operator in _selected_labels(spec):
-        rows = rows.join(labels[operator.output], keys=[operator.relation],
-                         join_type="inner")
+        rows = rows.join(labels[operator.output],
+                         keys=list(operator.relations), join_type="inner")
     return _distinct(rows.select(sorted(output_columns(spec))))
 
 
@@ -435,6 +472,12 @@ def implied_row_count(spec: QuerySpec, survivors: dict, relations: list) -> int:
     return pc.sum(current.column("weight")).as_py() or 0
 
 
+def _keys(table: pa.Table, columns) -> pa.ChunkedArray:
+    """Join string columns into one key per row, for set membership."""
+    return pc.binary_join_element_wise(
+        *(table.column(column) for column in columns), "\x1f")
+
+
 def implied_rows_mask(rows: pa.Table, survivors: dict, relations: list,
                       spec: QuerySpec, labels: dict | None = None
                       ) -> pa.ChunkedArray:
@@ -450,13 +493,9 @@ def implied_rows_mask(rows: pa.Table, survivors: dict, relations: list,
     """
     mask = pa.array([True] * rows.num_rows, pa.bool_())
     for operator in _selected_labels(spec):
-        pairs = pc.binary_join_element_wise(
-            rows.column(operator.relation), rows.column(operator.output),
-            "\x1f")
-        table = labels[operator.output]
-        known = pc.binary_join_element_wise(
-            table.column(operator.relation), table.column(operator.output),
-            "\x1f")
+        columns = [*operator.relations, operator.output]
+        pairs = _keys(rows, columns)
+        known = _keys(labels[operator.output], columns)
         mask = pc.and_(mask, pc.is_in(pairs, value_set=known))
     aliases = {relation.alias for relation in spec._info.relations}
     for alias in (name for name in rows.column_names if name in aliases):
@@ -527,15 +566,61 @@ def _classify_labels(ground_truth, operator):
 
 
 def expected_labels(spec: QuerySpec, ground_truth) -> dict:
-    """Return label column name to the reference (alias, label) rows."""
+    """Return label column name to the reference (aliases..., label) rows.
+
+    A one-document classification's rows drop the reference table's
+    null `right_id`; a classification of joined rows keeps both ids
+    under the anchor and partner aliases.
+    """
     labels = {}
     for operator in spec._info.classifies:
         reference = _classify_labels(ground_truth, operator).table
+        names = [operator.relation, operator.partner or "right_id", "label"]
         labels[operator.output] = _label_table(
-            reference.rename_columns(
-                [operator.relation, "right_id", "label"]),
-            operator.relation, operator.output)
+            reference.rename_columns(names), operator.relations,
+            operator.output)
     return labels
+
+
+def _expected_pairs(spec: QuerySpec, ground_truth, corpus_rows
+                    ) -> list[pa.Table]:
+    """Return, per join, the reference TRUE pairs that satisfy its equalities."""
+    relations = []
+    for join in spec._info.joins:
+        pairs = _labels(ground_truth, join.prompt).true_pairs
+        pairs = pairs.select(["left_id", "right_id"]).rename_columns(
+            list(join.relations))
+        relations.append(_apply_conditions(pairs, join, spec, corpus_rows))
+    return relations
+
+
+def _check_joined_labels(spec: QuerySpec, ground_truth, survivors: dict,
+                       pairs: list[pa.Table]) -> None:
+    """Check that every surviving reference pair has each joined-row label.
+
+    Args:
+        spec: The query.
+        ground_truth: The label collection.
+        survivors: Per alias, the ids that pass every filter on it.
+        pairs: Per join, the reference pairs, as `_expected_pairs`.
+
+    Raises:
+        KeyError: A pair the query would return has no reference label.
+    """
+    for join, table in zip(spec._info.joins, pairs):
+        for operator in _joined_classifies(spec, join):
+            labels = _classify_labels(ground_truth, operator)
+            for alias in operator.relations:
+                table = table.filter(pc.is_in(
+                    table.column(alias),
+                    value_set=pa.array(survivors[alias], pa.string())))
+            known = _keys(labels.table, ["left_id", "right_id"])
+            unknown = pc.invert(pc.is_in(
+                _keys(table, list(operator.relations)), value_set=known))
+            if pc.any(unknown).as_py():
+                raise KeyError(
+                    f"no ground truth for {labels.key} and "
+                    f"{pc.sum(unknown).as_py()} pairs of {join.id}")
 
 
 def expected_survivors(spec: QuerySpec, ground_truth, corpus_rows
@@ -560,6 +645,8 @@ def expected_survivors(spec: QuerySpec, ground_truth, corpus_rows
                 ids, value_set=labels.true_pairs.column("left_id")))
         survivors[relation.alias] = ids.to_pylist()
     for operator in spec._info.classifies:
+        if operator.partner is not None:
+            continue
         labels = _classify_labels(ground_truth, operator)
         ids = pa.array(survivors[operator.relation], pa.string())
         unknown = pc.invert(pc.is_in(
@@ -575,14 +662,14 @@ def expected_survivors(spec: QuerySpec, ground_truth, corpus_rows
 
 
 def expected_rows(spec: QuerySpec, ground_truth, corpus_rows) -> pa.Table:
-    """Return the final rows the labels say the query should return."""
+    """Return the final rows the labels say the query should return.
+
+    Raises:
+        KeyError: A document or pair the query returns has no label.
+    """
     survivors = expected_survivors(spec, ground_truth, corpus_rows)
-    relations = []
-    for join in spec._info.joins:
-        pairs = _labels(ground_truth, join.prompt).true_pairs
-        pairs = pairs.select(["left_id", "right_id"]).rename_columns(
-            list(join.relations))
-        relations.append(_apply_conditions(pairs, join, spec, corpus_rows))
+    relations = _expected_pairs(spec, ground_truth, corpus_rows)
+    _check_joined_labels(spec, ground_truth, survivors, relations)
     if relations:
         rows = _join_all(relations)
     else:
@@ -595,23 +682,39 @@ def expected_rows(spec: QuerySpec, ground_truth, corpus_rows) -> pa.Table:
     return _with_labels(rows, spec, expected_labels(spec, ground_truth))
 
 
-def label_agreement(table: pa.Table, alias: str, labels) -> LabelCounts:
+def label_agreement(table: pa.Table, aliases, labels) -> LabelCounts:
     """Count a classify answer table's agreement with its reference labels.
+
+    Args:
+        table: One id column per alias and a string `label` column.
+        aliases: The id columns: the anchor, then a pair's partner.
+        labels: The `PredicateLabels` of the classification.
+
+    Returns:
+        The counts. A pair the reference join does not keep has no
+        reference label; such a classified pair counts as unlabeled.
 
     Raises:
         KeyError: A document the engine classified has no label.
     """
-    answers = _label_table(table, alias, "predicted")
-    reference = labels.table.select(["left_id", "label"]).rename_columns(
-        [alias, "expected"])
-    joined = answers.join(reference, keys=[alias], join_type="left outer")
+    aliases = list(aliases)
+    answers = _label_table(table, aliases, "predicted")
+    reference = labels.table.select(
+        [*("left_id", "right_id")[:len(aliases)], "label"]
+    ).rename_columns([*aliases, "expected"])
+    joined = answers.join(reference, keys=aliases, join_type="left outer")
     expected = joined.column("expected")
-    if expected.null_count:
+    unlabeled = expected.null_count
+    if unlabeled and len(aliases) == 1:
         raise KeyError(
-            f"no ground truth for {labels.key} and {expected.null_count} "
+            f"no ground truth for {labels.key} and {unlabeled} "
             "classified rows")
+    if unlabeled:
+        joined = joined.filter(pc.is_valid(expected))
+        expected = joined.column("expected")
     correct = pc.sum(pc.equal(joined.column("predicted"), expected)).as_py()
-    return LabelCounts(correct=correct or 0, evaluated=joined.num_rows)
+    return LabelCounts(correct=correct or 0, evaluated=joined.num_rows,
+                       unlabeled=unlabeled)
 
 
 def agreement(table: pa.Table, aliases, labels) -> BinaryCounts:
@@ -626,31 +729,31 @@ def agreement(table: pa.Table, aliases, labels) -> BinaryCounts:
         KeyError: A row the engine answered has no label.
     """
     aliases = list(aliases)
-    answers = pa.table({
-        **{alias: pc.cast(table.column(alias), pa.string())
-           for alias in aliases},
-        "predicted": pc.cast(table.column("answer"), pa.bool_()),
-    })
-    reference = labels.table.select(
-        [*("left_id", "right_id")[:len(aliases)], "answer"]
-    ).rename_columns([*aliases, "expected"])
-    joined = answers.join(reference, keys=aliases, join_type="left outer")
-    expected = joined.column("expected")
-    if expected.null_count:
+    reference = labels.table
+    reference_keys, keys, count = tuple_keys(
+        [reference.column(name)
+         for name in ("left_id", "right_id")[:len(aliases)]],
+        [table.column(alias) for alias in aliases])
+    expected = lookup(
+        reference_keys,
+        np.asarray(pc.cast(reference.column("answer"), pa.int8())),
+        count, keys)
+    missing = int(np.count_nonzero(expected < 0))
+    if missing:
         raise KeyError(
-            f"no ground truth for {labels.key} and {expected.null_count} "
-            "answered rows")
-    predicted = joined.column("predicted")
+            f"no ground truth for {labels.key} and {missing} answered rows")
+    expected = expected.astype(bool)
+    predicted = np.asarray(pc.cast(table.column("answer"), pa.bool_()))
 
-    def count(mask):
-        return pc.sum(mask).as_py() or 0
+    def number(mask):
+        return int(np.count_nonzero(mask))
 
     counts = BinaryCounts(
-        evaluated=joined.num_rows,
-        true_positive=count(pc.and_(predicted, expected)),
-        true_negative=count(pc.and_(pc.invert(predicted), pc.invert(expected))),
-        false_positive=count(pc.and_(predicted, pc.invert(expected))),
-        false_negative=count(pc.and_(pc.invert(predicted), expected)),
+        evaluated=len(predicted),
+        true_positive=number(predicted & expected),
+        true_negative=number(~predicted & ~expected),
+        false_positive=number(predicted & ~expected),
+        false_negative=number(~predicted & expected),
     )
     counts.correct = counts.true_positive + counts.true_negative
     return counts
@@ -679,6 +782,73 @@ def _projection(selected, from_clause: str, distinct: bool) -> str:
             f"FROM {from_clause}")
 
 
+def _distinct(table: pa.Table) -> pa.Table:
+    """Return the table's distinct rows, every column as a string."""
+    table = pa.table({name: pc.cast(table.column(name), pa.string())
+                      for name in table.column_names})
+    return table.group_by(table.column_names).aggregate([])
+
+
+def join_size(tables: list[pa.Table]) -> int:
+    """Return the row count of the natural join of distinct tables.
+
+    The join is never built. Each table gets a weight of 1 per row, and
+    columns are summed out one at a time: the tables that hold the
+    column are joined on their shared columns, their weights multiplied,
+    and the result grouped by its other columns with the weights
+    summed. The column held by the fewest other columns goes first, so
+    for a chain of pair tables no intermediate outgrows a pair table.
+    """
+    factors = [_distinct(table) for table in tables]
+    factors = [table.append_column(
+        "weight", pa.array([1] * table.num_rows, pa.int64()))
+        for table in factors]
+    total = 1
+    while True:
+        columns = {name for table in factors for name in table.column_names
+                   if name != "weight"}
+        if not columns:
+            break
+
+        def neighbors(column):
+            return {name for table in factors
+                    if column in table.column_names
+                    for name in table.column_names} - {column, "weight"}
+
+        column = min(sorted(columns), key=lambda name: len(neighbors(name)))
+        holding = [table for table in factors if column in table.column_names]
+        factors = [table for table in factors
+                   if column not in table.column_names]
+        joined = holding[0]
+        for table in holding[1:]:
+            table = table.rename_columns(
+                [name if name != "weight" else "partner_weight"
+                 for name in table.column_names])
+            shared = sorted((set(joined.column_names) - {"weight"})
+                            & set(table.column_names))
+            joined = joined.join(table, keys=shared, join_type="inner")
+            joined = joined.set_column(
+                joined.column_names.index("weight"), "weight",
+                pc.multiply(joined.column("weight"),
+                            joined.column("partner_weight")))
+            joined = joined.drop_columns(["partner_weight"])
+        keep = sorted(set(joined.column_names) - {column, "weight"})
+        if keep:
+            factors.append(joined.group_by(keep).aggregate(
+                [("weight", "sum")]).rename_columns(keep + ["weight"]))
+        else:
+            total *= pc.sum(joined.column("weight")).as_py() or 0
+    for table in factors:
+        total *= pc.sum(table.column("weight")).as_py() or 0
+    return total
+
+
+def _intersection(left: pa.Table, right: pa.Table) -> pa.Table:
+    """Return the distinct rows in both tables, which share their columns."""
+    left, right = _distinct(left), _distinct(right)
+    return left.join(right, keys=left.column_names, join_type="inner")
+
+
 def row_counts(spec: QuerySpec, output: RunOutput, ground_truth,
                corpus_rows) -> tuple[int, int, int]:
     """Return (predicted, expected, matched) result rows, without building them.
@@ -691,7 +861,9 @@ def row_counts(spec: QuerySpec, output: RunOutput, ground_truth,
     survives both, so the matched rows are the join over the
     intersected pairs and survivors. DuckDB streams these joins and
     counts them, so a result of hundreds of millions of rows is never
-    held in memory. An untraced run's rows are counted as saved.
+    held in memory. When every alias is selected, the joined tuples are
+    distinct and the counts are join sizes, computed without walking the
+    rows (`join_size`). An untraced run's rows are counted as saved.
     """
     import duckdb
 
@@ -699,30 +871,36 @@ def row_counts(spec: QuerySpec, output: RunOutput, ground_truth,
     selected_aliases = {name.split(".")[0] for name in spec._info.select}
     aliases = [relation.alias for relation in spec._info.relations]
     # with every alias selected, the joined tuples are already distinct;
-    # a label column is a function of its alias's id
+    # a label column is a function of its alias's id, or of a pair's ids
     distinct = selected_aliases != set(aliases)
     returned_labels = [operator.output for operator in _selected_labels(spec)]
     with tempfile.TemporaryDirectory(prefix="quail_b_rows_") as spill:
         con = duckdb.connect()
         con.execute(f"SET temp_directory = '{spill}'")
+        tables = {}
+
+        def register(name, table):
+            con.register(name, table)
+            tables[name] = table
 
         def ids(name, values):
-            con.register(name, pa.table({
+            register(name, pa.table({
                 name.split(":", 1)[1]: pa.array(sorted(values), pa.string())}))
 
-        for alias, values in expected_survivors(
-                spec, ground_truth, corpus_rows).items():
+        def size(names) -> int:
+            return join_size([tables[name] for name in names])
+
+        survivors = expected_survivors(spec, ground_truth, corpus_rows)
+        for alias, values in survivors.items():
             ids(f"expected:{alias}", values)
-        for index, join in enumerate(spec._info.joins):
-            pairs = _labels(ground_truth, join.prompt).true_pairs
-            pairs = pairs.select(["left_id", "right_id"]).rename_columns(
-                list(join.relations))
-            con.register(f"expected_pairs:{index}",
-                         _apply_conditions(pairs, join, spec, corpus_rows))
+        pairs = _expected_pairs(spec, ground_truth, corpus_rows)
+        _check_joined_labels(spec, ground_truth, survivors, pairs)
+        for index, table in enumerate(pairs):
+            register(f"expected_pairs:{index}", table)
         reference_labels = expected_labels(spec, ground_truth)
         for output_name in returned_labels:
-            con.register(f"expected_labels:{output_name}",
-                         reference_labels[output_name])
+            register(f"expected_labels:{output_name}",
+                     reference_labels[output_name])
         expected_pairs = [f"expected_pairs:{i}"
                           for i in range(len(spec._info.joins))] + [
             f"expected_labels:{name}" for name in returned_labels]
@@ -732,7 +910,9 @@ def row_counts(spec: QuerySpec, output: RunOutput, ground_truth,
         def count(query: str) -> int:
             return con.execute(f"SELECT COUNT(*) FROM ({query})").fetchone()[0]
 
-        expected_count = count(_projection(selected, expected_from, distinct))
+        expected_names = expected_pairs + [f"expected:{alias}" for alias in aliases]
+        expected_count = (count(_projection(selected, expected_from, True))
+                          if distinct else size(expected_names))
         answers = scores_from_answers(spec, output, corpus_rows)
         if answers is None:
             # an untraced run: its saved rows, as strings like the ids above
@@ -758,30 +938,27 @@ def row_counts(spec: QuerySpec, output: RunOutput, ground_truth,
                     .to_pylist())
                 engine_ids.append(f"corpus:{alias}")
         for index, relation in enumerate(relations):
-            con.register(f"engine_pairs:{index}", relation)
+            register(f"engine_pairs:{index}", relation)
         engine_labels = answer_labels(spec, output.classify_answers)
         for output_name in returned_labels:
-            con.register(f"engine_labels:{output_name}",
-                         engine_labels[output_name])
+            register(f"engine_labels:{output_name}",
+                     engine_labels[output_name])
         engine_pairs = [f"engine_pairs:{i}" for i in range(len(relations))] + [
             f"engine_labels:{name}" for name in returned_labels]
         engine_from = _chain(engine_pairs, engine_ids)
-        predicted_count = count(_projection(selected, engine_from, distinct))
         if distinct:
+            predicted_count = count(_projection(selected, engine_from, True))
             matched_count = count(
                 f"({_projection(selected, expected_from, True)}) INTERSECT "
                 f"({_projection(selected, engine_from, True)})")
         else:
-            for index, (expected_name, engine_name) in enumerate(
-                    zip(expected_pairs, engine_pairs)):
-                con.execute(
-                    f"CREATE VIEW {_quoted(f'both_pairs:{index}')} AS "
-                    f"SELECT * FROM {_quoted(expected_name)} INTERSECT "
-                    f"SELECT * FROM {_quoted(engine_name)}")
-            matched_count = count(_projection(selected, _chain(
-                [f"both_pairs:{i}" for i in range(len(engine_pairs))],
-                [f"expected:{alias}" for alias in aliases] + engine_ids),
-                False))
+            predicted_count = size(engine_pairs + engine_ids)
+            matched_count = join_size(
+                [_intersection(tables[expected_name], tables[engine_name])
+                 for expected_name, engine_name in zip(expected_pairs,
+                                                       engine_pairs)]
+                + [tables[f"expected:{alias}"] for alias in aliases]
+                + [tables[name] for name in engine_ids])
         return predicted_count, expected_count, matched_count
 
 
@@ -811,7 +988,7 @@ def evaluate(spec: QuerySpec, output: RunOutput, ground_truth, corpus_rows) -> d
     for operator_id, table in (output.classify_answers or {}).items():
         operator = classifies[operator_id]
         labels = _classify_labels(ground_truth, operator)
-        counts = label_agreement(table, operator.relation, labels)
+        counts = label_agreement(table, operator.relations, labels)
         label_total.merge(counts)
         per_predicate.append({
             "predicate_key": labels.key, "op": "classify",

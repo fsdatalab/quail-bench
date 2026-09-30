@@ -14,8 +14,8 @@ from quail_b.prompts import (
 )
 from quail_b.queries import (
     FILTER_SELECTIVITY_ESTIMATES,
+    IN_LIST_SELECTIVITY_ESTIMATES,
     JOIN_SELECTIVITY_ESTIMATES,
-    LABEL_SELECTIVITY_ESTIMATES,
     PRIVACY_QUERIES,
     QUERIES,
     QUERY_FAMILY_WORKLOADS,
@@ -37,14 +37,14 @@ from quail_b.substrait import (
 from tools.make_substrait_plans import write_plans
 
 
-def test_catalog_has_the_41_default_queries_and_two_privacy_queries():
-    assert len(QUERIES) == 41
+def test_catalog_has_the_43_default_queries_and_two_privacy_queries():
+    assert len(QUERIES) == 43
     assert QUERY_ORDER == (
-        *(f"IMDB-{i}" for i in range(1, 15)),
+        *(f"IMDB-{i}" for i in range(1, 16)),
         *(f"BIO-{i}" for i in range(1, 7)),
         *(f"FEV-{i}" for i in range(1, 12)),
         *(f"LEP-{i}" for i in range(1, 7)),
-        *(f"AGENT-{i}" for i in range(1, 5)),
+        *(f"AGENT-{i}" for i in range(1, 6)),
     )
     assert [spec.id for spec in PRIVACY_QUERIES] == ["PRIV-1", "PRIV-2"]
     assert list(queries(include_privacy=True)) == [*QUERY_ORDER, "PRIV-1", "PRIV-2"]
@@ -59,9 +59,9 @@ def test_catalog_has_the_41_default_queries_and_two_privacy_queries():
             for join in info.joins
         ), spec.id
         assert all(
-            (info.classify_output(label_filter.output).prompt,
-             frozenset(label_filter.accepted)) in LABEL_SELECTIVITY_ESTIMATES
-            for label_filter in info.label_filters
+            (info.classify_output(in_list.output).prompt,
+             frozenset(in_list.accepted)) in IN_LIST_SELECTIVITY_ESTIMATES
+            for in_list in info.in_lists
         ), spec.id
         if not info.classifies:
             assert all(name.endswith(".id") for name in info.select), spec.id
@@ -232,6 +232,9 @@ def test_ai_extension_definition_is_packaged():
     assert "urn: extension:org.fsdatalab.quail_b:functions_ai" in extension
     assert "name: ai_filter" in extension
     assert "name: ai_join" in extension
+    assert "name: ai_classify" in extension
+    # one document, and a pair: prompt, two documents, labels, descriptions
+    assert extension.count("- name: document") == 4
 
 
 def test_substrait_plans_are_packaged():
@@ -239,7 +242,7 @@ def test_substrait_plans_are_packaged():
     catalog = package.joinpath("plans", "catalog.json")
     entries = json.loads(catalog.read_text())
 
-    assert len(entries) == 43
+    assert len(entries) == 45
     assert not any(entry.get("labels_pending") for entry in entries)
     assert all(
         package.joinpath("plans", f"{entry['id']}.json").is_file()
@@ -262,9 +265,9 @@ def test_checked_in_plans_equal_the_generator_output(tmp_path):
 def test_parallel_query_split_matches_stock_vllm():
     assert split_query_ids(QUERY_ORDER, 4) == (
         QUERY_ORDER[0:11],
-        QUERY_ORDER[11:21],
-        QUERY_ORDER[21:31],
-        QUERY_ORDER[31:41],
+        QUERY_ORDER[11:22],
+        QUERY_ORDER[22:33],
+        QUERY_ORDER[33:43],
     )
 
 
@@ -277,13 +280,13 @@ def test_query_family_split_matches_benchmark_catalog():
         "AGENT": "agent",
     }
     assert split_query_families(QUERY_ORDER) == (
-        QUERY_ORDER[0:14],
-        QUERY_ORDER[14:20],
-        QUERY_ORDER[20:31],
-        QUERY_ORDER[31:37],
-        QUERY_ORDER[37:41],
+        QUERY_ORDER[0:15],
+        QUERY_ORDER[15:21],
+        QUERY_ORDER[21:32],
+        QUERY_ORDER[32:38],
+        QUERY_ORDER[38:43],
     )
-    assert query_family_name(QUERY_ORDER[0:14]) == "imdb"
+    assert query_family_name(QUERY_ORDER[0:15]) == "imdb"
 
 
 def test_query_family_rejects_mixed_or_unknown_queries():
@@ -296,6 +299,8 @@ def test_query_family_rejects_mixed_or_unknown_queries():
 @pytest.mark.parametrize("query_id, expected", [
     ("IMDB-2", "f3b93b898b0d631fb451046b072920cb81f12d5aabb8dc1b853f913030b4f45e"),
     ("LEP-5", "6ca4bd71ae0304b98448d295d35213853c2d52242f8cc5bf23a817b0b9889a88"),
+    # a one-document classification with an IN-list filter
+    ("IMDB-14", "80c0d0927d64080e0d03936da550ce7c96ac0fc88bba22f8e0b2b793c35b9de9"),
 ])
 def test_raw_query_hash_matches_before_chat(query_id, expected, monkeypatch):
     import importlib
