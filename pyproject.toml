@@ -12,9 +12,12 @@ dependencies = [
     "huggingface-hub>=0.26",
     "datasets>=5.0.1",
     "transformers>=4.48",
+    # tokenizes documents for the token minimum
+    "gigatoken>=0.10",
+    "awkward>=2",
     "substrait-protobuf==0.103.0",
     "protobuf>=6.31.1,<7",
-    # counts result rows of a join chain without materializing them
+    # counts distinct result rows of a join chain without materializing them
     "duckdb>=1.1,<2",
 ]
 

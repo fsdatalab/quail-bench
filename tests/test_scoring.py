@@ -20,6 +20,7 @@ from quail_b.scoring import (
     RunOutput,
     evaluate,
     expected_rows,
+    join_size,
     rows_from_answers,
 )
 from tools.make_substrait_plans import Filter, Join, Scan, build_plan
@@ -737,3 +738,35 @@ def test_row_sample_is_taken_chunk_by_chunk():
     assert sample.column("r").to_pylist() == [
         f"r{i}" for i in range(0, step * 50, step)]
     assert _sample_rows(table, 1000) is table
+
+
+def _brute_join_size(tables):
+    rows = [{}]
+    for table in tables:
+        records = {tuple(sorted(record.items()))
+                   for record in table.to_pylist()}
+        rows = [{**row, **dict(record)} for row in rows for record in records
+                if all(row.get(key, value) == value for key, value in record)]
+    return len(rows)
+
+
+def test_join_size_counts_a_chain_without_building_it():
+    import random
+
+    rng = random.Random(7)
+
+    def pairs(left, right, n):
+        return pa.table({
+            left: [f"{left}{rng.randrange(6)}" for _ in range(n)],
+            right: [f"{right}{rng.randrange(4)}" for _ in range(n)]})
+
+    # r1 - a1 - r2 - a2, with duplicate pairs and survivors on r1 and a2
+    tables = [pairs("r1", "a1", 30), pairs("r2", "a1", 30),
+              pairs("r2", "a2", 30),
+              pa.table({"r1": ["r10", "r11", "r13", "r13"]}),
+              pa.table({"a2": ["a20", "a22"]})]
+    assert join_size(tables) == _brute_join_size(tables) > 0
+    # a table sharing no column multiplies the count
+    other = pa.table({"x": ["x0", "x1", "x2"]})
+    assert join_size(tables + [other]) == 3 * join_size(tables)
+    assert join_size([pa.table({"r1": pa.array([], pa.string())})]) == 0

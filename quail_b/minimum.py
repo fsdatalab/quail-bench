@@ -177,13 +177,22 @@ def _pair_piece(item, relations, kind) -> dict:
 
 @lru_cache(maxsize=4)
 def load_tokenizer(name: str):
-    """Return a callable tokenizing a list of texts, from HuggingFace."""
-    from transformers import AutoTokenizer
+    """Return a callable tokenizing a list of texts with Gigatoken.
 
-    tokenizer = AutoTokenizer.from_pretrained(name)
+    Gigatoken loads the Hugging Face tokenizer `name` and encodes a
+    batch in parallel, without special tokens. Each document's ids are
+    a view into one flat array.
+    """
+    import awkward
+    from gigatoken import Tokenizer
+
+    tokenizer = Tokenizer(name)
 
     def encode(texts):
-        return tokenizer(list(texts), add_special_tokens=False)["input_ids"]
+        batch = tokenizer.encode_batch(list(texts))
+        flat = _tokens(awkward.to_numpy(awkward.flatten(batch)))
+        ends = np.cumsum(awkward.to_numpy(awkward.num(batch)))
+        return np.split(flat, ends[:-1]) if len(ends) else []
 
     return encode
 

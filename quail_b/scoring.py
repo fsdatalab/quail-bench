@@ -780,6 +780,73 @@ def _projection(selected, from_clause: str, distinct: bool) -> str:
             f"FROM {from_clause}")
 
 
+def _distinct(table: pa.Table) -> pa.Table:
+    """Return the table's distinct rows, every column as a string."""
+    table = pa.table({name: pc.cast(table.column(name), pa.string())
+                      for name in table.column_names})
+    return table.group_by(table.column_names).aggregate([])
+
+
+def join_size(tables: list[pa.Table]) -> int:
+    """Return the row count of the natural join of distinct tables.
+
+    The join is never built. Each table gets a weight of 1 per row, and
+    columns are summed out one at a time: the tables that hold the
+    column are joined on their shared columns, their weights multiplied,
+    and the result grouped by its other columns with the weights
+    summed. The column held by the fewest other columns goes first, so
+    for a chain of pair tables no intermediate outgrows a pair table.
+    """
+    factors = [_distinct(table) for table in tables]
+    factors = [table.append_column(
+        "weight", pa.array([1] * table.num_rows, pa.int64()))
+        for table in factors]
+    total = 1
+    while True:
+        columns = {name for table in factors for name in table.column_names
+                   if name != "weight"}
+        if not columns:
+            break
+
+        def neighbors(column):
+            return {name for table in factors
+                    if column in table.column_names
+                    for name in table.column_names} - {column, "weight"}
+
+        column = min(sorted(columns), key=lambda name: len(neighbors(name)))
+        holding = [table for table in factors if column in table.column_names]
+        factors = [table for table in factors
+                   if column not in table.column_names]
+        joined = holding[0]
+        for table in holding[1:]:
+            table = table.rename_columns(
+                [name if name != "weight" else "partner_weight"
+                 for name in table.column_names])
+            shared = sorted((set(joined.column_names) - {"weight"})
+                            & set(table.column_names))
+            joined = joined.join(table, keys=shared, join_type="inner")
+            joined = joined.set_column(
+                joined.column_names.index("weight"), "weight",
+                pc.multiply(joined.column("weight"),
+                            joined.column("partner_weight")))
+            joined = joined.drop_columns(["partner_weight"])
+        keep = sorted(set(joined.column_names) - {column, "weight"})
+        if keep:
+            factors.append(joined.group_by(keep).aggregate(
+                [("weight", "sum")]).rename_columns(keep + ["weight"]))
+        else:
+            total *= pc.sum(joined.column("weight")).as_py() or 0
+    for table in factors:
+        total *= pc.sum(table.column("weight")).as_py() or 0
+    return total
+
+
+def _intersection(left: pa.Table, right: pa.Table) -> pa.Table:
+    """Return the distinct rows in both tables, which share their columns."""
+    left, right = _distinct(left), _distinct(right)
+    return left.join(right, keys=left.column_names, join_type="inner")
+
+
 def row_counts(spec: QuerySpec, output: RunOutput, ground_truth,
                corpus_rows) -> tuple[int, int, int]:
     """Return (predicted, expected, matched) result rows, without building them.
@@ -792,7 +859,9 @@ def row_counts(spec: QuerySpec, output: RunOutput, ground_truth,
     survives both, so the matched rows are the join over the
     intersected pairs and survivors. DuckDB streams these joins and
     counts them, so a result of hundreds of millions of rows is never
-    held in memory. An untraced run's rows are counted as saved.
+    held in memory. When every alias is selected, the joined tuples are
+    distinct and the counts are join sizes, computed without walking the
+    rows (`join_size`). An untraced run's rows are counted as saved.
     """
     import duckdb
 
@@ -806,10 +875,18 @@ def row_counts(spec: QuerySpec, output: RunOutput, ground_truth,
     with tempfile.TemporaryDirectory(prefix="quail_b_rows_") as spill:
         con = duckdb.connect()
         con.execute(f"SET temp_directory = '{spill}'")
+        tables = {}
+
+        def register(name, table):
+            con.register(name, table)
+            tables[name] = table
 
         def ids(name, values):
-            con.register(name, pa.table({
+            register(name, pa.table({
                 name.split(":", 1)[1]: pa.array(sorted(values), pa.string())}))
+
+        def size(names) -> int:
+            return join_size([tables[name] for name in names])
 
         survivors = expected_survivors(spec, ground_truth, corpus_rows)
         for alias, values in survivors.items():
@@ -817,11 +894,11 @@ def row_counts(spec: QuerySpec, output: RunOutput, ground_truth,
         pairs = _expected_pairs(spec, ground_truth, corpus_rows)
         _check_joined_labels(spec, ground_truth, survivors, pairs)
         for index, table in enumerate(pairs):
-            con.register(f"expected_pairs:{index}", table)
+            register(f"expected_pairs:{index}", table)
         reference_labels = expected_labels(spec, ground_truth)
         for output_name in returned_labels:
-            con.register(f"expected_labels:{output_name}",
-                         reference_labels[output_name])
+            register(f"expected_labels:{output_name}",
+                     reference_labels[output_name])
         expected_pairs = [f"expected_pairs:{i}"
                           for i in range(len(spec._info.joins))] + [
             f"expected_labels:{name}" for name in returned_labels]
@@ -831,7 +908,9 @@ def row_counts(spec: QuerySpec, output: RunOutput, ground_truth,
         def count(query: str) -> int:
             return con.execute(f"SELECT COUNT(*) FROM ({query})").fetchone()[0]
 
-        expected_count = count(_projection(selected, expected_from, distinct))
+        expected_names = expected_pairs + [f"expected:{alias}" for alias in aliases]
+        expected_count = (count(_projection(selected, expected_from, True))
+                          if distinct else size(expected_names))
         answers = scores_from_answers(spec, output, corpus_rows)
         if answers is None:
             # an untraced run: its saved rows, as strings like the ids above
@@ -857,30 +936,27 @@ def row_counts(spec: QuerySpec, output: RunOutput, ground_truth,
                     .to_pylist())
                 engine_ids.append(f"corpus:{alias}")
         for index, relation in enumerate(relations):
-            con.register(f"engine_pairs:{index}", relation)
+            register(f"engine_pairs:{index}", relation)
         engine_labels = answer_labels(spec, output.classify_answers)
         for output_name in returned_labels:
-            con.register(f"engine_labels:{output_name}",
-                         engine_labels[output_name])
+            register(f"engine_labels:{output_name}",
+                     engine_labels[output_name])
         engine_pairs = [f"engine_pairs:{i}" for i in range(len(relations))] + [
             f"engine_labels:{name}" for name in returned_labels]
         engine_from = _chain(engine_pairs, engine_ids)
-        predicted_count = count(_projection(selected, engine_from, distinct))
         if distinct:
+            predicted_count = count(_projection(selected, engine_from, True))
             matched_count = count(
                 f"({_projection(selected, expected_from, True)}) INTERSECT "
                 f"({_projection(selected, engine_from, True)})")
         else:
-            for index, (expected_name, engine_name) in enumerate(
-                    zip(expected_pairs, engine_pairs)):
-                con.execute(
-                    f"CREATE VIEW {_quoted(f'both_pairs:{index}')} AS "
-                    f"SELECT * FROM {_quoted(expected_name)} INTERSECT "
-                    f"SELECT * FROM {_quoted(engine_name)}")
-            matched_count = count(_projection(selected, _chain(
-                [f"both_pairs:{i}" for i in range(len(engine_pairs))],
-                [f"expected:{alias}" for alias in aliases] + engine_ids),
-                False))
+            predicted_count = size(engine_pairs + engine_ids)
+            matched_count = join_size(
+                [_intersection(tables[expected_name], tables[engine_name])
+                 for expected_name, engine_name in zip(expected_pairs,
+                                                       engine_pairs)]
+                + [tables[f"expected:{alias}"] for alias in aliases]
+                + [tables[name] for name in engine_ids])
         return predicted_count, expected_count, matched_count
 
 
