@@ -201,17 +201,17 @@
   },
   {
     "id": "AGENT-3",
-    "description": "recovered -> classify: whether the agent resolved the issue",
+    "description": "recovered -> classify: how far the agent has gotten",
     "privacy": false
   },
   {
     "id": "AGENT-4",
-    "description": "unresolved traces -> classify: why the agent failed",
+    "description": "traces that changed the code -> classify: what the latest test or reproduction run showed",
     "privacy": false
   },
   {
     "id": "AGENT-5",
-    "description": "classify every trace three ways: outcome, the project's PyPI topic, and the defect type of the bug",
+    "description": "classify every trace three ways: how far the agent has gotten, the project's PyPI topic, and the defect type of the bug",
     "privacy": false
   },
   {

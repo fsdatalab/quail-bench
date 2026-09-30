@@ -12,8 +12,9 @@ from google.protobuf.message import DecodeError
 from substrait import plan_pb2
 
 from quail_b.prompts import (
+    AGENT_CHANGED_CODE,
     AGENT_IMPLEMENTED_FIX,
-    AGENT_OUTCOME,
+    AGENT_PROGRESS,
     AGENT_RECOVERED,
     ASPECT_SENTIMENT,
     BIO_ORGAN_CLASS,
@@ -85,7 +86,8 @@ IN_LIST_SELECTIVITY_ESTIMATES = {
         109 / 1127,
     (FEV_TOPIC, frozenset({"politics", "history"})): 46 / 500,
     (LEP_AREA, frozenset({"constitutional law", "criminal law"})): 159 / 500,
-    (AGENT_OUTCOME, frozenset({"not resolved"})): 1112 / 1772,
+    # from gt_72abc9af3feaea668e493ece67e980a0
+    (AGENT_PROGRESS, frozenset(AGENT_CHANGED_CODE)): 639 / 1772,
 }
 
 

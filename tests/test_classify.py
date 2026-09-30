@@ -40,10 +40,10 @@ def test_classification_queries_are_published():
 def test_agent_5_classifies_each_trace_three_ways():
     info = quail_b.get_query("AGENT-5")._info
     assert [operator.output for operator in info.classifies] == [
-        "outcome", "domain", "root_cause"]
+        "progress", "domain", "root_cause"]
     assert {operator.relation for operator in info.classifies} == {"t"}
     assert not info.filters and not info.in_lists and not info.joins
-    assert info.select == ("t.id", "t.outcome", "t.domain", "t.root_cause")
+    assert info.select == ("t.id", "t.progress", "t.domain", "t.root_cause")
 
 
 def test_every_classification_has_one_predicate():
@@ -71,9 +71,10 @@ def test_plans_carry_label_columns_and_filters():
     assert in_list.accepted == ("negative", "mixed")
     agent = quail_b.get_query("AGENT-4")._info
     assert [operator.output for operator in agent.classifies] == [
-        "outcome", "failure"]
-    assert agent.classifies[0].descriptions == prompts.AGENT_OUTCOME_DESCRIPTIONS
-    assert agent.classifies[1].descriptions == prompts.AGENT_FAILURE_DESCRIPTIONS
+        "progress", "test_result"]
+    assert agent.in_lists[0].accepted == prompts.AGENT_CHANGED_CODE
+    assert agent.classifies[1].descriptions == (
+        prompts.AGENT_TEST_RESULT_DESCRIPTIONS)
     assert quail_b.get_query("IMDB-12")._info.classifies[0].descriptions == (
         ("",) * len(prompts.IMDB_GENRE_LABELS))
 
@@ -406,8 +407,8 @@ def test_rows_must_follow_the_classification_answers(tmp_path):
 
 def test_two_label_columns_and_chained_calls(tmp_path):
     complaint = predicates.PREDICATE_BY_KEY["quailb.imdb.review.main_complaint"]
-    outcome = predicates.PREDICATE_BY_KEY["quailb.agent.trace.outcome"]
-    failure = predicates.PREDICATE_BY_KEY["quailb.agent.trace.failure_mode"]
+    progress = predicates.PREDICATE_BY_KEY["quailb.agent.trace.progress"]
+    result = predicates.PREDICATE_BY_KEY["quailb.agent.trace.test_result"]
     topic = predicates.PREDICATE_BY_KEY["quailb.fever.claim.topic"]
     _collection(tmp_path, {
         "reviews": pa.table({"id": ["r0", "r1", "r2"],
@@ -425,10 +426,11 @@ def test_two_label_columns_and_chained_calls(tmp_path):
         (_classify_predicate(complaint), [
             ("r0", "slow pacing"), ("r1", "no specific complaint"),
             ("r2", "poor acting")]),
-        (_classify_predicate(outcome), [("t0", "resolved"),
-                                        ("t1", "not resolved")]),
-        (_classify_predicate(failure), [("t0", "made an incorrect fix"),
-                                        ("t1", "ran out of steps")]),
+        (_classify_predicate(progress), [
+            ("t0", "located the relevant code"),
+            ("t1", "changed the code, check fails")]),
+        (_classify_predicate(result), [("t0", "bug still occurs"),
+                                       ("t1", "bug still occurs")]),
         (_classify_predicate(topic), [("c0", "politics"), ("c1", "sports"),
                                       ("c2", "history")]),
     ])
@@ -449,11 +451,14 @@ def test_two_label_columns_and_chained_calls(tmp_path):
                                          ["slow pacing", "poor writing"])})
         if spec.id == "AGENT-4":
             return quail_b.RunOutput(
-                {}, {}, pa.table({"t": ["t1"], "failure": ["ran out of steps"]}),
+                {}, {}, pa.table({
+                    "t": ["t1"], "progress": ["changed the code, check fails"],
+                    "test_result": ["bug still occurs"]}),
                 runtime_s=1.0, classify_answers={
-                    "classify-1": labels("t", ["t0", "t1"],
-                                         ["resolved", "not resolved"]),
-                    "classify-2": labels("t", ["t1"], ["ran out of steps"])})
+                    "classify-1": labels(
+                        "t", ["t0", "t1"], ["located the relevant code",
+                                            "changed the code, check fails"]),
+                    "classify-2": labels("t", ["t1"], ["bug still occurs"])})
         return quail_b.RunOutput(
             {}, {}, pa.table({"c": ["c0", "c2"],
                               "topic": ["politics", "history"]}),

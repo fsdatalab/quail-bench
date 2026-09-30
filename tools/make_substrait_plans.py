@@ -510,10 +510,10 @@ def _organ_class(node):
                      prompts.BIO_ORGAN_CLASS_LABELS, "organ_class")
 
 
-def _outcome(node):
-    return _classify(node, prompts.AGENT_OUTCOME,
-                     prompts.AGENT_OUTCOME_LABELS, "outcome",
-                     prompts.AGENT_OUTCOME_DESCRIPTIONS)
+def _progress(node):
+    return _classify(node, prompts.AGENT_PROGRESS,
+                     prompts.AGENT_PROGRESS_LABELS, "progress",
+                     prompts.AGENT_PROGRESS_DESCRIPTIONS)
 
 
 def _imdb_chain(first):
@@ -680,23 +680,24 @@ QUERIES = (
           _filters(_traces(), AGENT_RECOVERED)),
     Query("AGENT-2", "filter: implemented a plausible fix",
           _filters(_traces(), AGENT_IMPLEMENTED_FIX)),
-    Query("AGENT-3", "recovered -> classify: whether the agent resolved "
-          "the issue",
-          _outcome(_filters(_traces(), AGENT_RECOVERED)),
-          select=("t", "t.outcome")),
-    Query("AGENT-4", "unresolved traces -> classify: why the agent failed",
-          _classify(InList(_outcome(_traces()), "outcome",
-                           ("not resolved",)),
-                    prompts.AGENT_FAILURE, prompts.AGENT_FAILURE_LABELS,
-                    "failure", prompts.AGENT_FAILURE_DESCRIPTIONS),
-          select=("t", "t.failure")),
-    Query("AGENT-5", "classify every trace three ways: outcome, the "
-          "project's PyPI topic, and the defect type of the bug",
-          _classify(_classify(_outcome(_traces()), prompts.AGENT_DOMAIN,
+    Query("AGENT-3", "recovered -> classify: how far the agent has gotten",
+          _progress(_filters(_traces(), AGENT_RECOVERED)),
+          select=("t", "t.progress")),
+    Query("AGENT-4", "traces that changed the code -> classify: what the "
+          "latest test or reproduction run showed",
+          _classify(InList(_progress(_traces()), "progress",
+                           prompts.AGENT_CHANGED_CODE),
+                    prompts.AGENT_TEST_RESULT, prompts.AGENT_TEST_RESULT_LABELS,
+                    "test_result", prompts.AGENT_TEST_RESULT_DESCRIPTIONS),
+          select=("t", "t.progress", "t.test_result")),
+    Query("AGENT-5", "classify every trace three ways: how far the agent "
+          "has gotten, the project's PyPI topic, and the defect type of the "
+          "bug",
+          _classify(_classify(_progress(_traces()), prompts.AGENT_DOMAIN,
                               prompts.AGENT_DOMAIN_LABELS, "domain"),
                     prompts.AGENT_ROOT_CAUSE, prompts.AGENT_ROOT_CAUSE_LABELS,
                     "root_cause", prompts.AGENT_ROOT_CAUSE_DESCRIPTIONS),
-          select=("t", "t.outcome", "t.domain", "t.root_cause")),
+          select=("t", "t.progress", "t.domain", "t.root_cause")),
 
     # PrivacyPolicies: only when that corpus is available.
     Query("PRIV-1", "2 filters: P_MSG + P_LOC",

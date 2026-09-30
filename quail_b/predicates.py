@@ -179,15 +179,15 @@ CLASSIFY_PREDICATES = (
         "classify", prompts.LEP_AREA, "excerpt", "citation_contexts",
         "destination_context", labels=prompts.LEP_AREA_LABELS),
     PredicateSpec(
-        "quailb.agent.trace.outcome", "agent", "trace_outcome", "classify",
-        prompts.AGENT_OUTCOME, "agent_trace", "agent_traces", "trace",
-        labels=prompts.AGENT_OUTCOME_LABELS,
-        descriptions=prompts.AGENT_OUTCOME_DESCRIPTIONS),
+        "quailb.agent.trace.progress", "agent", "trace_progress", "classify",
+        prompts.AGENT_PROGRESS, "agent_trace", "agent_traces", "trace",
+        labels=prompts.AGENT_PROGRESS_LABELS,
+        descriptions=prompts.AGENT_PROGRESS_DESCRIPTIONS),
     PredicateSpec(
-        "quailb.agent.trace.failure_mode", "agent", "trace_failure_mode",
-        "classify", prompts.AGENT_FAILURE, "agent_trace", "agent_traces",
-        "trace", labels=prompts.AGENT_FAILURE_LABELS,
-        descriptions=prompts.AGENT_FAILURE_DESCRIPTIONS),
+        "quailb.agent.trace.test_result", "agent", "trace_test_result",
+        "classify", prompts.AGENT_TEST_RESULT, "agent_trace", "agent_traces",
+        "trace", labels=prompts.AGENT_TEST_RESULT_LABELS,
+        descriptions=prompts.AGENT_TEST_RESULT_DESCRIPTIONS),
     PredicateSpec(
         "quailb.agent.trace.domain", "agent", "trace_domain", "classify",
         prompts.AGENT_DOMAIN, "agent_trace", "agent_traces", "trace",

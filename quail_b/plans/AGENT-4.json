@@ -23,7 +23,8 @@
               "emit": {
                 "output_mapping": [
                   4,
-                  5
+                  5,
+                  6
                 ]
               }
             },
@@ -32,6 +33,16 @@
                 "selection": {
                   "direct_reference": {
                     "struct_field": {}
+                  },
+                  "root_reference": {}
+                }
+              },
+              {
+                "selection": {
+                  "direct_reference": {
+                    "struct_field": {
+                      "field": 2
+                    }
                   },
                   "root_reference": {}
                 }
@@ -56,8 +67,8 @@
                     "output_names": [
                       "t.id",
                       "t.trace",
-                      "t.outcome",
-                      "t.failure"
+                      "t.progress",
+                      "t.test_result"
                     ]
                   }
                 },
@@ -68,7 +79,7 @@
                         {
                           "value": {
                             "literal": {
-                              "string": "Judge strictly from the agent trace above what most caused the agent not to resolve the issue.\n\n{0}"
+                              "string": "Judge strictly from the agent trace above what the most recent test or reproduction run showed.\n\n{0}"
                             }
                           }
                         },
@@ -90,28 +101,16 @@
                               "list": {
                                 "values": [
                                   {
-                                    "string": "misunderstood the issue"
+                                    "string": "bug fixed, tests pass"
                                   },
                                   {
-                                    "string": "could not reproduce the bug"
+                                    "string": "bug still occurs"
                                   },
                                   {
-                                    "string": "could not find the relevant code"
+                                    "string": "bug fixed, other tests fail"
                                   },
                                   {
-                                    "string": "could not run the tests"
-                                  },
-                                  {
-                                    "string": "made an incorrect fix"
-                                  },
-                                  {
-                                    "string": "broke existing tests"
-                                  },
-                                  {
-                                    "string": "environment or tool error"
-                                  },
-                                  {
-                                    "string": "ran out of steps"
+                                    "string": "run errored"
                                   }
                                 ]
                               }
@@ -124,28 +123,16 @@
                               "list": {
                                 "values": [
                                   {
-                                    "string": "worked on a different problem than the one reported"
+                                    "string": "the reported bug no longer occurs and other tests pass"
                                   },
                                   {
-                                    "string": "never saw the reported failure happen"
+                                    "string": "the reported bug still happens"
                                   },
                                   {
-                                    "string": "never found the code that causes the issue"
+                                    "string": "the reported bug no longer occurs but other tests fail"
                                   },
                                   {
-                                    "string": "could not get the test suite to run"
-                                  },
-                                  {
-                                    "string": "changed the right code, but the change does not fix the issue"
-                                  },
-                                  {
-                                    "string": "fixed the issue but made other tests fail"
-                                  },
-                                  {
-                                    "string": "a broken setup, missing dependency, or tool failure blocked progress"
-                                  },
-                                  {
-                                    "string": "reached the step limit while still making progress"
+                                    "string": "the run crashed or errored before testing anything"
                                   }
                                 ]
                               }
@@ -175,7 +162,17 @@
                         "options": [
                           {
                             "literal": {
-                              "string": "not resolved"
+                              "string": "changed the code, not checked"
+                            }
+                          },
+                          {
+                            "literal": {
+                              "string": "changed the code, check passes"
+                            }
+                          },
+                          {
+                            "literal": {
+                              "string": "changed the code, check fails"
                             }
                           }
                         ],
@@ -200,7 +197,7 @@
                             "output_names": [
                               "t.id",
                               "t.trace",
-                              "t.outcome"
+                              "t.progress"
                             ]
                           }
                         },
@@ -211,7 +208,7 @@
                                 {
                                   "value": {
                                     "literal": {
-                                      "string": "Judge strictly from the agent trace above whether the agent resolved the reported issue by the end of the trace.\n\n{0}"
+                                      "string": "Judge strictly from the agent trace above how far the agent has gotten so far.\n\n{0}"
                                     }
                                   }
                                 },
@@ -233,16 +230,19 @@
                                       "list": {
                                         "values": [
                                           {
-                                            "string": "resolved"
+                                            "string": "has not located the relevant code"
                                           },
                                           {
-                                            "string": "partially resolved"
+                                            "string": "located the relevant code"
                                           },
                                           {
-                                            "string": "not resolved"
+                                            "string": "changed the code, not checked"
                                           },
                                           {
-                                            "string": "gave up"
+                                            "string": "changed the code, check passes"
+                                          },
+                                          {
+                                            "string": "changed the code, check fails"
                                           }
                                         ]
                                       }
@@ -255,16 +255,19 @@
                                       "list": {
                                         "values": [
                                           {
-                                            "string": "made a change that fixes the reported issue"
+                                            "string": "has not yet found the code that causes the issue"
                                           },
                                           {
-                                            "string": "fixed part of the issue but not all of it"
+                                            "string": "found the code that causes the issue but has not changed it"
                                           },
                                           {
-                                            "string": "finished without a change that fixes the issue"
+                                            "string": "edited the code but has not run a test or reproduction since"
                                           },
                                           {
-                                            "string": "stopped early and said it could not continue"
+                                            "string": "edited the code and the latest test or reproduction run succeeds"
+                                          },
+                                          {
+                                            "string": "edited the code and the latest test or reproduction run still fails"
                                           }
                                         ]
                                       }
@@ -327,7 +330,8 @@
         },
         "names": [
           "t",
-          "failure"
+          "progress",
+          "test_result"
         ]
       }
     }

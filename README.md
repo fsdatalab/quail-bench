@@ -270,9 +270,9 @@ positive, negative, neutral, or mixed.
 | BIO-6 | Which cardiac or vascular reactions do serious reports describe? | Organ class, as a filter on one join input |
 | FEV-11 | Which claims are about politics or history, and which topic? | 11 topics; one call returned and filtered |
 | LEP-6 | Which passages do constitutional or criminal law excerpts cite? | 15 areas of law, as a filter before the join |
-| AGENT-3 | Did agents that recovered from a failed approach resolve the issue? | 4 outcomes with descriptions, after a filter |
-| AGENT-4 | Why did the agents that did not resolve the issue fail? | Outcome, then 8 failure modes with descriptions; three start with "could not" |
-| AGENT-5 | For every trace: did the agent resolve the issue, what is the project, and what kind of defect is the bug? | Outcome, 27 PyPI topics, and 8 ODC defect types; three questions of one trace |
+| AGENT-3 | How far have agents that recovered from a failed approach gotten? | 5 progress stages with descriptions, after a filter |
+| AGENT-4 | For agents that changed the code, what did the latest test or reproduction run show? | Progress, then 4 test results with descriptions |
+| AGENT-5 | For every trace: how far has the agent gotten, what is the project, and what kind of defect is the bug? | Progress, 27 PyPI topics, and 8 ODC defect types; three questions of one trace |
 
 A classification answer is the label with the largest sum of label-token log
 probabilities; the [reference](docs/reference.md#classification) defines the
@@ -334,9 +334,9 @@ to the data or labels produces new IDs. These are the published IDs:
 
 | Scale factor | Corpus ID | Collection ID |
 | --- | --- | --- |
-| 0.1 | `c_1aa2c4f0d0b6c816fd37aa5748c33341` | `gt_9b8e7f5a649d715d64a5fa4646855a4d` |
-| 0.5 | `c_6773c85b3754908434661c1dadfad0fa` | `gt_a0faa81557f0f7c98b6eb4c170ce3716` |
-| 1.0 | `c_81a95887a650aaa1a343e0d688b81bef` | `gt_cc042e13f1a6512ee51882e65d5d3456` |
+| 0.1 | `c_1aa2c4f0d0b6c816fd37aa5748c33341` | `gt_72abc9af3feaea668e493ece67e980a0` |
+| 0.5 | `c_6773c85b3754908434661c1dadfad0fa` | `gt_397dae1857e5850c84b61dccabb3431c` |
+| 1.0 | `c_81a95887a650aaa1a343e0d688b81bef` | `gt_a72baf70eae95e6b1681a11091eaafca` |
 
 `quail_b.run` loads the matching collection for you and records both IDs in
 `run.json`. Compare results only across runs with the same IDs.

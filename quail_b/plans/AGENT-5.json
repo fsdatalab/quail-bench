@@ -78,7 +78,7 @@
                     "output_names": [
                       "t.id",
                       "t.trace",
-                      "t.outcome",
+                      "t.progress",
                       "t.domain",
                       "t.root_cause"
                     ]
@@ -194,7 +194,7 @@
                         "output_names": [
                           "t.id",
                           "t.trace",
-                          "t.outcome",
+                          "t.progress",
                           "t.domain"
                         ]
                       }
@@ -423,7 +423,7 @@
                             "output_names": [
                               "t.id",
                               "t.trace",
-                              "t.outcome"
+                              "t.progress"
                             ]
                           }
                         },
@@ -434,7 +434,7 @@
                                 {
                                   "value": {
                                     "literal": {
-                                      "string": "Judge strictly from the agent trace above whether the agent resolved the reported issue by the end of the trace.\n\n{0}"
+                                      "string": "Judge strictly from the agent trace above how far the agent has gotten so far.\n\n{0}"
                                     }
                                   }
                                 },
@@ -456,16 +456,19 @@
                                       "list": {
                                         "values": [
                                           {
-                                            "string": "resolved"
+                                            "string": "has not located the relevant code"
                                           },
                                           {
-                                            "string": "partially resolved"
+                                            "string": "located the relevant code"
                                           },
                                           {
-                                            "string": "not resolved"
+                                            "string": "changed the code, not checked"
                                           },
                                           {
-                                            "string": "gave up"
+                                            "string": "changed the code, check passes"
+                                          },
+                                          {
+                                            "string": "changed the code, check fails"
                                           }
                                         ]
                                       }
@@ -478,16 +481,19 @@
                                       "list": {
                                         "values": [
                                           {
-                                            "string": "made a change that fixes the reported issue"
+                                            "string": "has not yet found the code that causes the issue"
                                           },
                                           {
-                                            "string": "fixed part of the issue but not all of it"
+                                            "string": "found the code that causes the issue but has not changed it"
                                           },
                                           {
-                                            "string": "finished without a change that fixes the issue"
+                                            "string": "edited the code but has not run a test or reproduction since"
                                           },
                                           {
-                                            "string": "stopped early and said it could not continue"
+                                            "string": "edited the code and the latest test or reproduction run succeeds"
+                                          },
+                                          {
+                                            "string": "edited the code and the latest test or reproduction run still fails"
                                           }
                                         ]
                                       }
@@ -550,7 +556,7 @@
         },
         "names": [
           "t",
-          "outcome",
+          "progress",
           "domain",
           "root_cause"
         ]
