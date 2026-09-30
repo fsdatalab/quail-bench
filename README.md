@@ -334,9 +334,9 @@ to the data or labels produces new IDs. These are the published IDs:
 
 | Scale factor | Corpus ID | Collection ID |
 | --- | --- | --- |
-| 0.1 | `c_1aa2c4f0d0b6c816fd37aa5748c33341` | `gt_9b8e7f5a649d715d64a5fa4646855a4d` |
-| 0.5 | `c_6773c85b3754908434661c1dadfad0fa` | `gt_a0faa81557f0f7c98b6eb4c170ce3716` |
-| 1.0 | `c_81a95887a650aaa1a343e0d688b81bef` | `gt_cc042e13f1a6512ee51882e65d5d3456` |
+| 0.1 | `c_1aa2c4f0d0b6c816fd37aa5748c33341` | `gt_72abc9af3feaea668e493ece67e980a0` |
+| 0.5 | `c_6773c85b3754908434661c1dadfad0fa` | `gt_397dae1857e5850c84b61dccabb3431c` |
+| 1.0 | `c_81a95887a650aaa1a343e0d688b81bef` | `gt_a72baf70eae95e6b1681a11091eaafca` |
 
 `quail_b.run` loads the matching collection for you and records both IDs in
 `run.json`. Compare results only across runs with the same IDs.

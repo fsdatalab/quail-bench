@@ -86,7 +86,8 @@ IN_LIST_SELECTIVITY_ESTIMATES = {
         109 / 1127,
     (FEV_TOPIC, frozenset({"politics", "history"})): 46 / 500,
     (LEP_AREA, frozenset({"constitutional law", "criminal law"})): 159 / 500,
-    (AGENT_PROGRESS, frozenset(AGENT_CHANGED_CODE)): 22 / 100,
+    # from gt_72abc9af3feaea668e493ece67e980a0
+    (AGENT_PROGRESS, frozenset(AGENT_CHANGED_CODE)): 639 / 1772,
 }
 
 
