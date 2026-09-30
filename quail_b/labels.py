@@ -21,6 +21,7 @@ import pyarrow as pa
 import pyarrow.compute as pc
 
 from quail_b._files import _list_files, _read_bytes, _read_parquet_columns
+from quail_b._keys import has_duplicates, tuple_keys
 from quail_b.data import GROUND_TRUTH_ROOT, _full_hash
 
 LABEL_COLUMNS = ("left_id", "right_id", "answer")
@@ -167,12 +168,18 @@ def _read_many(root, paths: list[str], read=_read_bytes) -> dict:
         return {path: future.result() for path, future in zip(paths, futures)}
 
 
+# the same value on every row of a label file
+CONSTANT_LABEL_COLUMNS = ("predicate_key", "label_set_id")
+
+
 def _read_label_file(root, path: str) -> pa.Table:
-    return _read_parquet_columns(root, path, LABEL_FILE_COLUMNS)
+    return _read_parquet_columns(root, path, LABEL_FILE_COLUMNS,
+                                 CONSTANT_LABEL_COLUMNS)
 
 
 def _read_classify_label_file(root, path: str) -> pa.Table:
-    return _read_parquet_columns(root, path, CLASSIFY_LABEL_FILE_COLUMNS)
+    return _read_parquet_columns(root, path, CLASSIFY_LABEL_FILE_COLUMNS,
+                                 CONSTANT_LABEL_COLUMNS)
 
 
 def _choose_collection(root, scale_factor: float,
@@ -360,8 +367,10 @@ def _read_label_set(parts: list[pa.Table], key: str, label_set_id: str,
     table = pa.concat_tables(parts)
     for column, expected in (("predicate_key", key),
                              ("label_set_id", label_set_id)):
-        mismatch = pc.fill_null(pc.not_equal(table.column(column), expected), True)
-        if pc.any(mismatch).as_py():
+        values = table.column(column)
+        if values.null_count or any(
+                value != expected
+                for value in pc.unique(values).cast(pa.string()).to_pylist()):
             raise ValueError(
                 f"a label file of {key} has the wrong {column}")
     table = _answer_table(table.select(list(columns)), kind)
@@ -371,8 +380,9 @@ def _read_label_set(parts: list[pa.Table], key: str, label_set_id: str,
             value_set=pa.array(predicate["labels"], pa.string())))
         if pc.any(unknown).as_py():
             raise ValueError(f"{key} has a label outside its label list")
-    distinct = table.group_by(["left_id", "right_id"]).aggregate([]).num_rows
-    if distinct != table.num_rows:
+    keys, _, count = tuple_keys(
+        [table.column("left_id"), table.column("right_id")])
+    if has_duplicates(keys, count):
         raise ValueError(f"duplicate ground truth for {key}")
     if table.num_rows != rows:
         raise ValueError(

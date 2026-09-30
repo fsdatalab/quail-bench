@@ -11,9 +11,11 @@ from __future__ import annotations
 import tempfile
 from dataclasses import dataclass, field
 
+import numpy as np
 import pyarrow as pa
 import pyarrow.compute as pc
 
+from quail_b._keys import lookup, tuple_keys
 from quail_b.data import _ids
 from quail_b.queries import QuerySpec
 
@@ -727,31 +729,31 @@ def agreement(table: pa.Table, aliases, labels) -> BinaryCounts:
         KeyError: A row the engine answered has no label.
     """
     aliases = list(aliases)
-    answers = pa.table({
-        **{alias: pc.cast(table.column(alias), pa.string())
-           for alias in aliases},
-        "predicted": pc.cast(table.column("answer"), pa.bool_()),
-    })
-    reference = labels.table.select(
-        [*("left_id", "right_id")[:len(aliases)], "answer"]
-    ).rename_columns([*aliases, "expected"])
-    joined = answers.join(reference, keys=aliases, join_type="left outer")
-    expected = joined.column("expected")
-    if expected.null_count:
+    reference = labels.table
+    reference_keys, keys, count = tuple_keys(
+        [reference.column(name)
+         for name in ("left_id", "right_id")[:len(aliases)]],
+        [table.column(alias) for alias in aliases])
+    expected = lookup(
+        reference_keys,
+        np.asarray(pc.cast(reference.column("answer"), pa.int8())),
+        count, keys)
+    missing = int(np.count_nonzero(expected < 0))
+    if missing:
         raise KeyError(
-            f"no ground truth for {labels.key} and {expected.null_count} "
-            "answered rows")
-    predicted = joined.column("predicted")
+            f"no ground truth for {labels.key} and {missing} answered rows")
+    expected = expected.astype(bool)
+    predicted = np.asarray(pc.cast(table.column("answer"), pa.bool_()))
 
-    def count(mask):
-        return pc.sum(mask).as_py() or 0
+    def number(mask):
+        return int(np.count_nonzero(mask))
 
     counts = BinaryCounts(
-        evaluated=joined.num_rows,
-        true_positive=count(pc.and_(predicted, expected)),
-        true_negative=count(pc.and_(pc.invert(predicted), pc.invert(expected))),
-        false_positive=count(pc.and_(predicted, pc.invert(expected))),
-        false_negative=count(pc.and_(pc.invert(predicted), expected)),
+        evaluated=len(predicted),
+        true_positive=number(predicted & expected),
+        true_negative=number(~predicted & ~expected),
+        false_positive=number(predicted & ~expected),
+        false_negative=number(~predicted & expected),
     )
     counts.correct = counts.true_positive + counts.true_negative
     return counts

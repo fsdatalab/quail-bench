@@ -79,27 +79,31 @@ def _read_bytes(root, path):
         return stream.read()
 
 
-def _read_parquet_columns(root, path, columns):
+def _read_parquet_columns(root, path, columns, dictionary=()):
     """Read selected Parquet columns, caching the selection for S3 files.
 
     Args:
         root: Local directory or S3 URI, or None for the public bucket.
         path: The Parquet file path under the root.
         columns: The columns to read.
+        dictionary: Columns to read as dictionary arrays.
 
     Returns:
         A table with only the requested columns.
     """
     columns = list(columns)
+    dictionary = list(dictionary) or None
     filesystem, _, source = _location(root, path)
     if root is not None and not str(root).startswith("s3://"):
-        return pq.read_table(source, filesystem=filesystem, columns=columns)
+        return pq.read_table(source, filesystem=filesystem, columns=columns,
+                             read_dictionary=dictionary)
     identity = "\0".join([source, *columns])
     cached = _cache_directory() / (
         f"{hashlib.sha256(identity.encode()).hexdigest()}.parquet")
     if not cached.exists():
         table = pq.read_table(
-            source, filesystem=filesystem, columns=columns, pre_buffer=True)
+            source, filesystem=filesystem, columns=columns, pre_buffer=True,
+            read_dictionary=dictionary)
         with tempfile.NamedTemporaryFile(
                 dir=cached.parent, suffix=".parquet", delete=False) as stream:
             temporary = Path(stream.name)
@@ -109,7 +113,7 @@ def _read_parquet_columns(root, path, columns):
         finally:
             temporary.unlink(missing_ok=True)
         return table
-    return pq.read_table(cached, columns=columns)
+    return pq.read_table(cached, columns=columns, read_dictionary=dictionary)
 
 
 def _list_files(root, path):
