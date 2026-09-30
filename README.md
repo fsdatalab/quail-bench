@@ -270,9 +270,9 @@ positive, negative, neutral, or mixed.
 | BIO-6 | Which cardiac or vascular reactions do serious reports describe? | Organ class, as a filter on one join input |
 | FEV-11 | Which claims are about politics or history, and which topic? | 11 topics; one call returned and filtered |
 | LEP-6 | Which passages do constitutional or criminal law excerpts cite? | 15 areas of law, as a filter before the join |
-| AGENT-3 | Did agents that recovered from a failed approach resolve the issue? | 4 outcomes with descriptions, after a filter |
-| AGENT-4 | Why did the agents that did not resolve the issue fail? | Outcome, then 8 failure modes with descriptions; three start with "could not" |
-| AGENT-5 | For every trace: did the agent resolve the issue, what is the project, and what kind of defect is the bug? | Outcome, 27 PyPI topics, and 8 ODC defect types; three questions of one trace |
+| AGENT-3 | How far have agents that recovered from a failed approach gotten? | 5 progress stages with descriptions, after a filter |
+| AGENT-4 | For agents that changed the code, what did the latest test or reproduction run show? | Progress, then 4 test results with descriptions |
+| AGENT-5 | For every trace: how far has the agent gotten, what is the project, and what kind of defect is the bug? | Progress, 27 PyPI topics, and 8 ODC defect types; three questions of one trace |
 
 A classification answer is the label with the largest sum of label-token log
 probabilities; the [reference](docs/reference.md#classification) defines the

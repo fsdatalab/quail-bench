@@ -498,7 +498,7 @@ A classification of one document is described like a filter, with `id` and
 A classification's pieces come from the reference prompt that
 `render_classify_prompt` produces, whatever prompt the engine sent. Its tail
 holds the question, the labels by name, and the answer cue. For example, an
-engine that lists AGENT-4's failure modes under letters still reports the
+engine that lists AGENT-4's test results under letters still reports the
 tail that lists them by name, so the minimum is the same for every engine
 that uses one tokenizer.
 

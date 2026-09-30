@@ -241,39 +241,39 @@ LEP_AREA_LABELS = (
     "immigration law", "bankruptcy", "antitrust",
 )
 
-AGENT_OUTCOME = (
-    "Judge strictly from the agent trace above whether the agent resolved "
-    "the reported issue by the end of the trace.\n\n{0}"
+# The traces are prefixes of agent runs, so these ask what the trace
+# shows so far, not how the run ended
+AGENT_PROGRESS = (
+    "Judge strictly from the agent trace above how far the agent has "
+    "gotten so far.\n\n{0}"
 )
-AGENT_OUTCOME_LABELS = (
-    "resolved", "partially resolved", "not resolved", "gave up",
+AGENT_PROGRESS_LABELS = (
+    "has not located the relevant code", "located the relevant code",
+    "changed the code, not checked", "changed the code, check passes",
+    "changed the code, check fails",
 )
-AGENT_OUTCOME_DESCRIPTIONS = (
-    "made a change that fixes the reported issue",
-    "fixed part of the issue but not all of it",
-    "finished without a change that fixes the issue",
-    "stopped early and said it could not continue",
+AGENT_PROGRESS_DESCRIPTIONS = (
+    "has not yet found the code that causes the issue",
+    "found the code that causes the issue but has not changed it",
+    "edited the code but has not run a test or reproduction since",
+    "edited the code and the latest test or reproduction run succeeds",
+    "edited the code and the latest test or reproduction run still fails",
 )
+AGENT_CHANGED_CODE = AGENT_PROGRESS_LABELS[2:]
 
-AGENT_FAILURE = (
-    "Judge strictly from the agent trace above what most caused the agent "
-    "not to resolve the issue.\n\n{0}"
+AGENT_TEST_RESULT = (
+    "Judge strictly from the agent trace above what the most recent test "
+    "or reproduction run showed.\n\n{0}"
 )
-AGENT_FAILURE_LABELS = (
-    "misunderstood the issue", "could not reproduce the bug",
-    "could not find the relevant code", "could not run the tests",
-    "made an incorrect fix", "broke existing tests",
-    "environment or tool error", "ran out of steps",
+AGENT_TEST_RESULT_LABELS = (
+    "bug fixed, tests pass", "bug still occurs",
+    "bug fixed, other tests fail", "run errored",
 )
-AGENT_FAILURE_DESCRIPTIONS = (
-    "worked on a different problem than the one reported",
-    "never saw the reported failure happen",
-    "never found the code that causes the issue",
-    "could not get the test suite to run",
-    "changed the right code, but the change does not fix the issue",
-    "fixed the issue but made other tests fail",
-    "a broken setup, missing dependency, or tool failure blocked progress",
-    "reached the step limit while still making progress",
+AGENT_TEST_RESULT_DESCRIPTIONS = (
+    "the reported bug no longer occurs and other tests pass",
+    "the reported bug still happens",
+    "the reported bug no longer occurs but other tests fail",
+    "the run crashed or errored before testing anything",
 )
 
 # PyPI's "Topic ::" trove classifiers, https://pypi.org/classifiers/
