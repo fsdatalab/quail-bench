@@ -599,12 +599,21 @@ is evaluated document pairs, summed across all joins, divided by `runtime_s`.
 | KV regret | Recomputed tokens divided by fresh tokens, as a percentage |
 | Input token throughput | Input tokens divided by `runtime_s` |
 
-The minimum counts each distinct prompt prefix once, so a document's questions
-share the document and any leading tokens they have in common. For joins, the
-partner label counts once per anchor, and each pair's partner document and
-answer cue count once per pair, less the leading tokens shared with another
-partner of the same anchor. Recomputed
-tokens are therefore the work a perfect prefix KV cache would have avoided.
+The minimum is the number of input tokens that the requests need when the KV of
+every prompt prefix stays in memory. It counts each distinct prompt prefix one
+time:
+
+- A document counts one time, however many questions ask about it.
+- If two questions about one document start with the same tokens, these tokens
+  count one time.
+- In a join, the anchor document, the frame, and the partner label count one
+  time for each anchor. The partner label is the same for every pair of that
+  anchor.
+- Each pair adds its partner document and its answer cue. If two partners of
+  the same anchor start with the same tokens, these tokens count one time.
+
+Recomputed tokens are fresh tokens minus minimum tokens. They are the work that
+a prefix KV cache with unlimited memory does not do.
 
 A classification's tail counts like a filter question: once per document,
 sharing its lead with the document's other questions. A classification of
