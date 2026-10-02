@@ -585,8 +585,11 @@ made.
 
 ### Throughput
 
-Document throughput is input documents divided by `runtime_s`. Join throughput
-is evaluated document pairs, summed across all joins, divided by `runtime_s`.
+| Metric | Definition |
+| --- | --- |
+| Document throughput | Input documents divided by `runtime_s` |
+| Join throughput | Evaluated document pairs, summed across all joins, divided by `runtime_s` |
+| Input token throughput | Input tokens divided by `runtime_s` |
 
 ### Tokens and KV
 
@@ -597,7 +600,20 @@ is evaluated document pairs, summed across all joins, divided by `runtime_s`.
 | Minimum tokens | Input positions required with an unlimited prefix KV cache |
 | Recomputed tokens | Fresh tokens minus minimum tokens |
 | KV regret | Recomputed tokens divided by fresh tokens, as a percentage |
-| Input token throughput | Input tokens divided by `runtime_s` |
+
+#### Input tokens
+
+Input tokens are the full length of every prompt that the plan evaluates. They
+include tokens that the engine serves from KV. Thus input tokens depend on
+which prompts the plan evaluates, not on how the engine computes them.
+
+#### Fresh tokens
+
+Fresh tokens are the input positions that model forward passes process. They
+measure model computation. Two engines can have the same input tokens and
+different fresh tokens.
+
+#### Minimum tokens
 
 The minimum is the number of input tokens that the requests need when the KV of
 every prompt prefix stays in memory. It counts each distinct prompt prefix one
@@ -611,9 +627,6 @@ time:
   anchor.
 - Each pair adds its partner document and its answer cue. If two partners of
   the same anchor start with the same tokens, these tokens count one time.
-
-Recomputed tokens are fresh tokens minus minimum tokens. They are the work that
-a prefix KV cache with unlimited memory does not do.
 
 A classification counts as follows:
 
@@ -632,15 +645,21 @@ then classifies each review. The minimum counts:
 - for each review, the filter question and the classification tail, less the
   tokens that they share at their start.
 
-These are recomputed tokens:
+#### Recomputed tokens
+
+Recomputed tokens are fresh tokens minus minimum tokens. They are the work that
+a prefix KV cache with unlimited memory does not do. In the example above, these
+are recomputed tokens:
 
 - a review that the engine computes two times;
 - a lettered list of categories that is longer than the reference tail;
 - label tokens that the engine feeds after the answer cue to score each label.
 
-Input tokens depend on which prompts the plan evaluates. Fresh tokens measure
-model computation. Two engines can therefore have the same input tokens and
-different fresh tokens.
+#### KV regret
+
+KV regret is recomputed tokens divided by fresh tokens, as a percentage. For
+example, an engine that computes 100 fresh tokens for requests with a minimum
+of 80 tokens has 20 recomputed tokens and a KV regret of 20%.
 
 ### Cost
 
