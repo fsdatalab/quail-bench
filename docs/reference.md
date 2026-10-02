@@ -600,8 +600,10 @@ is evaluated document pairs, summed across all joins, divided by `runtime_s`.
 | Input token throughput | Input tokens divided by `runtime_s` |
 
 The minimum counts each distinct prompt prefix once, so a document's questions
-share the document and any leading tokens they have in common. For joins, each
-pair's label, partner document, and answer cue count once per pair. Recomputed
+share the document and any leading tokens they have in common. For joins, the
+partner label counts once per anchor, and each pair's partner document and
+answer cue count once per pair, less the leading tokens shared with another
+partner of the same anchor. Recomputed
 tokens are therefore the work a perfect prefix KV cache would have avoided.
 
 A classification's tail counts like a filter question: once per document,
