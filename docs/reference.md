@@ -615,17 +615,28 @@ time:
 Recomputed tokens are fresh tokens minus minimum tokens. They are the work that
 a prefix KV cache with unlimited memory does not do.
 
-A classification's tail counts like a filter question: once per document,
-sharing its lead with the document's other questions. A classification of
-joined rows counts like a join. Reading a label takes no position after the
-answer cue, so the minimum does not depend on how an engine reads labels.
+A classification counts as follows:
 
-For example, suppose an engine classifies 100 reviews after asking one filter
-question of each. Each review's tokens count once, and the filter question
-and the classification tail count once per review, minus the tokens they
-share at their start. Computing a review twice, sending a longer lettered
-category list, or feeding label tokens after the cue to score each label is
-work beyond the minimum, and counts as recomputed tokens.
+- The classification tail (the question, the labels, and the answer cue) counts
+  like a filter question: one time for each document. If it starts with the
+  same tokens as another question about the document, these tokens count one
+  time.
+- A classification of joined rows counts like a join.
+- The minimum stops at the answer cue. It does not depend on how an engine
+  reads the label.
+
+For example, an engine asks one filter question about each of 100 reviews, and
+then classifies each review. The minimum counts:
+
+- the tokens of each review, one time;
+- for each review, the filter question and the classification tail, less the
+  tokens that they share at their start.
+
+These are recomputed tokens:
+
+- a review that the engine computes two times;
+- a lettered list of categories that is longer than the reference tail;
+- label tokens that the engine feeds after the answer cue to score each label.
 
 Input tokens depend on which prompts the plan evaluates. Fresh tokens measure
 model computation. Two engines can therefore have the same input tokens and
