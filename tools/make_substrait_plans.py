@@ -42,6 +42,7 @@ from quail_b.prompts import (
     P_MSG,
     REACTION,
     REFUTE,
+    REVIEW_GUIDELINE_CHECKS,
     SCENARIO_MATCH,
     SERIOUS_ADVERSE_EVENT,
     SUPPORT,
@@ -585,6 +586,13 @@ QUERIES = (
                    prompts.IMDB_ASPECT_SENTIMENT,
                    prompts.IMDB_ASPECT_SENTIMENT_LABELS, "aspect_sentiment"),
           select=("r", "r.sentiment", "a", "r.aspect_sentiment")),
+    Query("IMDB-16", "five checks of one set of review guidelines -> "
+          "classify: genre, keeping war and western reviews",
+          InList(_classify(_filters(_reviews(), *REVIEW_GUIDELINE_CHECKS),
+                           prompts.IMDB_GENRE, prompts.IMDB_GENRE_LABELS,
+                           "genre"),
+                 "genre", ("war", "western")),
+          select=("r", "r.genre"), labels_pending=True),
 
     Query("BIO-1", "filter: serious adverse event",
           _filters(_reports(), SERIOUS_ADVERSE_EVENT)),

@@ -193,7 +193,7 @@ lists the queries that use it.
 
 | Dataset | Queries | Tables | Task |
 | --- | --- | --- | --- |
-| IMDB | IMDB-1 to IMDB-15 | `reviews`, `aspects` | Review aspects and sentiment |
+| IMDB | IMDB-1 to IMDB-16 | `reviews`, `aspects` | Review aspects and sentiment |
 | BioDEX | BIO-1 to BIO-6 | `reports`, `terms` | Adverse drug reactions |
 | FEVER | FEV-1 to FEV-11 | `claims`, `evidence` | Fact verification |
 | LePaRD | LEP-1 to LEP-6 | `citation_contexts`, `citation_passages` | Legal citations |
@@ -253,6 +253,14 @@ Label length follows from the list, from one token for sentiment to eleven
 for an organ class under the Qwen3 tokenizer. IMDB-14, LEP-6, and AGENT-4
 have labels that start with the same words, as category names often do.
 
+IMDB-16 checks each review against one set of five review guidelines, such as
+no unwarned spoilers of the ending, then keeps war and western reviews. The
+five checks repeat the same guidelines text, about 850 tokens, after the review
+and differ only in their last sentence. The order of the checks and the
+classification, and whether the shared text is computed once per review, change
+the work by several times. Its labels are not published yet, so `queries()`
+leaves it out.
+
 IMDB-15 is the one query that classifies joined rows. It joins each negative
 or mixed review with the movie aspects the review discusses. It then labels
 each (review, aspect) row with the review's sentiment toward that aspect. For
@@ -266,6 +274,7 @@ positive, negative, neutral, or mixed.
 | IMDB-13 | Which aspects do negative or mixed reviews discuss? | Sentiment, as a filter before J1, returned per pair |
 | IMDB-14 | What do negative or mixed reviews complain about most? | Sentiment, then 8 complaints; three start with "poor" and two with "too"; both returned |
 | IMDB-15 | What sentiment does each negative or mixed review express toward each aspect it discusses? | Sentiment, as a filter before J1, then 4 sentiments per pair; both returned |
+| IMDB-16 | Which war and western reviews follow all five review guidelines? | IMDb's 21 genres, as a filter after five guideline checks; labels pending |
 | BIO-5 | Which system organ class does each reaction term belong to? | MedDRA's 26 classes, 1 to 11 tokens |
 | BIO-6 | Which cardiac or vascular reactions do serious reports describe? | Organ class, as a filter on one join input |
 | FEV-11 | Which claims are about politics or history, and which topic? | 11 topics; one call returned and filtered |

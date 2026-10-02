@@ -75,6 +75,12 @@
     "privacy": false
   },
   {
+    "id": "IMDB-16",
+    "description": "five checks of one set of review guidelines -> classify: genre, keeping war and western reviews",
+    "privacy": false,
+    "labels_pending": true
+  },
+  {
     "id": "BIO-1",
     "description": "filter: serious adverse event",
     "privacy": false

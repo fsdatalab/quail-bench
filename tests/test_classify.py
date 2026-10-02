@@ -32,7 +32,7 @@ CLASSIFY_QUERIES = ("IMDB-11", "IMDB-12", "IMDB-13", "IMDB-14", "IMDB-15",
 
 
 def test_classification_queries_are_published():
-    assert pending_query_ids() == ()
+    assert pending_query_ids() == ("IMDB-16",)
     assert tuple(query_id for query_id, spec in queries().items()
                  if spec._info.classifies) == CLASSIFY_QUERIES
 
@@ -77,6 +77,19 @@ def test_plans_carry_label_columns_and_filters():
         prompts.AGENT_TEST_RESULT_DESCRIPTIONS)
     assert quail_b.get_query("IMDB-12")._info.classifies[0].descriptions == (
         ("",) * len(prompts.IMDB_GENRE_LABELS))
+    guidelines = quail_b.get_query("IMDB-16")._info
+    assert [operator.id for operator in guidelines.operators] == [
+        "filter-1", "filter-2", "filter-3", "filter-4", "filter-5",
+        "classify-1", "in-list-1"]
+    assert guidelines.in_lists[0].accepted == ("war", "western")
+    # after the document, the five checks repeat the guidelines and
+    # differ only in their last sentence
+    tails = [rendering.render_filter_prompt(prompt, "")
+             for prompt in prompts.REVIEW_GUIDELINE_CHECKS]
+    text = prompts.REVIEW_GUIDELINES_TEXT
+    shared = tails[0].index(text) + len(text)
+    assert len({tail[:shared] for tail in tails}) == 1
+    assert len({tail[shared:] for tail in tails}) == 5
 
 
 def test_joined_classification_plan():

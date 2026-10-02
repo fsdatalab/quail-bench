@@ -18,6 +18,104 @@ F5 = ("Judge strictly from the review above whether it mentions any "
       "answer TRUE if the review mentions a specific actor or actress "
       "by name, FALSE otherwise.")
 
+# IMDB-16: five checks of one set of review guidelines. The guidelines
+# come before `{0}`, so after rendering every check repeats them as the
+# same text after the document and differs only in its last sentence.
+REVIEW_GUIDELINES_TEXT = """\
+REVIEW GUIDELINES
+
+These guidelines describe what a published movie review may contain. A \
+review is judged only by its own text. A review may be short or long, \
+positive or negative, formal or casual; none of that matters here. What \
+matters is whether the text keeps to the five guidelines below. Each \
+guideline lists what it forbids, what it allows, and how to decide \
+borderline cases.
+
+Guideline 1. Spoilers of the ending.
+A review must not reveal how the movie ends unless it warns the reader \
+first. Revealing the ending means stating the outcome of the main \
+story: who survives or dies at the end, whether the central mystery is \
+solved and how, the final twist, or the last scene's events. A warning \
+is any plain statement before the reveal that the review contains \
+spoilers, such as "spoiler warning" or "spoilers ahead". Allowed \
+without a warning: describing the premise, the setup, or events from \
+the first half; saying the ending is good, bad, surprising, or \
+predictable without saying what happens; and naming a twist exists \
+without describing it. If the review describes the final events only \
+vaguely ("it all goes wrong for them in the end"), it does not reveal \
+the ending. If a warning appears only after the reveal, the review \
+breaks this guideline.
+
+Guideline 2. Personal attacks.
+A review must not attack a person rather than their work. Forbidden: \
+insults about a named or clearly identified person's appearance, \
+intelligence, character, private life, or worth as a human being; \
+wishing harm on anyone; and insults aimed at other reviewers or at \
+people who liked or disliked the movie. Allowed: harsh criticism of a \
+performance, a script, direction, or any other work ("the acting is \
+wooden", "the director has no sense of pacing", "this is the worst \
+script I have read"). Criticism of a performance stays criticism of \
+work even when it is rude. Calling a person stupid, ugly, or worthless \
+is an attack; calling their performance stupid is not.
+
+Guideline 3. About this movie.
+A review must be mainly about the movie it reviews. Forbidden: reviews \
+that are mostly about another movie, a television series, a book, a \
+real-world event, the reviewer's day, the theater, ticket prices, or \
+politics unrelated to the movie. Allowed: comparisons with other \
+movies, remarks about the source book or the director's earlier work, \
+and short personal context, as long as most of the text discusses \
+this movie's story, acting, direction, look, sound, or effect on the \
+viewer. If a reader could not tell from the review what the movie is \
+like, the review breaks this guideline.
+
+Guideline 4. Profanity and slurs.
+A review must not contain slurs against any group of people, and must \
+not use strong profanity. Strong profanity means the most offensive \
+swear words, spelled out or thinly masked with symbols or misspellings. \
+Allowed: mild words such as "damn", "hell", "crap", or "sucks"; \
+quoting a line of dialogue from the movie when the review says it is a \
+quotation; and describing that the movie contains strong language \
+without repeating it. A single slur or a single strong profanity \
+outside a marked quotation breaks this guideline.
+
+Guideline 5. Links, advertising, and contact details.
+A review must not contain web addresses, email addresses, phone \
+numbers, social media handles, or requests to visit, follow, buy from, \
+or contact anyone. It must not promote a product, service, channel, or \
+other review. Allowed: naming the studio, distributor, or streaming \
+service that released the movie, and mentioning where the reviewer \
+watched it, without a link or a request. Text that only looks like a \
+link, such as a movie title with a period in it, does not break this \
+guideline.
+
+How to judge. Read the whole review. Judge each guideline separately: \
+a review can follow one guideline and break another. When the text is \
+ambiguous, decide by what a careful reader would most likely \
+understand. Do not guess at intent that the text does not show, and do \
+not penalize spelling, grammar, length, or the reviewer's opinion of \
+the movie."""
+
+
+
+def _guideline_check(number: int, name: str) -> str:
+    return ("Judge strictly from the review above against the review "
+            "guidelines below.\n\n" + REVIEW_GUIDELINES_TEXT + "\n\n{0}\n\n"
+            f"Instruction: answer TRUE if the review follows guideline "
+            f"{number} ({name}), FALSE otherwise.")
+
+
+GUIDELINE_SPOILERS = _guideline_check(1, "spoilers of the ending")
+GUIDELINE_ATTACKS = _guideline_check(2, "personal attacks")
+GUIDELINE_ON_TOPIC = _guideline_check(3, "about this movie")
+GUIDELINE_LANGUAGE = _guideline_check(4, "profanity and slurs")
+GUIDELINE_PROMOTION = _guideline_check(
+    5, "links, advertising, and contact details")
+REVIEW_GUIDELINE_CHECKS = (
+    GUIDELINE_SPOILERS, GUIDELINE_ATTACKS, GUIDELINE_ON_TOPIC,
+    GUIDELINE_LANGUAGE, GUIDELINE_PROMOTION,
+)
+
 DISCUSS_ASPECT = ("Does the review in DOCUMENT {0} discuss the movie "
                   "aspect in DOCUMENT {1}?")
 

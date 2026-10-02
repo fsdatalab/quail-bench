@@ -66,6 +66,26 @@ PREDICATES = (
         prompts.ASPECT_SENTIMENT,
         "review", "reviews", "body", "aspect", "aspects", "aspect"),
     PredicateSpec(
+        "quailb.imdb.review.follows_spoiler_guideline", "imdb",
+        "review_follows_spoiler_guideline", "filter",
+        prompts.GUIDELINE_SPOILERS, "review", "reviews", "body"),
+    PredicateSpec(
+        "quailb.imdb.review.follows_personal_attack_guideline", "imdb",
+        "review_follows_personal_attack_guideline", "filter",
+        prompts.GUIDELINE_ATTACKS, "review", "reviews", "body"),
+    PredicateSpec(
+        "quailb.imdb.review.follows_on_topic_guideline", "imdb",
+        "review_follows_on_topic_guideline", "filter",
+        prompts.GUIDELINE_ON_TOPIC, "review", "reviews", "body"),
+    PredicateSpec(
+        "quailb.imdb.review.follows_language_guideline", "imdb",
+        "review_follows_language_guideline", "filter",
+        prompts.GUIDELINE_LANGUAGE, "review", "reviews", "body"),
+    PredicateSpec(
+        "quailb.imdb.review.follows_promotion_guideline", "imdb",
+        "review_follows_promotion_guideline", "filter",
+        prompts.GUIDELINE_PROMOTION, "review", "reviews", "body"),
+    PredicateSpec(
         "quailb.biodex.report.describes_serious_adverse_event", "biodex",
         "report_describes_serious_adverse_event", "filter",
         prompts.SERIOUS_ADVERSE_EVENT,
