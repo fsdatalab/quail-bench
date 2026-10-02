@@ -8,10 +8,11 @@ With unlimited KV every distinct prefix across the document
 sequences is computed once: each document's text once, and the
 questions and frames after one document once each, sharing the lead
 they have in common (an engine that rewinds KV to where two questions
-diverge computes that lead once). A pair's suffix after its anchor
-(label, partner document, answer cue) is computed once per pair, with
-nothing shared between the pairs of one anchor: those tokens are one
-request's own, so they are never regret. What an engine computed
+diverge computes that lead once). The partner label after a frame is
+the same for every pair of one anchor, so it is computed once per
+anchor. Each pair's partner document and answer cue follow it; the
+pairs of one anchor share the tokens their partner documents begin
+with, as a prefix cache over whole requests does. What an engine computed
 beyond the minimum is its regret, whatever the cause: an evicted
 anchor computed again, a set scanned twice under two aliases, or a
 prompt prefix the documents share computed once per document.
@@ -234,6 +235,61 @@ class DocumentTokens:
         return self._tokens[document]
 
 
+class _PartnerTrie:
+    """Prefix trie sizes of partner documents that one tail follows.
+
+    The documents are sorted once. Two sorted neighbours of a subset
+    share the shortest common prefix of the sorted run between them, so
+    a subset's trie size is its length minus a range minimum per
+    neighbour pair.
+
+    Args:
+        documents: The document tokens, fetched.
+        keys: The ((table, column), id) partner documents.
+        tail: Token ids after every partner document.
+    """
+
+    def __init__(self, documents, keys, tail):
+        keys = list(keys)
+        tail = _tokens(tail)
+        packed = [np.concatenate((documents[(*table_set, row_id)], tail))
+                  .astype(">u4").tobytes() for table_set, row_id in keys]
+        order = sorted(range(len(keys)), key=packed.__getitem__)
+        self.rank = {keys[index]: rank for rank, index in enumerate(order)}
+        self.length = np.array([len(packed[index]) // 4 for index in order],
+                               dtype=np.int64)
+        shared = np.zeros(max(len(order) - 1, 0), dtype=np.int64)
+        for position, (earlier, later) in enumerate(zip(order, order[1:])):
+            left, right = packed[earlier], packed[later]
+            length = min(len(left), len(right))
+            differs = (np.frombuffer(left, np.uint8, length)
+                       != np.frombuffer(right, np.uint8, length))
+            first = int(differs.argmax()) if differs.any() else length
+            shared[position] = first // 4
+        self.levels = [shared]
+        width = 1
+        while 2 * width <= len(shared):
+            last = self.levels[-1]
+            self.levels.append(np.minimum(last[:-width], last[width:]))
+            width *= 2
+
+    def size(self, members) -> int:
+        """Return the prefix trie size of the member documents with the tail."""
+        ranks = np.sort(np.fromiter((self.rank[key] for key in members),
+                                    dtype=np.int64, count=len(members)))
+        total = int(self.length[ranks].sum())
+        if len(ranks) < 2:
+            return total
+        low, high = ranks[:-1], ranks[1:]
+        level = np.floor(np.log2(high - low)).astype(np.int64)
+        for step in np.unique(level).tolist():
+            pick = level == step
+            table = self.levels[step]
+            total -= int(np.minimum(
+                table[low[pick]], table[high[pick] - (1 << step)]).sum())
+        return total
+
+
 def _encoded(column) -> tuple[np.ndarray, pa.Array]:
     """Return a string id column as dictionary indices and the dictionary."""
     column = pc.cast(column, pa.string())
@@ -333,7 +389,7 @@ def minimum_input_tokens(spec, pieces, filter_answers, join_answers,
                     (partner_set, row_id) for row_id in pc.take(
                         partner_ids, pa.array(members)).to_pylist())
             document = record(anchor, anchor_ids[int(anchors[start])].as_py())
-            document.suffixes.add(group[0])
+            document.suffixes.add(group[0] + group[1])
             document.groups.setdefault(group, set()).add(key)
 
     documents.fetch([(*table_set, row_id) for table_set, row_id in records]
@@ -345,20 +401,21 @@ def minimum_input_tokens(spec, pieces, filter_answers, join_answers,
         for table_set, row_id in records)
     suffix_sizes: dict = {}
     partner_sizes: dict = {}
+    partner_tries: dict = {}
+    partners = frozenset().union(*members_of.values())
     for document in records.values():
         suffixes = frozenset(document.suffixes)
         if suffixes not in suffix_sizes:
             suffix_sizes[suffixes] = prefix_trie_size(suffixes)
         total += suffix_sizes[suffixes]
-        for (_, label, tail), keys in document.groups.items():
-            keys = frozenset(keys)
-            if keys not in partner_sizes:
-                members = frozenset().union(*(members_of[key] for key in keys))
-                partner_sizes[keys] = (len(members), sum(
-                    len(documents[(*member_set, row_id)])
-                    for member_set, row_id in members))
-            count, size = partner_sizes[keys]
-            total += (len(label) + len(tail)) * count + size
+        for (_, _, tail), keys in document.groups.items():
+            key = (tail, frozenset(keys))
+            if key not in partner_sizes:
+                if tail not in partner_tries:
+                    partner_tries[tail] = _PartnerTrie(documents, partners, tail)
+                partner_sizes[key] = partner_tries[tail].size(
+                    frozenset().union(*(members_of[member] for member in keys)))
+            total += partner_sizes[key]
     return total
 
 
