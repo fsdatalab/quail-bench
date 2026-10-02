@@ -585,8 +585,11 @@ made.
 
 ### Throughput
 
-Document throughput is input documents divided by `runtime_s`. Join throughput
-is evaluated document pairs, summed across all joins, divided by `runtime_s`.
+| Metric | Definition |
+| --- | --- |
+| Document throughput | Input documents divided by `runtime_s` |
+| Join throughput | Evaluated document pairs, summed across all joins, divided by `runtime_s` |
+| Input token throughput | Input tokens divided by `runtime_s` |
 
 ### Tokens and KV
 
@@ -597,28 +600,66 @@ is evaluated document pairs, summed across all joins, divided by `runtime_s`.
 | Minimum tokens | Input positions required with an unlimited prefix KV cache |
 | Recomputed tokens | Fresh tokens minus minimum tokens |
 | KV regret | Recomputed tokens divided by fresh tokens, as a percentage |
-| Input token throughput | Input tokens divided by `runtime_s` |
 
-The minimum counts each distinct prompt prefix once, so a document's questions
-share the document and any leading tokens they have in common. For joins, each
-pair's label, partner document, and answer cue count once per pair. Recomputed
-tokens are therefore the work a perfect prefix KV cache would have avoided.
+#### Input tokens
 
-A classification's tail counts like a filter question: once per document,
-sharing its lead with the document's other questions. A classification of
-joined rows counts like a join. Reading a label takes no position after the
-answer cue, so the minimum does not depend on how an engine reads labels.
+Input tokens are the full length of every prompt that the plan evaluates. They
+include tokens that the engine serves from KV. Thus input tokens depend on
+which prompts the plan evaluates, not on how the engine computes them.
 
-For example, suppose an engine classifies 100 reviews after asking one filter
-question of each. Each review's tokens count once, and the filter question
-and the classification tail count once per review, minus the tokens they
-share at their start. Computing a review twice, sending a longer lettered
-category list, or feeding label tokens after the cue to score each label is
-work beyond the minimum, and counts as recomputed tokens.
+#### Fresh tokens
 
-Input tokens depend on which prompts the plan evaluates. Fresh tokens measure
-model computation. Two engines can therefore have the same input tokens and
+Fresh tokens are the input positions that model forward passes process. They
+measure model computation. Two engines can have the same input tokens and
 different fresh tokens.
+
+#### Minimum tokens
+
+The minimum is the number of input tokens that the requests need when the KV of
+every prompt prefix stays in memory. It counts each distinct prompt prefix one
+time:
+
+- A document counts one time, however many questions ask about it.
+- If two questions about one document start with the same tokens, these tokens
+  count one time.
+- In a join, the anchor document, the frame, and the partner label count one
+  time for each anchor. The partner label is the same for every pair of that
+  anchor.
+- Each pair adds its partner document and its answer cue. If two partners of
+  the same anchor start with the same tokens, these tokens count one time.
+
+A classification counts as follows:
+
+- The classification tail (the question, the labels, and the answer cue) counts
+  like a filter question: one time for each document. If it starts with the
+  same tokens as another question about the document, these tokens count one
+  time.
+- A classification of joined rows counts like a join.
+- The minimum stops at the answer cue. It does not depend on how an engine
+  reads the label.
+
+For example, an engine asks one filter question about each of 100 reviews, and
+then classifies each review. The minimum counts:
+
+- the tokens of each review, one time;
+- for each review, the filter question and the classification tail, less the
+  tokens that they share at their start.
+
+#### Recomputed tokens
+
+Recomputed tokens are fresh tokens minus minimum tokens. They are the work that
+a prefix KV cache with unlimited memory does not do. In the example above, these
+are recomputed tokens:
+
+- a review that the engine computes two times;
+- a lettered list of categories that is longer than the reference tail;
+- label tokens that the engine feeds after the answer cue to score each label.
+
+#### KV regret
+
+KV regret is recomputed tokens divided by fresh tokens, as a percentage. For
+example, an engine that computes 100 fresh tokens for requests with a minimum
+of 80 tokens has 20 recomputed tokens and a KV regret of 20%.
 
 ### Cost
 

@@ -1,10 +1,14 @@
 """CPU checks for the prefix trie and the minimum input tokens of a run."""
 
+import random
+
+import numpy as np
 import pyarrow as pa
 import pytest
 
 from quail_b.minimum import (
     DocumentTokens,
+    _PartnerTrie,
     input_tokens,
     minimum_input_tokens,
     prefix_trie_size,
@@ -83,13 +87,13 @@ def test_minimum_input_tokens_counts_each_document_prefix_once_and_pairs_apart()
 
     # the three documents share the preamble, and the first two share
     # "same start " (11 tokens) beyond it; every document gets the
-    # question once, the two anchors get the frame once, sharing the
-    # lead it has in common with the question; each pair gets its own
-    # label, partner, and tail
+    # question once, the two anchors get the frame and label once,
+    # sharing the lead they have in common with the question; each
+    # anchor's partners "aa" and "ab" share their first token
     pre = len(PRE)
     documents = 3 * pre + 14 + 14 + 5 - (pre + pre + 11)
-    anchored = len(QUESTION) + len(FRAME) - _lcp(QUESTION, FRAME)
-    pairs = 2 * len(LABEL) + 4 + 2 * len(TAIL)
+    anchored = prefix_trie_size([QUESTION, FRAME + LABEL])
+    pairs = 2 * (2 + len(TAIL)) - 1
     assert minimum == documents + len(QUESTION) + 2 * anchored + 2 * pairs
     full_inputs = (
         3 * (len(PRE) + len(QUESTION)) + 14 + 14 + 5
@@ -129,10 +133,9 @@ def test_minimum_input_tokens_counts_a_document_once_across_uses():
         DocumentTokens(corpus, _encode))
 
     documents = 2 * len(PRE) + 5 + 4 - len(PRE)
-    alpha = len(first) + len(second) + len(FRAME) - sum((
-        _lcp(first, second), max(_lcp(FRAME, first), _lcp(FRAME, second))))
-    beta = len(first) + len(FRAME) - _lcp(first, FRAME)
-    pairs = 2 * len(LABEL) + 9 + 2 * len(TAIL)
+    alpha = prefix_trie_size([first, second, FRAME + LABEL])
+    beta = prefix_trie_size([first, FRAME + LABEL])
+    pairs = 9 + 2 * len(TAIL)
     assert minimum == documents + alpha + beta + 2 * pairs
     full_inputs = (
         2 * (len(PRE) + len(first)) + 9
@@ -140,6 +143,59 @@ def test_minimum_input_tokens_counts_a_document_once_across_uses():
         + 4 * (len(PRE) + len(FRAME) + len(LABEL) + len(TAIL)) + 36)
     assert input_tokens(spec, pieces, filter_answers, join_answers,
                         DocumentTokens(corpus, _encode)) == full_inputs
+
+
+def test_minimum_input_tokens_of_a_join_is_the_trie_of_its_requests():
+    spec = _spec(
+        "TEST-5",
+        "one join",
+        Join(Scan("docs", "d", "body"), Scan("notes", "n", "text"),
+             ("d", "n"), "{0} cites {1}"),
+    )
+    corpus = {
+        "docs": pa.table({"id": ["r", "g"], "body": ["red apple", "green pear"]}),
+        "notes": pa.table({"id": ["1", "2", "3", "4"],
+                           "text": ["the cat sat", "the cat ran", "a dog",
+                                    "the cat sat"]}),
+    }
+    pieces = validate_prompt_pieces(spec, {
+        "tokenizer": "test", "preamble": PRE,
+        "joins": [{"id": "join-1", "anchor": "d", "frame": FRAME,
+                   "label": LABEL, "tail": TAIL}],
+    })
+    pairs = [("r", "1"), ("r", "2"), ("r", "3"), ("r", "4"),
+             ("g", "1"), ("g", "3")]
+    join_answers = {"join-1": pa.table({
+        "d": [anchor for anchor, _ in pairs],
+        "n": [partner for _, partner in pairs],
+        "answer": [True] * len(pairs)})}
+    minimum = minimum_input_tokens(
+        spec, pieces, {}, join_answers, DocumentTokens(corpus, _encode))
+
+    # with unlimited KV every distinct prefix of the requests is computed
+    # once: the label once per anchor, and the partners of one anchor
+    # sharing "the cat " and the whole of a repeated text
+    bodies = {"r": "red apple", "g": "green pear"}
+    texts = {"1": "the cat sat", "2": "the cat ran", "3": "a dog",
+             "4": "the cat sat"}
+    requests = [PRE + _ids(bodies[anchor]) + FRAME + LABEL
+                + _ids(texts[partner]) + TAIL for anchor, partner in pairs]
+    assert minimum == prefix_trie_size(requests)
+
+
+def test_partner_trie_size_matches_the_trie_of_any_subset():
+    rng = random.Random(0)
+    table = ("notes", "text")
+    texts = {str(i): [rng.choice((1, 2, 3)) for _ in range(rng.randint(0, 6))]
+             for i in range(60)}
+    documents = {(*table, i): np.asarray(t, dtype=np.uint32)
+                 for i, t in texts.items()}
+    keys = [(table, i) for i in texts]
+    trie = _PartnerTrie(documents, keys, TAIL)
+    for _ in range(200):
+        members = rng.sample(keys, rng.randint(1, len(keys)))
+        assert trie.size(frozenset(members)) == prefix_trie_size(
+            [texts[i] + TAIL for _, i in members])
 
 
 def _filter_spec():
@@ -313,12 +369,12 @@ def test_minimum_input_tokens_count_joined_rows_as_pairs_after_the_anchor():
     minimum = minimum_input_tokens(
         spec, pieces, {}, join_answers, tokens, classify_answers)
 
-    # the anchor is computed once with both frames after it; the join's
-    # two pairs and the classified pair each get their own suffix
-    anchored = (len(FRAME) + len(classify_frame)
-                - _lcp(FRAME, classify_frame))
-    joined = 2 * (len(LABEL) + len(TAIL)) + 4
-    classified = len(LABEL) + len(CLASSIFY_TAIL) + 2
+    # the anchor is computed once with both frames and their label after
+    # it; the join's partners "aa" and "ab" share their first token, and
+    # the classified pair gets its own partner and tail
+    anchored = prefix_trie_size([FRAME + LABEL, classify_frame + LABEL])
+    joined = 2 * (2 + len(TAIL)) - 1
+    classified = 2 + len(CLASSIFY_TAIL)
     assert minimum == len(PRE) + 5 + anchored + joined + classified
 
 
