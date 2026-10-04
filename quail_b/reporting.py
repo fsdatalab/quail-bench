@@ -77,7 +77,8 @@ def measurement_rows(record) -> list[dict]:
             Null when the query has no classification or none was saved.
         labels_correct: Those classification answers that matched.
         predicted_rows: Distinct result rows the engine produced.
-        expected_rows: Distinct result rows the labels require.
+        expected_rows: Distinct result rows the labels require. Null for
+            a fetch sorted by a score, which precision at k scores.
         matching_rows: Expected rows the engine also produced.
         cost_usd: GPU cost of `runtime_s`, or null when no rate was given.
         cost_usd_per_million_input_tokens: Cost divided by full input tokens,
@@ -108,9 +109,9 @@ def measurement_rows(record) -> list[dict]:
             "answers_correct": answers.get("correct"),
             "labels_evaluated": labels.get("evaluated"),
             "labels_correct": labels.get("correct"),
-            "predicted_rows": output["predicted_rows"],
-            "expected_rows": output["expected_rows"],
-            "matching_rows": output["matching_rows"],
+            "predicted_rows": output.get("predicted_rows"),
+            "expected_rows": output.get("expected_rows"),
+            "matching_rows": output.get("matching_rows"),
             "cost_usd": metrics["cost_usd"],
             "cost_usd_per_million_input_tokens": metrics.get(
                 "cost_usd_per_million_input_tokens"),
