@@ -251,3 +251,25 @@ def test_relational_runs_rescore_from_their_saved_rows(tmp_path):
     rescored = json.loads((destination / "run.json").read_text())
     assert rescored["queries"][0]["status"] == "complete"
     assert rescored["queries"][0]["metrics"] == metrics
+
+
+def test_measurement_rows_take_a_scored_fetch_without_expected_rows(tmp_path):
+    from quail_b.reporting import _write_measurements, measurement_rows
+
+    record = {"queries": [{
+        "id": "REL-AGENT-4", "status": "complete", "runtime_s": 2.0,
+        "metrics": {
+            "fresh_tokens": 1000, "minimum_tokens": None, "regret_tokens": None,
+            "evaluated_document_pairs": None, "input_rows": {"t": 8},
+            "cost_usd": None,
+            "accuracy": {
+                "answer_accuracy": None, "label_accuracy": None,
+                "output_accuracy": {
+                    "predicted_rows": 3, "k": 3, "eligible_rows": 5,
+                    "matching_rows": 2, "precision_at_k": round(2 / 3, 6),
+                    "exact_match": False}}}}]}
+    (row,) = measurement_rows(record)
+    assert (row["predicted_rows"], row["expected_rows"],
+            row["matching_rows"]) == (3, None, 2)
+    _write_measurements(tmp_path, record)
+    assert (tmp_path / "measurements.parquet").exists()
