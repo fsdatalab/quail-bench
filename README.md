@@ -229,9 +229,9 @@ following question:", so an engine can reuse a document's KV across questions.
 
 ### Developing an adapter
 
-The 50 queries have several different shapes: how many filters and joins they
-have, and how those operators are arranged in the plan. The table below lists
-one query for each distinct shape, from simplest to most complex. Test your
+The 50 queries have several different shapes: which operators they have and
+how those operators are arranged in the plan. The table below lists one query
+for each mechanism an adapter needs, from simplest to most complex. Test your
 adapter on these queries first, then run it on all 50.
 
 | Query | Shape | What it tests |
@@ -244,6 +244,17 @@ adapter on these queries first, then run it on all 50.
 | FEV-8 | Chain of three joins | Multiple joins |
 | FEV-10 | Filtered join with equality | Equality and AI conditions together |
 | BIO-4 | Three filters, two joins | Filters on two aliases of one table |
+| FEV-11 | Classification returned and filtered | A label column, and an IN-list filter on it |
+| AGENT-4 | Two classifications in a chain | Label descriptions, and a label filter feeding a classification |
+| IMDB-15 | Classification of joined rows | A label of two documents, returned per pair |
+| REL-AGENT-1 | Two column tests, then a filter | Column tests before the model |
+| REL-AGENT-2 | Filter, sort, offset, limit | Ordered and paged rows |
+| REL-AGENT-4 | Score, sort, limit | `ai_score` and top-k |
+| REL-AGENT-5 | Classify, group by a label, having | `COUNT`, `COUNT(DISTINCT)`, `HAVING`, label keys |
+| REL-AGENT-6 | Filter, group by a column, having, limit | `MIN`, `MAX`, and a limit after an aggregate |
+
+IMDB-11 and REL-AGENT-3 and 7 add no mechanism beyond these: a returned
+label, `DISTINCT` as an aggregate with no measures, and `AVG` over a score.
 
 ### Classification queries
 
