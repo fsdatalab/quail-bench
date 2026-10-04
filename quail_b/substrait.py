@@ -49,21 +49,21 @@ _FUNCTION_URNS = {
 
 
 @dataclass(frozen=True)
-class _Relation:
+class Relation:
     alias: str
     table: str
     text_column: str
 
 
 @dataclass(frozen=True)
-class _Filter:
+class Filter:
     id: str
     relation: str
     prompt: str
 
 
 @dataclass(frozen=True)
-class _Join:
+class Join:
     id: str
     relations: tuple[str, str]
     prompt: str
@@ -71,7 +71,7 @@ class _Join:
 
 
 @dataclass(frozen=True)
-class _Classify:
+class Classify:
     """One ai_classify call that adds a label column to one relation.
 
     A one-document classification labels each document of `relation`.
@@ -107,7 +107,7 @@ class _Classify:
 
 
 @dataclass(frozen=True)
-class _InList:
+class InList:
     """Keep the documents whose label is one of the accepted labels."""
 
     id: str
@@ -117,7 +117,7 @@ class _InList:
 
 
 @dataclass(frozen=True)
-class _Score:
+class Score:
     """One ai_score call that adds a number column to one relation.
 
     The prompt is a filter prompt; the number is the model's belief
@@ -131,7 +131,7 @@ class _Score:
 
 
 @dataclass(frozen=True)
-class _ColumnTest:
+class ColumnTest:
     """A test of one source column against a literal, before the model."""
 
     id: str
@@ -142,7 +142,7 @@ class _ColumnTest:
 
 
 @dataclass(frozen=True)
-class _Aggregate:
+class Aggregate:
     """Group the rows by key columns and compute measures per group.
 
     Attributes:
@@ -158,7 +158,7 @@ class _Aggregate:
 
 
 @dataclass(frozen=True)
-class _Having:
+class Having:
     """Keep the groups whose measures pass (name, comparison, value) tests."""
 
     id: str
@@ -166,7 +166,7 @@ class _Having:
 
 
 @dataclass(frozen=True)
-class _Sort:
+class Sort:
     """Order the rows by (field name, descending) keys; nulls go last."""
 
     id: str
@@ -174,7 +174,7 @@ class _Sort:
 
 
 @dataclass(frozen=True)
-class _Fetch:
+class Fetch:
     """Skip `offset` rows and keep at most `count`."""
 
     id: str
@@ -182,12 +182,12 @@ class _Fetch:
     count: int
 
 
-type _Operator = _Filter | _Join | _Classify | _InList | _Score | _ColumnTest
-type _Step = _Aggregate | _Having | _Sort | _Fetch
+type Operator = Filter | Join | Classify | InList | Score | ColumnTest
+type Step = Aggregate | Having | Sort | Fetch
 
 
 @dataclass(frozen=True)
-class _PlanInfo:
+class PlanInfo:
     """The benchmark reading of a plan.
 
     `operators` are the steps under the AI tree, in post-order.
@@ -198,46 +198,46 @@ class _PlanInfo:
     bare name for a measure.
     """
 
-    relations: tuple[_Relation, ...]
-    operators: tuple[_Operator, ...]
+    relations: tuple[Relation, ...]
+    operators: tuple[Operator, ...]
     select: tuple[str, ...]
-    tail: tuple[_Step, ...] = ()
+    tail: tuple[Step, ...] = ()
     fields: tuple[str, ...] = ()
 
     @property
-    def filters(self) -> tuple[_Filter, ...]:
+    def filters(self) -> tuple[Filter, ...]:
         return tuple(
             operator
             for operator in self.operators
-            if isinstance(operator, _Filter)
+            if isinstance(operator, Filter)
         )
 
     @property
-    def joins(self) -> tuple[_Join, ...]:
+    def joins(self) -> tuple[Join, ...]:
         return tuple(
             operator
             for operator in self.operators
-            if isinstance(operator, _Join)
+            if isinstance(operator, Join)
         )
 
     @property
-    def ai_operators(self) -> tuple[_Filter | _Join | _Classify | _Score, ...]:
+    def ai_operators(self) -> tuple[Filter | Join | Classify | Score, ...]:
         """The operators that ask the model, each with its prompt."""
         return tuple(
             operator
             for operator in self.operators
-            if not isinstance(operator, (_InList, _ColumnTest))
+            if not isinstance(operator, (InList, ColumnTest))
         )
 
     @property
-    def scores(self) -> tuple[_Score, ...]:
+    def scores(self) -> tuple[Score, ...]:
         return tuple(operator for operator in self.operators
-                     if isinstance(operator, _Score))
+                     if isinstance(operator, Score))
 
     @property
-    def column_tests(self) -> tuple[_ColumnTest, ...]:
+    def column_tests(self) -> tuple[ColumnTest, ...]:
         return tuple(operator for operator in self.operators
-                     if isinstance(operator, _ColumnTest))
+                     if isinstance(operator, ColumnTest))
 
     @property
     def relational(self) -> bool:
@@ -245,48 +245,48 @@ class _PlanInfo:
         return bool(self.scores or self.column_tests or self.tail)
 
     @property
-    def aggregate(self) -> _Aggregate | None:
+    def aggregate(self) -> Aggregate | None:
         return next((step for step in self.tail
-                     if isinstance(step, _Aggregate)), None)
+                     if isinstance(step, Aggregate)), None)
 
     @property
-    def having(self) -> _Having | None:
+    def having(self) -> Having | None:
         return next((step for step in self.tail
-                     if isinstance(step, _Having)), None)
+                     if isinstance(step, Having)), None)
 
     @property
-    def sort(self) -> _Sort | None:
+    def sort(self) -> Sort | None:
         return next((step for step in self.tail
-                     if isinstance(step, _Sort)), None)
+                     if isinstance(step, Sort)), None)
 
     @property
-    def fetch(self) -> _Fetch | None:
+    def fetch(self) -> Fetch | None:
         return next((step for step in self.tail
-                     if isinstance(step, _Fetch)), None)
+                     if isinstance(step, Fetch)), None)
 
     @property
-    def classifies(self) -> tuple[_Classify, ...]:
+    def classifies(self) -> tuple[Classify, ...]:
         return tuple(
             operator
             for operator in self.operators
-            if isinstance(operator, _Classify)
+            if isinstance(operator, Classify)
         )
 
     @property
-    def in_lists(self) -> tuple[_InList, ...]:
+    def in_lists(self) -> tuple[InList, ...]:
         return tuple(
             operator
             for operator in self.operators
-            if isinstance(operator, _InList)
+            if isinstance(operator, InList)
         )
 
-    def classify_output(self, output: str) -> _Classify:
+    def classify_output(self, output: str) -> Classify:
         return next(
             operator for operator in self.classifies
             if operator.output == output
         )
 
-    def pairing_join(self, operator: _Classify) -> _Join | None:
+    def pairing_join(self, operator: Classify) -> Join | None:
         """The join of exactly the two relations whose rows the call labels."""
         return next(
             (join for join in self.joins
@@ -297,7 +297,7 @@ class _PlanInfo:
     def base_alias(self) -> str:
         return self.relations[0].alias
 
-    def relation(self, alias: str) -> _Relation:
+    def relation(self, alias: str) -> Relation:
         return next(
             relation for relation in self.relations if relation.alias == alias
         )
@@ -308,7 +308,7 @@ class _Decoded:
     fields: tuple[tuple[str, str], ...]
     tables: tuple[tuple[str, str], ...]
     text_columns: tuple[tuple[str, str], ...]
-    operators: tuple[_Operator, ...]
+    operators: tuple[Operator, ...]
 
 
 def _with_text_column(
@@ -468,7 +468,7 @@ def _decode(
         alias, output = _selected(child.fields, membership.value)
         classify = next(
             (operator for operator in child.operators
-             if isinstance(operator, _Classify)
+             if isinstance(operator, Classify)
              and (operator.relation, operator.output) == (alias, output)),
             None)
         if classify is None:
@@ -481,7 +481,7 @@ def _decode(
             raise ValueError("an IN-list filter needs distinct accepted labels")
         if not set(accepted) <= set(classify.labels):
             raise ValueError("an IN-list filter accepts a label not in its call")
-        operator = _InList(
+        operator = InList(
             rel.filter.common.hint.alias, alias, output, accepted)
         return _Decoded(child.fields, child.tables, child.text_columns,
                         (*child.operators, operator))
@@ -499,7 +499,7 @@ def _decode(
                 comparison))
         if len({test.relation for test in tests}) != 1:
             raise ValueError("a column test FilterRel tests one relation")
-        if any(not isinstance(operator, _ColumnTest)
+        if any(not isinstance(operator, ColumnTest)
                for operator in child.operators):
             raise ValueError(
                 "a column test sits directly over its relation's scan")
@@ -517,7 +517,7 @@ def _decode(
             raise ValueError("ai_filter needs a prompt and document")
         prompt = _literal_string(arguments[0])
         field = _selected(child.fields, arguments[1])
-        operator = _Filter(rel.filter.common.hint.alias, field[0], prompt)
+        operator = Filter(rel.filter.common.hint.alias, field[0], prompt)
         return _Decoded(
             child.fields,
             child.tables,
@@ -574,7 +574,7 @@ def _decode(
                 on.append((second[1], first[1]))
             else:
                 raise ValueError("join equality uses unrelated relations")
-        operator = _Join(
+        operator = Join(
             rel.join.common.hint.alias,
             relation_aliases,
             prompt,
@@ -614,14 +614,14 @@ def _literal_value(expression: algebra_pb2.Expression):
 
 
 def _column_test(operator_id: str, fields, condition, comparison: str
-                 ) -> _ColumnTest:
+                 ) -> ColumnTest:
     arguments = _arguments(condition)
     if len(arguments) != 2:
         raise ValueError("a column test compares a column with a literal")
     alias, column = _selected(fields, arguments[0])
     if column == "id":
         raise ValueError("a column test does not test the id column")
-    return _ColumnTest(operator_id, alias, column, comparison,
+    return ColumnTest(operator_id, alias, column, comparison,
                        _literal_value(arguments[1]))
 
 
@@ -656,7 +656,7 @@ def _decode_score(project: algebra_pb2.ProjectRel,
         raise ValueError("a score column must belong to the scored relation")
     if output == "id" or (alias, output) in child.fields:
         raise ValueError(f"score column {output!r} is already a field")
-    operator = _Score(project.common.hint.alias, alias, prompt, output)
+    operator = Score(project.common.hint.alias, alias, prompt, output)
     return _Decoded(
         (*child.fields, (alias, output)),
         child.tables,
@@ -706,7 +706,7 @@ def _decode_classify(project: algebra_pb2.ProjectRel,
     if output == "id" or (alias, output) in child.fields:
         raise ValueError(f"label column {output!r} is already a field")
     partner = fields[1][0] if documents == 2 else None
-    operator = _Classify(project.common.hint.alias, alias, prompt, labels,
+    operator = Classify(project.common.hint.alias, alias, prompt, labels,
                          descriptions, output, partner)
     text_columns = child.text_columns
     for field in fields:
@@ -727,7 +727,7 @@ def _field_alias(name: str) -> str:
 
 
 def _decode_tail(rel: algebra_pb2.Rel, functions: dict[int, str]
-                 ) -> tuple[_Decoded, tuple[_Step, ...], tuple[str, ...]]:
+                 ) -> tuple[_Decoded, tuple[Step, ...], tuple[str, ...]]:
     """Decode the relational steps between the root projection and the AI tree.
 
     Returns:
@@ -745,7 +745,7 @@ def _decode_tail(rel: algebra_pb2.Rel, functions: dict[int, str]
                 or offset < 0 or count <= 0:
             raise ValueError("a fetch needs a nonnegative offset and a "
                              "positive count")
-        return child, (*steps, _Fetch(fetch.common.hint.alias, offset, count)), \
+        return child, (*steps, Fetch(fetch.common.hint.alias, offset, count)), \
             fields
     if kind == "sort":
         sort = rel.sort
@@ -758,11 +758,11 @@ def _decode_tail(rel: algebra_pb2.Rel, functions: dict[int, str]
             keys.append((fields[_selection_index(item.expr)], descending))
         if not keys:
             raise ValueError("a sort needs at least one key")
-        return child, (*steps, _Sort(sort.common.hint.alias, tuple(keys))), \
+        return child, (*steps, Sort(sort.common.hint.alias, tuple(keys))), \
             fields
     if kind == "filter" and _comparison_name(rel.filter.condition, functions):
         child, steps, fields = _decode_tail(rel.filter.input, functions)
-        if not steps or not isinstance(steps[-1], _Aggregate):
+        if not steps or not isinstance(steps[-1], Aggregate):
             raise ValueError("a having FilterRel sits over an AggregateRel")
         tests = []
         for condition in _flatten(rel.filter.condition, functions):
@@ -775,7 +775,7 @@ def _decode_tail(rel: algebra_pb2.Rel, functions: dict[int, str]
             if isinstance(value, str):
                 raise ValueError("a having test compares with a number")
             tests.append((name, _comparison_name(condition, functions), value))
-        return child, (*steps, _Having(rel.filter.common.hint.alias,
+        return child, (*steps, Having(rel.filter.common.hint.alias,
                                         tuple(tests))), fields
     if kind == "aggregate":
         aggregate = rel.aggregate
@@ -807,18 +807,18 @@ def _decode_tail(rel: algebra_pb2.Rel, functions: dict[int, str]
             if not name or "." in name:
                 raise ValueError(f"a measure needs a bare name, got {name!r}")
             measures.append((name, function, argument))
-        step = _Aggregate(aggregate.common.hint.alias, keys, tuple(measures))
+        step = Aggregate(aggregate.common.hint.alias, keys, tuple(measures))
         return child, (step,), names
     decoded = _decode(rel, functions)
     return decoded, (), tuple(".".join(field) for field in decoded.fields)
 
 
-def _validate_relational(info: _PlanInfo) -> None:
+def _validate_relational(info: PlanInfo) -> None:
     """Check the column tests, scores, tail, and projection of a relational plan."""
     if len(info.relations) != 1:
         raise ValueError("a relational QUAIL-B query reads one relation")
     kinds = [type(step) for step in info.tail]
-    allowed = [_Aggregate, _Having, _Sort, _Fetch]
+    allowed = [Aggregate, Having, Sort, Fetch]
     order = [allowed.index(kind) for kind in kinds]
     if order != sorted(order) or len(set(order)) != len(order):
         raise ValueError("relational steps are at most one aggregate, "
@@ -856,7 +856,7 @@ def _validate_relational(info: _PlanInfo) -> None:
             raise ValueError(f"score column {score.output!r} is never used")
 
 
-def _validate_info(info: _PlanInfo) -> None:
+def _validate_info(info: PlanInfo) -> None:
     aliases = [relation.alias for relation in info.relations]
     if not aliases or len(set(aliases)) != len(aliases):
         raise ValueError("QUAIL-B relation aliases must be nonempty and unique")
@@ -878,13 +878,13 @@ def _validate_info(info: _PlanInfo) -> None:
         joined.update(referenced)
     first_join = {alias: len(info.operators) for alias in aliases}
     for index, operator in enumerate(info.operators):
-        if isinstance(operator, _Join):
+        if isinstance(operator, Join):
             for alias in operator.relations:
                 first_join[alias] = min(first_join[alias], index)
     join_index = {join.id: index for index, join in enumerate(info.operators)
-                  if isinstance(join, _Join)}
+                  if isinstance(join, Join)}
     for index, operator in enumerate(info.operators):
-        if isinstance(operator, _Classify) and operator.partner is not None:
+        if isinstance(operator, Classify) and operator.partner is not None:
             # a classification of joined rows labels the rows a join kept
             join = info.pairing_join(operator)
             if join is None or index < join_index[join.id]:
@@ -892,7 +892,7 @@ def _validate_info(info: _PlanInfo) -> None:
                     f"classification {operator.id!r} of joined rows must follow the "
                     "join of its two relations")
         elif (
-            isinstance(operator, (_Filter, _Classify, _InList))
+            isinstance(operator, (Filter, Classify, InList))
             and index > first_join[operator.relation]
         ):
             raise ValueError(
@@ -932,7 +932,7 @@ def _validate_info(info: _PlanInfo) -> None:
                 f"label column {operator.output!r} is never used")
 
 
-def _inspect_plan(plan: plan_pb2.Plan) -> _PlanInfo:
+def inspect_plan(plan: plan_pb2.Plan) -> PlanInfo:
     """Return the benchmark information in a supported Substrait plan."""
     version = plan.version
     if (
@@ -967,8 +967,8 @@ def _inspect_plan(plan: plan_pb2.Plan) -> _PlanInfo:
     for alias, table in decoded.tables:
         if alias not in text_columns:
             raise ValueError(f"relation {alias!r} is not read by an AI function")
-        relations.append(_Relation(alias, table, text_columns[alias]))
-    info = _PlanInfo(tuple(relations), decoded.operators, select, tail, fields)
+        relations.append(Relation(alias, table, text_columns[alias]))
+    info = PlanInfo(tuple(relations), decoded.operators, select, tail, fields)
     _validate_info(info)
     return info
 

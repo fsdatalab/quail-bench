@@ -10,7 +10,7 @@ from pyarrow import fs
 import quail_b as benchmark
 from quail_b import _files
 from quail_b.data import GROUND_TRUTH_ROOT, PUBLISHED_CORPORA
-from quail_b.substrait import _inspect_plan
+from quail_b.substrait import inspect_plan
 
 
 def test_load_table_and_query(tmp_path):
@@ -33,9 +33,9 @@ def test_load_table_and_query(tmp_path):
             benchmark.load_table(root=tmp_path, **kwargs)
     with pytest.raises(FileNotFoundError):
         benchmark.load_table("aspects", root=tmp_path)
-    first = _inspect_plan(benchmark.get_query("IMDB-1").plan)
+    first = inspect_plan(benchmark.get_query("IMDB-1").plan)
     assert first.relations[0].table == "reviews"
-    join = _inspect_plan(benchmark.get_query("IMDB-4").plan)
+    join = inspect_plan(benchmark.get_query("IMDB-4").plan)
     assert {relation.table for relation in join.relations} == {
         "reviews", "aspects"
     }

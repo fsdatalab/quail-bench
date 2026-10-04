@@ -242,9 +242,9 @@ def test_fev9_expected_rows_follow_the_join_chain_and_every_filter():
 
     spec = queries()["FEV-9"]
     assert [(filter_spec.relation, filter_spec.prompt)
-            for filter_spec in spec._info.filters] == [
+            for filter_spec in spec.info.filters] == [
         ("c1", F11), ("e1", F13), ("c2", F11), ("e2", F13)]
-    assert [join.relations for join in spec._info.joins] == [
+    assert [join.relations for join in spec.info.joins] == [
         ("c1", "e1"), ("c2", "e1"), ("c2", "e2")]
 
     rows = expected_rows(spec, truth, corpus)
@@ -259,10 +259,10 @@ def test_fev10_rows_keep_only_pairs_on_the_claims_own_page():
     corpus, truth = fever_truth()
     spec = queries()["FEV-10"]
     cross = queries()["FEV-5"]
-    assert spec._info.joins[0].on == (("evidence_wiki_url", "id"),)
+    assert spec.info.joins[0].on == (("evidence_wiki_url", "id"),)
     assert (
-        spec._info.relations == cross._info.relations
-        and not cross._info.joins[0].on
+        spec.info.relations == cross.info.relations
+        and not cross.info.joins[0].on
     )
 
     # FEV-5 keeps every supported pair of surviving documents; FEV-10
@@ -304,7 +304,7 @@ def test_load_benchmark_with_local_reference_labels(tmp_path):
 
     corpus_id = PUBLISHED_CORPORA[0.1]
     spec = benchmark.get_query("IMDB-1")
-    template = spec._info.filters[0].prompt
+    template = spec.info.filters[0].prompt
     predicate_key = "test.review.filter"
     collection_dir = (tmp_path / GROUND_TRUTH_ROOT / "collections"
                       / collection_id)
@@ -571,13 +571,13 @@ def _chain_spec():
 
 def _random_output(spec, rng, claims=12, evidence=8):
     filters = {}
-    for filter_spec in spec._info.filters:
+    for filter_spec in spec.info.filters:
         alias = filter_spec.relation
         filters[filter_spec.id] = pa.table({
             alias: [f"c{i}" for i in range(claims)],
             "answer": [rng.random() < 0.7 for _ in range(claims)]})
     joins = {}
-    for join in spec._info.joins:
+    for join in spec.info.joins:
         left, right = join.relations
         sizes = {"c": claims, "e": evidence}
         pairs = [(f"{left[0]}{i}", f"{right[0]}{j}")
@@ -672,7 +672,7 @@ def test_row_counts_agree_with_built_rows():
     # projection (which scores the saved rows)
     for select in (None, ["c1", "e2"]):
         spec = _fever_chain_spec(select)
-        selected = [name.split(".")[0] for name in spec._info.select]
+        selected = [name.split(".")[0] for name in spec.info.select]
         for seed in range(4):
             rng = random.Random(seed)
             corpus, truth = _chain_truth(rng)

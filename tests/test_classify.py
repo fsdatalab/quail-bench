@@ -34,11 +34,11 @@ CLASSIFY_QUERIES = ("IMDB-11", "IMDB-12", "IMDB-13", "IMDB-14", "IMDB-15",
 def test_classification_queries_are_published():
     assert pending_query_ids() == ()
     assert tuple(query_id for query_id, spec in queries().items()
-                 if spec._info.classifies) == CLASSIFY_QUERIES
+                 if spec.info.classifies) == CLASSIFY_QUERIES
 
 
 def test_agent_5_classifies_each_trace_three_ways():
-    info = quail_b.get_query("AGENT-5")._info
+    info = quail_b.get_query("AGENT-5").info
     assert [operator.output for operator in info.classifies] == [
         "progress", "domain", "root_cause"]
     assert {operator.relation for operator in info.classifies} == {"t"}
@@ -52,7 +52,7 @@ def test_every_classification_has_one_predicate():
     assert len(by_template) == len(predicates.CLASSIFY_PREDICATES)
     used = set()
     for query_id in CLASSIFY_QUERIES + pending_query_ids():
-        for operator in quail_b.get_query(query_id)._info.classifies:
+        for operator in quail_b.get_query(query_id).info.classifies:
             spec = by_template[operator.prompt]
             assert spec.labels == operator.labels
             assert predicates._descriptions(spec) == operator.descriptions
@@ -61,7 +61,7 @@ def test_every_classification_has_one_predicate():
 
 
 def test_plans_carry_label_columns_and_filters():
-    info = quail_b.get_query("IMDB-13")._info
+    info = quail_b.get_query("IMDB-13").info
     assert [operator.id for operator in info.operators] == [
         "classify-1", "in-list-1", "join-1"]
     assert info.select == ("r.id", "r.sentiment", "a.id")
@@ -69,19 +69,19 @@ def test_plans_carry_label_columns_and_filters():
         == ["r", "sentiment", "a"]
     (in_list,) = info.in_lists
     assert in_list.accepted == ("negative", "mixed")
-    agent = quail_b.get_query("AGENT-4")._info
+    agent = quail_b.get_query("AGENT-4").info
     assert [operator.output for operator in agent.classifies] == [
         "progress", "test_result"]
     assert agent.in_lists[0].accepted == prompts.AGENT_CHANGED_CODE
     assert agent.classifies[1].descriptions == (
         prompts.AGENT_TEST_RESULT_DESCRIPTIONS)
-    assert quail_b.get_query("IMDB-12")._info.classifies[0].descriptions == (
+    assert quail_b.get_query("IMDB-12").info.classifies[0].descriptions == (
         ("",) * len(prompts.IMDB_GENRE_LABELS))
 
 
 def test_joined_classification_plan():
     plan = quail_b.get_query("IMDB-15").plan
-    info = quail_b.get_query("IMDB-15")._info
+    info = quail_b.get_query("IMDB-15").info
     assert [operator.id for operator in info.operators] == [
         "classify-1", "in-list-1", "join-1", "classify-2"]
     one, pair = info.classifies
@@ -120,9 +120,9 @@ def _pair_tree(documents=None):
 
 
 def test_joined_classification_rules():
-    info = _spec(_pair_tree(), ("r", "a", "r.x"))._info
+    info = _spec(_pair_tree(), ("r", "a", "r.x")).info
     assert info.classifies[0].relations == ("r", "a")
-    reversed_info = _spec(_pair_tree(("a", "r")), ("r", "a", "a.x"))._info
+    reversed_info = _spec(_pair_tree(("a", "r")), ("r", "a", "a.x")).info
     assert reversed_info.classifies[0].relations == ("a", "r")
     with pytest.raises(ValueError, match="one-document classification"):
         _spec(InList(_pair_tree(), "x", ("yes",)), ("r", "a"))

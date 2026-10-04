@@ -26,12 +26,12 @@ from quail_b.scoring import (
     scores_from_answers,
 )
 from quail_b.substrait import (
-    _Classify,
-    _ColumnTest,
-    _Filter,
-    _InList,
-    _Join,
-    _Score,
+    Classify,
+    ColumnTest,
+    Filter,
+    InList,
+    Join,
+    Score,
 )
 
 RUN_SCHEMA_VERSION = 2
@@ -63,15 +63,15 @@ def _query_hash(spec):
         )
     functions.sort()
     operators = []
-    for operator in spec._info.operators:
-        if isinstance(operator, _Filter):
+    for operator in spec.info.operators:
+        if isinstance(operator, Filter):
             operators.append({
                 "kind": "filter",
                 "id": operator.id,
                 "relation": operator.relation,
                 "prompt": operator.prompt,
             })
-        elif isinstance(operator, _Classify):
+        elif isinstance(operator, Classify):
             operators.append({
                 "kind": "classify",
                 "id": operator.id,
@@ -85,7 +85,7 @@ def _query_hash(spec):
                 **({"partner": operator.partner}
                    if operator.partner is not None else {}),
             })
-        elif isinstance(operator, _InList):
+        elif isinstance(operator, InList):
             operators.append({
                 "kind": "in_list",
                 "id": operator.id,
@@ -93,7 +93,7 @@ def _query_hash(spec):
                 "output": operator.output,
                 "accepted": operator.accepted,
             })
-        elif isinstance(operator, _ColumnTest):
+        elif isinstance(operator, ColumnTest):
             operators.append({
                 "kind": "column_test",
                 "id": operator.id,
@@ -102,7 +102,7 @@ def _query_hash(spec):
                 "comparison": operator.comparison,
                 "value": operator.value,
             })
-        elif isinstance(operator, _Score):
+        elif isinstance(operator, Score):
             operators.append({
                 "kind": "score",
                 "id": operator.id,
@@ -111,7 +111,7 @@ def _query_hash(spec):
                 "output": operator.output,
             })
         else:
-            assert isinstance(operator, _Join)
+            assert isinstance(operator, Join)
             operators.append({
                 "kind": "join",
                 "id": operator.id,
@@ -132,18 +132,18 @@ def _query_hash(spec):
                 "table": relation.table,
                 "text_column": relation.text_column,
             }
-            for relation in spec._info.relations
+            for relation in spec.info.relations
         ],
         "operators": operators,
-        "select": spec._info.select,
+        "select": spec.info.select,
     }
-    if spec._info.tail:
+    if spec.info.tail:
         # only a relational query has a tail, so the published hashes
         # of the other queries stay as they are
         definition["tail"] = [
             {"kind": type(step).__name__.lstrip("_").lower(),
              **{key: value for key, value in vars(step).items()}}
-            for step in spec._info.tail]
+            for step in spec.info.tail]
     if PROMPT_FORMAT != "raw-v1":
         definition["prompt_format"] = PROMPT_FORMAT
     encoded = json.dumps(
@@ -258,11 +258,11 @@ def _validate_output(spec, output, tables):
                 codes.group_by(aliases).aggregate([]).num_rows != codes.num_rows):
             raise ValueError("duplicate document IDs in an answer table")
 
-    selected = [name.split(".")[0] for name in spec._info.select
+    selected = [name.split(".")[0] for name in spec.info.select
                 if name.endswith(".id")]
     columns = output_columns(spec)
     label_names = {
-        operator.output: operator for operator in spec._info.classifies}
+        operator.output: operator for operator in spec.info.classifies}
 
     def validate_labels(table, names):
         for name in names:
@@ -276,13 +276,13 @@ def _validate_output(spec, output, tables):
 
     returned = [name for name in columns if name in label_names]
     answers = scores_from_answers(spec, output, tables)
-    if spec._info.relational:
+    if spec.info.relational:
         if output.rows is None:
             raise ValueError("a relational query's run must include its rows")
         if set(output.rows.column_names) != set(columns):
             raise ValueError("output columns must match the query's selected "
                              "fields")
-        fetch = spec._info.fetch
+        fetch = spec.info.fetch
         if fetch is not None and output.rows.num_rows > fetch.count:
             raise ValueError(
                 f"the engine returned {output.rows.num_rows:,} rows for a "
@@ -320,7 +320,7 @@ def _validate_output(spec, output, tables):
         if not (pc.all(mask).as_py() if sample.num_rows else True):
             raise ValueError("a returned row is not implied by the answers")
     filters = {
-        filter_spec.id: filter_spec for filter_spec in spec._info.filters
+        filter_spec.id: filter_spec for filter_spec in spec.info.filters
     }
     for operator_id, table in (output.filter_answers or {}).items():
         if operator_id not in filters:
@@ -329,14 +329,14 @@ def _validate_output(spec, output, tables):
         validate_ids(table, [alias])
         if table["answer"].null_count or str(table["answer"].type) != "bool":
             raise ValueError("predicate answers must be non-null booleans")
-    joins = {join.id: join for join in spec._info.joins}
+    joins = {join.id: join for join in spec.info.joins}
     for operator_id, table in (output.join_answers or {}).items():
         if operator_id not in joins:
             raise ValueError(f"unknown join operator {operator_id!r}")
         validate_ids(table, joins[operator_id].relations)
         if table["answer"].null_count or str(table["answer"].type) != "bool":
             raise ValueError("predicate answers must be non-null booleans")
-    classifies = {operator.id: operator for operator in spec._info.classifies}
+    classifies = {operator.id: operator for operator in spec.info.classifies}
     for operator_id, table in (output.classify_answers or {}).items():
         if operator_id not in classifies:
             raise ValueError(f"unknown classify operator {operator_id!r}")
@@ -356,7 +356,7 @@ def _score(spec, output, suite, gpu_count, gpu_hourly_rate_usd, tokens=None):
     seconds = output.runtime_s
     inputs = {
         relation.alias: len(suite.tables[relation.table])
-        for relation in spec._info.relations
+        for relation in spec.info.relations
     }
     metrics = {
         "runtime_s": seconds, "input_rows": inputs,
@@ -375,11 +375,11 @@ def _score(spec, output, suite, gpu_count, gpu_hourly_rate_usd, tokens=None):
     metrics["kv_regret_percent"] = (
         100 * metrics["regret_tokens"] / metrics["fresh_tokens"]
         if metrics["regret_tokens"] is not None and metrics["fresh_tokens"] else None)
-    if spec._info.joins:
+    if spec.info.joins:
         pairs = output.measurements.get("evaluated_document_pairs")
         if output.join_answers is not None:
             if set(output.join_answers) == {
-                join.id for join in spec._info.joins
+                join.id for join in spec.info.joins
             }:
                 pairs = sum(len(table) for table in output.join_answers.values())
         if pairs is not None and (
@@ -455,7 +455,7 @@ def run(run_query, *, queries=None, scale_factor=0.1, output_dir,
             print(f"[quail-b] {spec.id}: {spec.description}", flush=True)
             tables = {
                 relation.table: suite.tables[relation.table]
-                for relation in spec._info.relations
+                for relation in spec.info.relations
             }
             try:
                 output = run_query(spec, tables)

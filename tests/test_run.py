@@ -39,8 +39,8 @@ def _inputs(root, sf):
     label_sets = {}
     predicates = [
         ("filter", filter_spec.prompt, None)
-        for filter_spec in spec._info.filters
-    ] + [("join", spec._info.joins[0].prompt, "aspects")]
+        for filter_spec in spec.info.filters
+    ] + [("join", spec.info.joins[0].prompt, "aspects")]
     for index, (kind, template, right) in enumerate(predicates):
         key = f"predicate_{index}"
         label_id = f"ls_{sf}_{index}"
@@ -78,7 +78,7 @@ def test_join_runs_at_all_scales_and_report_cli(tmp_path):
         return quail_b.RunOutput(
             {filter_spec.id: pa.table({
                 "r": ["r0", "r1"], "answer": [True, True]})
-             for filter_spec in spec._info.filters},
+             for filter_spec in spec.info.filters},
             {"join-1": pa.table({
                 "r": ["r0", "r1"], "a": ["a0", "a0"], "answer": [True, True]})},
             pa.table({"r": ["r0", "r1"], "a": ["a0", "a0"]}),
@@ -136,7 +136,7 @@ def test_prompt_pieces_give_the_minimum_and_the_regret(
         "tokenizer": "test-tokenizer", "preamble": [1, 2],
         "filters": [
             {"id": filter_spec.id, "tail": [10 + index, 20]}
-            for index, filter_spec in enumerate(spec._info.filters)
+            for index, filter_spec in enumerate(spec.info.filters)
         ],
         "joins": [{"id": "join-1", "anchor": "r", "frame": [30, 31],
                    "label": [40], "tail": [50, 51, 52]}],
@@ -146,7 +146,7 @@ def test_prompt_pieces_give_the_minimum_and_the_regret(
         return quail_b.RunOutput(
             {filter_spec.id: pa.table({
                 "r": ["r0", "r1"], "answer": [True, True]})
-             for filter_spec in spec._info.filters},
+             for filter_spec in spec.info.filters},
             {"join-1": pa.table({
                 "r": ["r0", "r1"], "a": ["a0", "a0"], "answer": [True, True]})},
             pa.table({"r": ["r0", "r1"], "a": ["a0", "a0"]}),
@@ -161,7 +161,7 @@ def test_prompt_pieces_give_the_minimum_and_the_regret(
     # the preamble once, then "good" and "bad" (4 and 3 tokens, sharing
     # nothing); per review the two filter tails and the frame, which
     # share nothing; per pair the label, "acting", and the tail
-    stages = len(spec._info.filters)
+    stages = len(spec.info.filters)
     assert stages == 2
     minimum = (2 + 4 + 3) + 2 * (2 * 2 + 2) + 2 * (1 + 6 + 3)
     assert metrics["minimum_tokens"] == minimum

@@ -32,7 +32,7 @@ from quail_b.substrait import (
     AI_JOIN_NAME,
     AND_NAME,
     EQUAL_NAME,
-    _inspect_plan,
+    inspect_plan,
 )
 from tools.make_substrait_plans import write_plans
 
@@ -50,7 +50,7 @@ def test_catalog_has_the_50_default_queries_and_two_privacy_queries():
     assert [spec.id for spec in PRIVACY_QUERIES] == ["PRIV-1", "PRIV-2"]
     assert list(queries(include_privacy=True)) == [*QUERY_ORDER, "PRIV-1", "PRIV-2"]
     for spec in QUERIES:
-        info = _inspect_plan(spec.plan)
+        info = inspect_plan(spec.plan)
         assert all(
             filter_spec.prompt in FILTER_SELECTIVITY_ESTIMATES
             for filter_spec in info.filters
@@ -67,7 +67,7 @@ def test_catalog_has_the_50_default_queries_and_two_privacy_queries():
         if not info.classifies and not info.relational:
             assert all(name.endswith(".id") for name in info.select), spec.id
     for spec in PRIVACY_QUERIES:
-        info = _inspect_plan(spec.plan)
+        info = inspect_plan(spec.plan)
         assert any(
             filter_spec.prompt not in FILTER_SELECTIVITY_ESTIMATES
             for filter_spec in info.filters
@@ -84,7 +84,7 @@ def test_query_spec_contains_only_identity_and_plan_bytes():
 
 @pytest.mark.parametrize("query_id", ["BIO-1", "BIO-3"])
 def test_biodex_filters_match_the_replacement_reference(query_id):
-    info = _inspect_plan(queries()[query_id].plan)
+    info = inspect_plan(queries()[query_id].plan)
     assert [(op.id, op.relation, op.prompt) for op in info.filters] == [
         ("filter-1", "r", SERIOUS_ADVERSE_EVENT),
     ]
@@ -92,7 +92,7 @@ def test_biodex_filters_match_the_replacement_reference(query_id):
 
 
 def test_bio_4_filters_each_input_and_reuses_the_report_in_both_joins():
-    info = _inspect_plan(queries()["BIO-4"].plan)
+    info = inspect_plan(queries()["BIO-4"].plan)
     assert [(op.relation, op.prompt) for op in info.filters] == [
         ("r", SERIOUS_ADVERSE_EVENT),
         ("n", NEUROLOGICAL_REACTION),
@@ -115,7 +115,7 @@ def test_filters_are_substrait_relations_over_their_input():
 
     plan = spec.plan
     assert isinstance(plan, plan_pb2.Plan)
-    info = _inspect_plan(plan)
+    info = inspect_plan(plan)
     assert [
         (relation.alias, relation.table, relation.text_column)
         for relation in info.relations
@@ -175,7 +175,7 @@ def test_fev_10_combines_ai_and_ordinary_join_conditions():
 
 def test_repeated_tables_and_join_order_round_trip_through_substrait():
     spec = queries()["IMDB-9"]
-    details = _inspect_plan(spec.plan)
+    details = inspect_plan(spec.plan)
 
     assert [(relation.alias, relation.table) for relation in details.relations] == [
         ("r1", "reviews"),
