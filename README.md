@@ -281,51 +281,27 @@ prompt, the answer tables, and label accuracy.
 
 ### Relational queries
 
-Seven queries combine the AI functions with the relational operators an
-analyst writes around them: a test of a plain column before any model
-call, `ORDER BY` with `OFFSET` and `LIMIT`, `DISTINCT`, `GROUP BY` with
-`COUNT`, `COUNT(DISTINCT)`, `SUM`, `AVG`, `MIN`, and `MAX`, and
-`HAVING`. They read the agent traces, whose columns `trajectory_id`,
-`turn_index`, and `token_count` are plain values beside the trace. Two
-of them use a fourth AI function:
-
-```text
-ai_score(prompt, document) -> fp64
-```
-
-`ai_score` takes a filter prompt and returns the model's belief that the
-document answers it TRUE, between 0 and 1. The plans put the relational
-steps above the AI tree as Substrait `AggregateRel`, `FilterRel`,
-`SortRel`, and `FetchRel`, and a column test as a `FilterRel` directly
-over the scan.
+The seven `REL-AGENT` queries add relational operators over the agent traces:
+column tests, `ORDER BY` with `OFFSET` and `LIMIT`, `DISTINCT`, `GROUP BY` with
+`COUNT`, `COUNT(DISTINCT)`, `SUM`, `AVG`, `MIN`, `MAX`, and `HAVING`. Two of them
+use a fourth AI function, `ai_score(prompt, document) -> fp64`. It returns the
+model's belief, from 0 to 1, that the document answers a filter prompt TRUE.
 
 | Query | Question | Operators |
 | --- | --- | --- |
-| REL-AGENT-1 | Which snapshots past turn 10 and under 6,000 tokens recovered from a failed approach? | Two column tests, then a filter |
-| REL-AGENT-2 | The second page of ten recovered snapshots, shortest trace first | Filter, sort, fetch |
-| REL-AGENT-3 | Which trajectories implemented a plausible fix at some snapshot? | Filter, distinct |
-| REL-AGENT-4 | The 20 snapshots the model is most confident recovered | Score, sort, fetch |
-| REL-AGENT-5 | For traces that changed the code, how many snapshots and trajectories had each test outcome, with at least 50 snapshots? | Classify, label filter, classify, group by, count, count distinct, having, sort |
-| REL-AGENT-6 | Trajectories with at least two fixes: how many, the first fix's turn, the longest trace; earliest first | Filter, group by, min, max, having, sort, fetch |
-| REL-AGENT-7 | The ten trajectories of at least five snapshots the model rates most consistently as having a fix | Score, group by, avg, having, sort, fetch |
+| REL-AGENT-1 | Recovered snapshots at turn 10 or later, of at most 6,000 tokens | Column tests, filter |
+| REL-AGENT-2 | Second page of ten recovered snapshots, shortest first | Filter, sort, fetch |
+| REL-AGENT-3 | Trajectories with a plausible fix | Filter, distinct |
+| REL-AGENT-4 | The 20 snapshots with the highest recovery score | Score, sort, fetch |
+| REL-AGENT-5 | Snapshots and trajectories per test outcome, at least 50 snapshots | Two classifies, group by, count, count distinct, having, sort |
+| REL-AGENT-6 | Trajectories with at least two fixes, earliest first | Filter, group by, min, max, having, sort, fetch |
+| REL-AGENT-7 | Ten trajectories of at least five snapshots with the highest mean fix score | Score, group by, avg, having, sort, fetch |
 
-Each result is small enough to read. The reference result applies the
-same relational steps to the saved labels: a filter keeps the documents
-labeled TRUE, a label column holds the reference label, and a score
-column holds 1.0 for a document labeled TRUE and 0.0 otherwise. A
-query whose result the labels determine (REL-AGENT-1, 2, 3, 5, 6) is
-scored by its rows: precision, recall, and an exact match, plus an
-ordered match when the query sorts. A query that ranks by a score
-(REL-AGENT-4, 7) is scored as precision at k: the fraction of returned
-rows whose documents or trajectories rank at least as well as the last
-returned row under the reference scores, ties included. The score
-queries report no token minimum, since every document is scored once.
-Their accuracy is the point; their time is the time of scoring every
-document.
-
-These queries run on Quail. The stock vLLM and SGLang backends of the
-Quail runner refuse column tests, sorts, and aggregates, so a
-comparison between engines is not available for them.
+The reference result applies the same steps to the saved labels. A score is 1.0
+for a document labeled TRUE and 0.0 otherwise. REL-AGENT-1, 2, 3, 5, and 6 are
+scored by their rows: precision, recall, exact match, and ordered match when the
+query sorts. REL-AGENT-4 and 7 are scored by precision at k, ties included. The
+score queries report no token minimum. These queries run on Quail only.
 
 ## Scale factors
 

@@ -24,11 +24,9 @@ Read `README.md` for the public benchmark contract and metric definitions.
   and input tables, then returns a `RunOutput`.
 - Do not add engine runtime code, GPU infrastructure, or experiment reports
   here.
-- The supported AI operators are `ai_filter`, `ai_join`, `ai_classify`,
-  and `ai_score`. The relational operators (column tests, sort, fetch,
-  distinct, aggregate, having) appear only in the `REL-` queries. Do
-  not add maps, speculation, or forking unless the task changes the
-  benchmark scope.
+- The AI operators are `ai_filter`, `ai_join`, `ai_classify`, and `ai_score`.
+  Relational operators appear only in the `REL-` queries. Do not add maps,
+  speculation, or forking unless the task changes the benchmark scope.
 - Preserve query IDs, operator IDs, prompt text, corpus identities, scale
   factors, and label identities unless the task explicitly changes that
   public contract.
