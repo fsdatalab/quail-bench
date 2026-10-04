@@ -182,3 +182,72 @@ def test_relational_runs_are_validated_and_scored(ground_truth):
     with pytest.raises(ValueError, match="include its rows"):
         _validate_output(spec, quail_b.RunOutput({}, {}, None, runtime_s=1.0),
                          CORPUS)
+
+
+def _published_inputs(root):
+    """Write the trace corpus and recovered labels in the published layout."""
+    import pyarrow.parquet as pq
+
+    from quail_b.data import (
+        DATA_SEED,
+        GROUND_TRUTH_ROOT,
+        PUBLISHED_CORPORA,
+        SOURCE_REVISIONS,
+        corpus_identity,
+    )
+    from quail_b.run import _write_json
+
+    corpus_id = PUBLISHED_CORPORA[0.1]
+    corpus = root / GROUND_TRUTH_ROOT / "corpora" / corpus_id
+    corpus.mkdir(parents=True)
+    manifest = corpus_identity(CORPUS, 0.1, DATA_SEED, SOURCE_REVISIONS)
+    manifest["corpus_id"] = corpus_id
+    _write_json(corpus / "manifest.json", manifest)
+    pq.write_table(TRACES, corpus / "agent_traces.parquet")
+    key, label_id = "recovered", "ls_recovered"
+    directory = root / GROUND_TRUTH_ROOT / "label_sets" / key / label_id
+    directory.mkdir(parents=True)
+    _write_json(directory / "manifest.json", {
+        "status": "complete", "rows": len(RECOVERED),
+        "source_rows": {"test": len(RECOVERED)},
+        "predicate": {
+            "key": key, "template": prompts.AGENT_RECOVERED, "kind": "filter",
+            "left_table": "agent_traces", "left_column": "trace",
+            "right_table": None, "right_column": None,
+        },
+    })
+    pq.write_table(pa.table({
+        "predicate_key": [key] * len(RECOVERED),
+        "label_set_id": [label_id] * len(RECOVERED),
+        "left_id": TRACES["id"], "right_id": [None] * len(RECOVERED),
+        "answer": RECOVERED,
+    }), directory / "labels.parquet")
+    collection = root / GROUND_TRUTH_ROOT / "collections" / "gt_test"
+    collection.mkdir(parents=True)
+    _write_json(collection / "manifest.json", {
+        "status": "complete", "collection_id": "gt_test",
+        "corpus_id": corpus_id, "scale_factor": 0.1,
+        "label_sets": {key: label_id}, "summary": {"model": "test"},
+    })
+    _write_json(corpus / "active_collection.json", {"collection_id": "gt_test"})
+
+
+def test_relational_runs_rescore_from_their_saved_rows(tmp_path):
+    import json
+
+    def execute(spec, tables):
+        return quail_b.RunOutput(
+            {"filter-1": pa.table({"t": ["s1", "s3", "s6"],
+                                   "answer": [False, True, True]})},
+            {}, pa.table({"t": ["s3", "s6"]}), runtime_s=1.0)
+
+    _published_inputs(tmp_path)
+    destination = tmp_path / "run"
+    record = quail_b.run(execute, queries=["REL-AGENT-1"],
+                         output_dir=destination, root=tmp_path)
+    metrics = record["queries"][0]["metrics"]
+    assert metrics["accuracy"]["output_accuracy"]["exact_match"]
+    quail_b.report(destination, rescore=True, root=tmp_path)
+    rescored = json.loads((destination / "run.json").read_text())
+    assert rescored["queries"][0]["status"] == "complete"
+    assert rescored["queries"][0]["metrics"] == metrics
