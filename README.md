@@ -253,9 +253,6 @@ adapter on these queries first, then run it on all 50.
 | REL-AGENT-5 | Classify, group by a label, having | `COUNT`, `COUNT(DISTINCT)`, `HAVING`, label keys |
 | REL-AGENT-6 | Filter, group by a column, having, limit | `MIN`, `MAX`, and a limit after an aggregate |
 
-IMDB-11 and REL-AGENT-3 and 7 add no mechanism beyond these: a returned
-label, `DISTINCT` as an aggregate with no measures, and `AVG` over a score.
-
 ### Classification queries
 
 Twelve queries return or filter on a label chosen from a fixed list. Each asks
