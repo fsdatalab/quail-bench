@@ -195,6 +195,20 @@ The harness rejects:
 
 Scoring ignores column order and row order.
 
+### Rows of a relational query
+
+A query with a column test, a score, a sort, a fetch, or an aggregate
+(the `REL-` queries) selects fields of its last relational step. Its
+`rows` has one column per selected field, named by `output_name`: the
+alias for an id column, the column name after the alias for another
+column or a label, and the measure's name for an aggregate. REL-AGENT-6
+returns `trajectory_id`, `fixes`, `first_fix`, and `longest`. The
+harness rejects a row count above the query's fetch count and ids
+absent from the input table, and scores the rows as the README's
+[relational queries](../README.md#relational-queries) section
+describes. Omit `prompt_pieces` for a query with a score: the token
+minimum counts filters, joins, and classifications only.
+
 ### Runtime
 
 `runtime_s` is a finite, nonnegative number of seconds. It includes query

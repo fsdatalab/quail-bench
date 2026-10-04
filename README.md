@@ -22,7 +22,7 @@ The query is written with BigQuery's
 function, and its prompts are shortened. QUAIL-B publishes each query as a
 Substrait plan with the exact prompt text.
 
-The benchmark contains 43 such queries over five document collections: movie
+The benchmark contains 50 such queries over five document collections: movie
 reviews, adverse drug reaction reports, claims and evidence for fact
 verification, legal citations, and software agent trajectories. Each collection
 comes at three scale factors, with reference answers for every filter, join,
@@ -113,7 +113,7 @@ A full call to `quail_b.run` looks like:
 ```python
 quail_b.run(
     run_query,
-    queries=None,                        # None runs all 43 queries
+    queries=None,                        # None runs all 50 queries
     scale_factor=0.1,                    # 0.1, 0.5, or 1.0
     output_dir="results/vllm_qwen3_4b",  # must be a new directory
     metadata={"engine": "vllm", "model": "Qwen/Qwen3-4B-FP8"},
@@ -129,7 +129,7 @@ it saves the output, scores it, and updates `run.json`. At the end it writes
 | Parameter | Default | Meaning |
 | --- | --- | --- |
 | `run_query` | required | Your adapter |
-| `queries` | `None` | Query IDs to run; `None` runs all 43 |
+| `queries` | `None` | Query IDs to run; `None` runs all 50 |
 | `scale_factor` | `0.1` | Published scale factor: `0.1`, `0.5`, or `1.0` |
 | `output_dir` | required | New directory for this run's results |
 | `metadata` | `None` | JSON object saved with the run: engine, model, settings |
@@ -198,6 +198,7 @@ lists the queries that use it.
 | FEVER | FEV-1 to FEV-11 | `claims`, `evidence` | Fact verification |
 | LePaRD | LEP-1 to LEP-6 | `citation_contexts`, `citation_passages` | Legal citations |
 | SWE-Next | AGENT-1 to AGENT-5 | `agent_traces` | Software agent trajectories |
+| SWE-Next | REL-AGENT-1 to REL-AGENT-7 | `agent_traces` | Relational operators over the trajectories |
 
 Within each dataset, the first queries have a single filter or join. Later
 queries chain filters, filter both join inputs, scan one table under two
@@ -228,10 +229,10 @@ following question:", so an engine can reuse a document's KV across questions.
 
 ### Developing an adapter
 
-The 43 queries have several different shapes: how many filters and joins they
+The 50 queries have several different shapes: how many filters and joins they
 have, and how those operators are arranged in the plan. The table below lists
 one query for each distinct shape, from simplest to most complex. Test your
-adapter on these queries first, then run it on all 43.
+adapter on these queries first, then run it on all 50.
 
 | Query | Shape | What it tests |
 | --- | --- | --- |
@@ -277,6 +278,54 @@ positive, negative, neutral, or mixed.
 A classification answer is the label with the largest sum of label-token log
 probabilities; the [reference](docs/reference.md#classification) defines the
 prompt, the answer tables, and label accuracy.
+
+### Relational queries
+
+Seven queries combine the AI functions with the relational operators an
+analyst writes around them: a test of a plain column before any model
+call, `ORDER BY` with `OFFSET` and `LIMIT`, `DISTINCT`, `GROUP BY` with
+`COUNT`, `COUNT(DISTINCT)`, `SUM`, `AVG`, `MIN`, and `MAX`, and
+`HAVING`. They read the agent traces, whose columns `trajectory_id`,
+`turn_index`, and `token_count` are plain values beside the trace. Two
+of them use a fourth AI function:
+
+```text
+ai_score(prompt, document) -> fp64
+```
+
+`ai_score` takes a filter prompt and returns the model's belief that the
+document answers it TRUE, between 0 and 1. The plans put the relational
+steps above the AI tree as Substrait `AggregateRel`, `FilterRel`,
+`SortRel`, and `FetchRel`, and a column test as a `FilterRel` directly
+over the scan.
+
+| Query | Question | Operators |
+| --- | --- | --- |
+| REL-AGENT-1 | Which snapshots past turn 10 and under 6,000 tokens recovered from a failed approach? | Two column tests, then a filter |
+| REL-AGENT-2 | The second page of ten recovered snapshots, shortest trace first | Filter, sort, fetch |
+| REL-AGENT-3 | Which trajectories implemented a plausible fix at some snapshot? | Filter, distinct |
+| REL-AGENT-4 | The 20 snapshots the model is most confident recovered | Score, sort, fetch |
+| REL-AGENT-5 | For traces that changed the code, how many snapshots and trajectories had each test outcome, with at least 50 snapshots? | Classify, label filter, classify, group by, count, count distinct, having, sort |
+| REL-AGENT-6 | Trajectories with at least two fixes: how many, the first fix's turn, the longest trace; earliest first | Filter, group by, min, max, having, sort, fetch |
+| REL-AGENT-7 | The ten trajectories of at least five snapshots the model rates most consistently as having a fix | Score, group by, avg, having, sort, fetch |
+
+Each result is small enough to read. The reference result applies the
+same relational steps to the saved labels: a filter keeps the documents
+labeled TRUE, a label column holds the reference label, and a score
+column holds 1.0 for a document labeled TRUE and 0.0 otherwise. A
+query whose result the labels determine (REL-AGENT-1, 2, 3, 5, 6) is
+scored by its rows: precision, recall, and an exact match, plus an
+ordered match when the query sorts. A query that ranks by a score
+(REL-AGENT-4, 7) is scored as precision at k: the fraction of returned
+rows whose documents or trajectories rank at least as well as the last
+returned row under the reference scores, ties included. The score
+queries report no token minimum, since every document is scored once.
+Their accuracy is the point; their time is the time of scoring every
+document.
+
+These queries run on Quail. The stock vLLM and SGLang backends of the
+Quail runner refuse column tests, sorts, and aggregates, so a
+comparison between engines is not available for them.
 
 ## Scale factors
 

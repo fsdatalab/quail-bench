@@ -25,7 +25,14 @@ from quail_b.scoring import (
     output_columns,
     scores_from_answers,
 )
-from quail_b.substrait import _Classify, _Filter, _InList, _Join
+from quail_b.substrait import (
+    _Classify,
+    _ColumnTest,
+    _Filter,
+    _InList,
+    _Join,
+    _Score,
+)
 
 RUN_SCHEMA_VERSION = 2
 
@@ -86,6 +93,23 @@ def _query_hash(spec):
                 "output": operator.output,
                 "accepted": operator.accepted,
             })
+        elif isinstance(operator, _ColumnTest):
+            operators.append({
+                "kind": "column_test",
+                "id": operator.id,
+                "relation": operator.relation,
+                "column": operator.column,
+                "comparison": operator.comparison,
+                "value": operator.value,
+            })
+        elif isinstance(operator, _Score):
+            operators.append({
+                "kind": "score",
+                "id": operator.id,
+                "relation": operator.relation,
+                "prompt": operator.prompt,
+                "output": operator.output,
+            })
         else:
             assert isinstance(operator, _Join)
             operators.append({
@@ -113,6 +137,13 @@ def _query_hash(spec):
         "operators": operators,
         "select": spec._info.select,
     }
+    if spec._info.tail:
+        # only a relational query has a tail, so the published hashes
+        # of the other queries stay as they are
+        definition["tail"] = [
+            {"kind": type(step).__name__.lstrip("_").lower(),
+             **{key: value for key, value in vars(step).items()}}
+            for step in spec._info.tail]
     if PROMPT_FORMAT != "raw-v1":
         definition["prompt_format"] = PROMPT_FORMAT
     encoded = json.dumps(
@@ -245,7 +276,19 @@ def _validate_output(spec, output, tables):
 
     returned = [name for name in columns if name in label_names]
     answers = scores_from_answers(spec, output, tables)
-    if output.rows is None:
+    if spec._info.relational:
+        if output.rows is None:
+            raise ValueError("a relational query's run must include its rows")
+        if set(output.rows.column_names) != set(columns):
+            raise ValueError("output columns must match the query's selected "
+                             "fields")
+        fetch = spec._info.fetch
+        if fetch is not None and output.rows.num_rows > fetch.count:
+            raise ValueError(
+                f"the engine returned {output.rows.num_rows:,} rows for a "
+                f"fetch of {fetch.count:,}")
+        validate_ids(output.rows, selected)
+    elif output.rows is None:
         # a saved run rescored from its answers: its rows were checked
         # when they were saved
         if answers is None:

@@ -215,6 +215,41 @@
     "privacy": false
   },
   {
+    "id": "REL-AGENT-1",
+    "description": "column tests: snapshots past turn 10 of at most 6,000 tokens -> filter: recovered",
+    "privacy": false
+  },
+  {
+    "id": "REL-AGENT-2",
+    "description": "recovered -> the second page of ten, shortest trace first",
+    "privacy": false
+  },
+  {
+    "id": "REL-AGENT-3",
+    "description": "implemented a fix -> distinct trajectories",
+    "privacy": false
+  },
+  {
+    "id": "REL-AGENT-4",
+    "description": "score: recovered -> the 20 highest scores",
+    "privacy": false
+  },
+  {
+    "id": "REL-AGENT-5",
+    "description": "traces that changed the code -> classify: test result -> snapshots and trajectories per result, at least 50 snapshots, most first",
+    "privacy": false
+  },
+  {
+    "id": "REL-AGENT-6",
+    "description": "implemented a fix -> per trajectory: fixes, first fix turn, longest trace; at least two fixes, earliest first, 50",
+    "privacy": false
+  },
+  {
+    "id": "REL-AGENT-7",
+    "description": "score: implemented a fix -> per trajectory of at least five snapshots: the mean score; the ten highest",
+    "privacy": false
+  },
+  {
     "id": "PRIV-1",
     "description": "2 filters: P_MSG + P_LOC",
     "privacy": true

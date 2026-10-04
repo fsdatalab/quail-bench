@@ -37,14 +37,15 @@ from quail_b.substrait import (
 from tools.make_substrait_plans import write_plans
 
 
-def test_catalog_has_the_43_default_queries_and_two_privacy_queries():
-    assert len(QUERIES) == 43
+def test_catalog_has_the_50_default_queries_and_two_privacy_queries():
+    assert len(QUERIES) == 50
     assert QUERY_ORDER == (
         *(f"IMDB-{i}" for i in range(1, 16)),
         *(f"BIO-{i}" for i in range(1, 7)),
         *(f"FEV-{i}" for i in range(1, 12)),
         *(f"LEP-{i}" for i in range(1, 7)),
         *(f"AGENT-{i}" for i in range(1, 6)),
+        *(f"REL-AGENT-{i}" for i in range(1, 8)),
     )
     assert [spec.id for spec in PRIVACY_QUERIES] == ["PRIV-1", "PRIV-2"]
     assert list(queries(include_privacy=True)) == [*QUERY_ORDER, "PRIV-1", "PRIV-2"]
@@ -63,7 +64,7 @@ def test_catalog_has_the_43_default_queries_and_two_privacy_queries():
              frozenset(in_list.accepted)) in IN_LIST_SELECTIVITY_ESTIMATES
             for in_list in info.in_lists
         ), spec.id
-        if not info.classifies:
+        if not info.classifies and not info.relational:
             assert all(name.endswith(".id") for name in info.select), spec.id
     for spec in PRIVACY_QUERIES:
         info = _inspect_plan(spec.plan)
@@ -233,8 +234,10 @@ def test_ai_extension_definition_is_packaged():
     assert "name: ai_filter" in extension
     assert "name: ai_join" in extension
     assert "name: ai_classify" in extension
-    # one document, and a pair: prompt, two documents, labels, descriptions
-    assert extension.count("- name: document") == 4
+    assert "name: ai_score" in extension
+    # a filter, a score, a one-document classification, and a pair:
+    # prompt, two documents, labels, descriptions
+    assert extension.count("- name: document") == 5
 
 
 def test_substrait_plans_are_packaged():
@@ -242,7 +245,7 @@ def test_substrait_plans_are_packaged():
     catalog = package.joinpath("plans", "catalog.json")
     entries = json.loads(catalog.read_text())
 
-    assert len(entries) == 45
+    assert len(entries) == 52
     assert not any(entry.get("labels_pending") for entry in entries)
     assert all(
         package.joinpath("plans", f"{entry['id']}.json").is_file()
@@ -264,10 +267,10 @@ def test_checked_in_plans_equal_the_generator_output(tmp_path):
 
 def test_parallel_query_split_matches_stock_vllm():
     assert split_query_ids(QUERY_ORDER, 4) == (
-        QUERY_ORDER[0:11],
-        QUERY_ORDER[11:22],
-        QUERY_ORDER[22:33],
-        QUERY_ORDER[33:43],
+        QUERY_ORDER[0:13],
+        QUERY_ORDER[13:26],
+        QUERY_ORDER[26:38],
+        QUERY_ORDER[38:50],
     )
 
 
@@ -278,6 +281,7 @@ def test_query_family_split_matches_benchmark_catalog():
         "FEV": "fever",
         "LEP": "lepard",
         "AGENT": "agent",
+        "REL": "relational",
     }
     assert split_query_families(QUERY_ORDER) == (
         QUERY_ORDER[0:15],
@@ -285,8 +289,10 @@ def test_query_family_split_matches_benchmark_catalog():
         QUERY_ORDER[21:32],
         QUERY_ORDER[32:38],
         QUERY_ORDER[38:43],
+        QUERY_ORDER[43:50],
     )
     assert query_family_name(QUERY_ORDER[0:15]) == "imdb"
+    assert query_family_name(QUERY_ORDER[43:50]) == "relational"
 
 
 def test_query_family_rejects_mixed_or_unknown_queries():
