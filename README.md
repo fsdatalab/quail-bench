@@ -22,7 +22,7 @@ The query is written with BigQuery's
 function, and its prompts are shortened. QUAIL-B publishes each query as a
 Substrait plan with the exact prompt text.
 
-The benchmark contains 43 such queries over five document collections: movie
+The benchmark contains 50 such queries over five document collections: movie
 reviews, adverse drug reaction reports, claims and evidence for fact
 verification, legal citations, and software agent trajectories. Each collection
 comes at three scale factors, with reference answers for every filter, join,
@@ -113,7 +113,7 @@ A full call to `quail_b.run` looks like:
 ```python
 quail_b.run(
     run_query,
-    queries=None,                        # None runs all 43 queries
+    queries=None,                        # None runs all 50 queries
     scale_factor=0.1,                    # 0.1, 0.5, or 1.0
     output_dir="results/vllm_qwen3_4b",  # must be a new directory
     metadata={"engine": "vllm", "model": "Qwen/Qwen3-4B-FP8"},
@@ -129,7 +129,7 @@ it saves the output, scores it, and updates `run.json`. At the end it writes
 | Parameter | Default | Meaning |
 | --- | --- | --- |
 | `run_query` | required | Your adapter |
-| `queries` | `None` | Query IDs to run; `None` runs all 43 |
+| `queries` | `None` | Query IDs to run; `None` runs all 50 |
 | `scale_factor` | `0.1` | Published scale factor: `0.1`, `0.5`, or `1.0` |
 | `output_dir` | required | New directory for this run's results |
 | `metadata` | `None` | JSON object saved with the run: engine, model, settings |
@@ -198,6 +198,7 @@ lists the queries that use it.
 | FEVER | FEV-1 to FEV-11 | `claims`, `evidence` | Fact verification |
 | LePaRD | LEP-1 to LEP-6 | `citation_contexts`, `citation_passages` | Legal citations |
 | SWE-Next | AGENT-1 to AGENT-5 | `agent_traces` | Software agent trajectories |
+| SWE-Next | REL-AGENT-1 to REL-AGENT-7 | `agent_traces` | Relational operators over the trajectories |
 
 Within each dataset, the first queries have a single filter or join. Later
 queries chain filters, filter both join inputs, scan one table under two
@@ -228,10 +229,10 @@ following question:", so an engine can reuse a document's KV across questions.
 
 ### Developing an adapter
 
-The 43 queries have several different shapes: how many filters and joins they
+The 50 queries have several different shapes: how many filters and joins they
 have, and how those operators are arranged in the plan. The table below lists
 one query for each distinct shape, from simplest to most complex. Test your
-adapter on these queries first, then run it on all 43.
+adapter on these queries first, then run it on all 50.
 
 | Query | Shape | What it tests |
 | --- | --- | --- |
@@ -277,6 +278,26 @@ positive, negative, neutral, or mixed.
 A classification answer is the label with the largest sum of label-token log
 probabilities; the [reference](docs/reference.md#classification) defines the
 prompt, the answer tables, and label accuracy.
+
+### Relational queries
+
+The seven `REL-AGENT` queries add relational operators over the agent traces:
+a column test (a `WHERE` condition on a stored column, such as
+`turn_index >= 10`, applied before any model call), `ORDER BY` with `OFFSET`
+and `LIMIT`, `DISTINCT`, `GROUP BY` with `COUNT`, `COUNT(DISTINCT)`, `SUM`,
+`AVG`, `MIN`, `MAX`, and `HAVING`. Two of them use a fourth AI function,
+`ai_score(prompt, document) -> fp64`. It returns the model's belief, from 0
+to 1, that the document answers a filter prompt TRUE.
+
+| Query | Question | Operators |
+| --- | --- | --- |
+| REL-AGENT-1 | Recovered snapshots at turn 10 or later, of at most 6,000 tokens | Two column tests, `ai_filter` |
+| REL-AGENT-2 | Second page of ten recovered snapshots, shortest first | `ai_filter`, `ORDER BY`, `OFFSET`, `LIMIT` |
+| REL-AGENT-3 | Trajectories with a plausible fix | `ai_filter`, `DISTINCT` |
+| REL-AGENT-4 | The 20 snapshots with the highest recovery score | `ai_score`, `ORDER BY`, `LIMIT` |
+| REL-AGENT-5 | Snapshots and trajectories per test outcome, at least 50 snapshots | Two `ai_classify`, `GROUP BY`, `COUNT`, `COUNT(DISTINCT)`, `HAVING`, `ORDER BY` |
+| REL-AGENT-6 | Trajectories with at least two fixes, earliest first | `ai_filter`, `GROUP BY`, `MIN`, `MAX`, `HAVING`, `ORDER BY`, `LIMIT` |
+| REL-AGENT-7 | Ten trajectories of at least five snapshots with the highest mean fix score | `ai_score`, `GROUP BY`, `AVG`, `HAVING`, `ORDER BY`, `LIMIT` |
 
 ## Scale factors
 

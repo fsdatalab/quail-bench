@@ -180,12 +180,15 @@ def __getattr__(name: str):
     return globals()[name]
 
 
+# the relational queries read the agent traces and their labels, as
+# their own family so a runner keeps their results apart
 QUERY_FAMILY_WORKLOADS = {
     "IMDB": "imdb",
     "BIO": "biodex",
     "FEV": "fever",
     "LEP": "lepard",
     "AGENT": "agent",
+    "REL": "relational",
 }
 
 

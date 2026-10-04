@@ -18,6 +18,8 @@ import pyarrow.compute as pc
 from quail_b._keys import lookup, tuple_keys
 from quail_b.data import _ids
 from quail_b.queries import QuerySpec
+from quail_b.relational import relational_accuracy
+from quail_b.substrait import output_name
 
 
 @dataclass
@@ -68,9 +70,7 @@ class RunOutput:
 
 def output_columns(spec: QuerySpec) -> list[str]:
     """Return the result column names: aliases for ids, then label names."""
-    return [alias if column == "id" else column
-            for alias, column in (name.split(".", 1)
-                                  for name in spec._info.select)]
+    return [output_name(name) for name in spec._info.select]
 
 
 def _selected_labels(spec: QuerySpec):
@@ -994,8 +994,16 @@ def evaluate(spec: QuerySpec, output: RunOutput, ground_truth, corpus_rows) -> d
             "predicate_key": labels.key, "op": "classify",
             "alias": operator.relation, **counts.as_dict()})
 
-    predicted_count, expected_count, matched_count = row_counts(
-        spec, output, ground_truth, corpus_rows)
+    if spec._info.relational:
+        if output.rows is None:
+            raise ValueError("a relational query is scored from its rows")
+        output_accuracy = relational_accuracy(
+            spec, output.rows, ground_truth, corpus_rows)
+    else:
+        predicted_count, expected_count, matched_count = row_counts(
+            spec, output, ground_truth, corpus_rows)
+        output_accuracy = _row_metrics(
+            predicted_count, expected_count, matched_count)
     input_document_rows = sum(
         len(corpus_rows[relation.table])
         for relation in spec._info.relations)
@@ -1010,8 +1018,7 @@ def evaluate(spec: QuerySpec, output: RunOutput, ground_truth, corpus_rows) -> d
         "answer_accuracy": (total.as_dict() if total.evaluated else None),
         "label_accuracy": (
             label_total.as_dict() if label_total.evaluated else None),
-        "output_accuracy": _row_metrics(
-            predicted_count, expected_count, matched_count),
+        "output_accuracy": output_accuracy,
         "per_predicate": per_predicate,
         "input_document_rows": input_document_rows,
         "unique_input_documents": len(unique_documents),

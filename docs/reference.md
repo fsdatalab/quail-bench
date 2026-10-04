@@ -195,6 +195,18 @@ The harness rejects:
 
 Scoring ignores column order and row order.
 
+### Rows of a relational query
+
+A `REL-` query selects fields of its last relational step. Its `rows` columns
+are named by `output_name`: the alias for an id, the column name after the alias
+for another column or a label, and the bare name for a measure. For example,
+REL-AGENT-6 returns `trajectory_id`, `fixes`, `first_fix`, and `longest`. The
+harness rejects more rows than the query's `LIMIT` and ids absent from the
+input table. The reference rows apply the query's relational steps to the saved
+labels, with a score of 1.0 for a document labeled TRUE; a query sorted by a
+score is scored by precision at k. Omit `prompt_pieces` for a query with a
+score.
+
 ### Runtime
 
 `runtime_s` is a finite, nonnegative number of seconds. It includes query

@@ -47,16 +47,20 @@ from quail_b.prompts import (
     SUPPORT,
 )
 from quail_b.substrait import (
+    AGGREGATE_GENERIC_EXTENSION_URN,
     AI_CLASSIFY_JOINED_NAME,
     AI_CLASSIFY_NAME,
     AI_EXTENSION_URN,
     AI_FILTER_NAME,
     AI_JOIN_NAME,
+    AI_SCORE_NAME,
     AND_NAME,
+    ARITHMETIC_EXTENSION_URN,
     BOOLEAN_EXTENSION_URN,
     COMPARISON_EXTENSION_URN,
     EQUAL_NAME,
     SUBSTRAIT_VERSION,
+    output_name,
 )
 
 PLANS_DIR = Path(__file__).resolve().parents[1] / "quail_b" / "plans"
@@ -67,6 +71,8 @@ _URN_ANCHORS = {
     AI_EXTENSION_URN: 1,
     COMPARISON_EXTENSION_URN: 2,
     BOOLEAN_EXTENSION_URN: 3,
+    AGGREGATE_GENERIC_EXTENSION_URN: 4,
+    ARITHMETIC_EXTENSION_URN: 5,
 }
 _FUNCTIONS = {
     AI_FILTER_NAME: (1, AI_EXTENSION_URN),
@@ -75,6 +81,22 @@ _FUNCTIONS = {
     AND_NAME: (4, BOOLEAN_EXTENSION_URN),
     AI_CLASSIFY_NAME: (5, AI_EXTENSION_URN),
     AI_CLASSIFY_JOINED_NAME: (6, AI_EXTENSION_URN),
+    AI_SCORE_NAME: (7, AI_EXTENSION_URN),
+    "not_equal:any_any": (8, COMPARISON_EXTENSION_URN),
+    "lt:any_any": (9, COMPARISON_EXTENSION_URN),
+    "lte:any_any": (10, COMPARISON_EXTENSION_URN),
+    "gt:any_any": (11, COMPARISON_EXTENSION_URN),
+    "gte:any_any": (12, COMPARISON_EXTENSION_URN),
+    "count:any": (13, AGGREGATE_GENERIC_EXTENSION_URN),
+    "sum:i32": (14, ARITHMETIC_EXTENSION_URN),
+    "avg:i32": (15, ARITHMETIC_EXTENSION_URN),
+    "avg:fp64": (16, ARITHMETIC_EXTENSION_URN),
+    "min:i32": (17, ARITHMETIC_EXTENSION_URN),
+    "max:i32": (18, ARITHMETIC_EXTENSION_URN),
+}
+_COMPARISONS = {
+    "=": EQUAL_NAME, "<>": "not_equal:any_any", "<": "lt:any_any",
+    "<=": "lte:any_any", ">": "gt:any_any", ">=": "gte:any_any",
 }
 
 
@@ -86,20 +108,87 @@ class Scan:
         table: The table name.
         alias: The relation alias, unique within a query.
         text: The column the AI functions read.
-        columns: Further columns, for ordinary join conditions.
+        columns: Further columns, for ordinary join conditions, column
+            tests, keys, and measures.
+        integers: The columns among `columns` typed as 32-bit integers.
     """
 
     table: str
     alias: str
     text: str
     columns: tuple[str, ...] = ()
+    integers: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class Where:
+    """Keep the documents whose column passes a test against a literal.
+
+    The test runs before any AI function reads the relation, so it
+    sits directly over the scan.
+    """
+
+    input: "Scan | Where"
+    column: str
+    comparison: str
+    value: int | float | str
+
+
+@dataclass(frozen=True)
+class Score:
+    """Add a number column: the model's belief that a document answers TRUE."""
+
+    input: "Scan | Where | Filter | Classify | InList | Score"
+    prompt: str
+    output: str
+
+
+@dataclass(frozen=True)
+class Aggregate:
+    """Group the rows by key fields and compute measures per group.
+
+    Attributes:
+        input: The AI tree.
+        keys: Fields grouped by, as `alias.column` or a label name.
+        measures: (name, function, argument) per measure, the argument
+            a field or None for `count(*)`. No measures means DISTINCT.
+    """
+
+    input: object
+    keys: tuple[str, ...]
+    measures: tuple[tuple[str, str, str | None], ...] = ()
+
+
+@dataclass(frozen=True)
+class Having:
+    """Keep the groups whose measures pass (name, comparison, value) tests."""
+
+    input: Aggregate
+    tests: tuple[tuple[str, str, int | float], ...]
+
+
+@dataclass(frozen=True)
+class Sort:
+    """Order the rows by (field, descending) keys."""
+
+    input: object
+    keys: tuple[tuple[str, bool], ...]
+
+
+@dataclass(frozen=True)
+class Fetch:
+    """Skip `offset` rows and keep at most `count`."""
+
+    input: object
+    count: int
+    offset: int = 0
 
 
 @dataclass(frozen=True)
 class Filter:
     """Keep the documents of one relation that answer a prompt TRUE."""
 
-    input: Scan | Filter | Classify | InList
+    input: "Scan | Where | Filter | Classify | InList | Score"
     prompt: str
 
 
@@ -188,6 +277,35 @@ def _string_type():
     )
 
 
+def _i32_type():
+    return type_pb2.Type(
+        i32=type_pb2.Type.I32(nullability=type_pb2.Type.NULLABILITY_REQUIRED)
+    )
+
+
+def _i64_type():
+    return type_pb2.Type(
+        i64=type_pb2.Type.I64(nullability=type_pb2.Type.NULLABILITY_REQUIRED)
+    )
+
+
+def _fp64_type():
+    return type_pb2.Type(
+        fp64=type_pb2.Type.FP64(nullability=type_pb2.Type.NULLABILITY_REQUIRED)
+    )
+
+
+def _number(value):
+    """Return a literal for a Python int, float, or string."""
+    if isinstance(value, bool):
+        raise TypeError("a column test compares with a number or string")
+    if isinstance(value, int):
+        return algebra.Expression(literal=algebra.Expression.Literal(i32=value))
+    if isinstance(value, float):
+        return algebra.Expression(literal=algebra.Expression.Literal(fp64=value))
+    return _literal(value)
+
+
 def _bool_type():
     return type_pb2.Type(
         bool=type_pb2.Type.Boolean(
@@ -255,7 +373,8 @@ class _Emitter:
 
     def __init__(self):
         self.counts = {"filter": 0, "join": 0, "classify": 0,
-                       "in-list": 0}
+                       "in-list": 0, "where": 0, "score": 0,
+                       "aggregate": 0, "having": 0, "sort": 0, "fetch": 0}
         self.functions = set()
 
     def _operator_id(self, kind):
@@ -271,7 +390,8 @@ class _Emitter:
                 base_schema=type_pb2.NamedStruct(
                     names=names,
                     struct=type_pb2.Type.Struct(
-                        types=[_string_type() for _name in names],
+                        types=[_i32_type() if name in node.integers
+                               else _string_type() for name in names],
                         nullability=type_pb2.Type.NULLABILITY_REQUIRED,
                     ),
                 ),
@@ -279,6 +399,39 @@ class _Emitter:
             )
             fields = tuple((node.alias, name) for name in names)
             return algebra.Rel(read=read), fields, {node.alias: node.text}
+
+        if isinstance(node, Where):
+            rel, fields, text = self.emit(node.input)
+            (alias,) = text
+            name = _COMPARISONS[node.comparison]
+            self.functions.add(name)
+            relation = algebra.FilterRel(
+                common=_common(self._operator_id("where")),
+                input=rel,
+                condition=_call(name, [
+                    _field(fields.index((alias, node.column))),
+                    _number(node.value),
+                ]),
+            )
+            return algebra.Rel(filter=relation), fields, text
+
+        if isinstance(node, Score):
+            rel, fields, text = self.emit(node.input)
+            (alias,) = text
+            self.functions.add(AI_SCORE_NAME)
+            output_fields = (*fields, (alias, node.output))
+            common = _common(self._operator_id("score"))
+            common.hint.output_names.extend(
+                ".".join(field) for field in output_fields)
+            relation = algebra.ProjectRel(
+                common=common,
+                input=rel,
+                expressions=[_call(AI_SCORE_NAME, [
+                    _literal(node.prompt),
+                    _field(fields.index((alias, text[alias]))),
+                ], _fp64_type())],
+            )
+            return algebra.Rel(project=relation), output_fields, text
 
         if isinstance(node, Classify):
             rel, fields, text = self.emit(node.input)
@@ -375,29 +528,131 @@ def _join_aliases(node) -> tuple[str, str]:
     return node.aliases
 
 
+def _emit_tail(emitter, node):
+    """Return (rel, field names) for the relational steps over the AI tree."""
+    if isinstance(node, Fetch):
+        rel, names = _emit_tail(emitter, node.input)
+        relation = algebra.FetchRel(
+            common=_common(emitter._operator_id("fetch")),
+            input=rel,
+            offset_expr=algebra.Expression(
+                literal=algebra.Expression.Literal(i64=node.offset)),
+            count_expr=algebra.Expression(
+                literal=algebra.Expression.Literal(i64=node.count)),
+        )
+        return algebra.Rel(fetch=relation), names
+    if isinstance(node, Sort):
+        rel, names = _emit_tail(emitter, node.input)
+        relation = algebra.SortRel(
+            common=_common(emitter._operator_id("sort")),
+            input=rel,
+            sorts=[algebra.SortField(
+                expr=_field(names.index(name)),
+                direction=(
+                    algebra.SortField.SORT_DIRECTION_DESC_NULLS_LAST
+                    if descending
+                    else algebra.SortField.SORT_DIRECTION_ASC_NULLS_LAST))
+                for name, descending in node.keys],
+        )
+        return algebra.Rel(sort=relation), names
+    if isinstance(node, Having):
+        rel, names = _emit_tail(emitter, node.input)
+        conditions = []
+        for name, comparison, value in node.tests:
+            function = _COMPARISONS[comparison]
+            emitter.functions.add(function)
+            conditions.append(_call(function, [
+                _field(names.index(name)), _number(value)]))
+        if len(conditions) > 1:
+            emitter.functions.add(AND_NAME)
+        relation = algebra.FilterRel(
+            common=_common(emitter._operator_id("having")),
+            input=rel,
+            condition=(conditions[0] if len(conditions) == 1
+                       else _call(AND_NAME, conditions)),
+        )
+        return algebra.Rel(filter=relation), names
+    if isinstance(node, Aggregate):
+        rel, fields, _text = emitter.emit(node.input)
+        names = tuple(".".join(field) for field in fields)
+        output = (*node.keys, *(name for name, _, _ in node.measures))
+        common = _common(emitter._operator_id("aggregate"))
+        common.hint.output_names.extend(output)
+        measures = []
+        for _name, function, argument in node.measures:
+            if argument is None:
+                kernel = "count:any"
+                arguments = []
+            else:
+                kernel = {
+                    "count": "count:any", "count_distinct": "count:any",
+                    "sum": "sum:i32", "min": "min:i32", "max": "max:i32",
+                    "avg": ("avg:fp64" if argument.rpartition(".")[2]
+                            in _score_columns(node.input) else "avg:i32"),
+                }[function]
+                arguments = [algebra.FunctionArgument(
+                    value=_field(names.index(argument)))]
+            emitter.functions.add(kernel)
+            measures.append(algebra.AggregateRel.Measure(
+                measure=algebra.AggregateFunction(
+                    function_reference=_FUNCTIONS[kernel][0],
+                    arguments=arguments,
+                    output_type=(_fp64_type() if kernel == "avg:fp64"
+                                 else _i64_type()),
+                    phase=algebra.AGGREGATION_PHASE_INITIAL_TO_RESULT,
+                    invocation=(
+                        algebra.AggregateFunction.AGGREGATION_INVOCATION_DISTINCT
+                        if function == "count_distinct"
+                        else algebra.AggregateFunction.AGGREGATION_INVOCATION_ALL),
+                )))
+        relation = algebra.AggregateRel(
+            common=common,
+            input=rel,
+            grouping_expressions=[_field(names.index(key)) for key in node.keys],
+            groupings=[algebra.AggregateRel.Grouping(
+                expression_references=list(range(len(node.keys))))],
+            measures=measures,
+        )
+        return algebra.Rel(aggregate=relation), output
+    rel, fields, _text = emitter.emit(node)
+    return rel, tuple(".".join(field) for field in fields)
+
+
+def _score_columns(node) -> set[str]:
+    """Return the score column names an AI tree adds."""
+    found = set()
+    while node is not None and not isinstance(node, Join):
+        if isinstance(node, Score):
+            found.add(node.output)
+        node = getattr(node, "input", None)
+    return found
+
+
 def build_plan(tree, select=None) -> plan_pb2.Plan:
     """Return the Substrait plan selecting the id of each relation.
 
     Args:
-        tree: The query tree.
-        select: Returned columns, an alias for its id or `alias.column`
-            for a label column, or None for every relation's id in scan
-            order.
+        tree: The query tree, with any relational steps on top.
+        select: Returned columns, an alias for its id, `alias.column`
+            for another column, or a bare measure name, or None for
+            every relation's id in scan order.
     """
     emitter = _Emitter()
-    rel, fields, text = emitter.emit(tree)
-    columns = [
-        tuple(name.split(".", 1)) if "." in name else (name, "id")
-        for name in (list(text) if select is None else select)
-    ]
-    names = [alias if column == "id" else column for alias, column in columns]
-    expressions = [_field(fields.index(column)) for column in columns]
+    rel, field_names = _emit_tail(emitter, tree)
+    if select is None:
+        select = [alias for alias, column in
+                  (name.split(".", 1) for name in field_names if "." in name)
+                  if column == "id"]
+    columns = [name if name in field_names else f"{name}.id"
+               for name in select]
+    names = [output_name(column) for column in columns]
+    expressions = [_field(field_names.index(column)) for column in columns]
     project = algebra.Rel(
         project=algebra.ProjectRel(
             common=algebra.RelCommon(
                 emit=algebra.RelCommon.Emit(
                     output_mapping=[
-                        len(fields) + index
+                        len(field_names) + index
                         for index in range(len(expressions))
                     ]
                 )
@@ -485,6 +740,19 @@ def _passages():
 
 def _traces():
     return Scan("agent_traces", "t", "trace")
+
+
+def _traces_with_columns():
+    """The agent traces with the columns the relational queries read."""
+    return Scan("agent_traces", "t", "trace",
+                ("trajectory_id", "turn_index", "token_count"),
+                integers=("turn_index", "token_count"))
+
+
+def _test_result(node):
+    return _classify(node, prompts.AGENT_TEST_RESULT,
+                     prompts.AGENT_TEST_RESULT_LABELS, "test_result",
+                     prompts.AGENT_TEST_RESULT_DESCRIPTIONS)
 
 
 def _policies():
@@ -698,6 +966,60 @@ QUERIES = (
                     prompts.AGENT_ROOT_CAUSE, prompts.AGENT_ROOT_CAUSE_LABELS,
                     "root_cause", prompts.AGENT_ROOT_CAUSE_DESCRIPTIONS),
           select=("t", "t.progress", "t.domain", "t.root_cause")),
+
+    # Relational operators over the agent traces. Each query returns a
+    # result small enough to read, and runs on Quail only: the stock
+    # backends refuse column tests, sorts, and aggregates.
+    Query("REL-AGENT-1", "column tests: snapshots past turn 10 of at most "
+          "6,000 tokens -> filter: recovered",
+          _filters(Where(Where(_traces_with_columns(), "turn_index", ">=", 10),
+                         "token_count", "<=", 6000), AGENT_RECOVERED)),
+    Query("REL-AGENT-2", "recovered -> the second page of ten, shortest "
+          "trace first",
+          Fetch(Sort(_filters(_traces_with_columns(), AGENT_RECOVERED),
+                     (("t.token_count", False), ("t.id", False))),
+                count=10, offset=10),
+          select=("t", "t.token_count")),
+    Query("REL-AGENT-3", "implemented a fix -> distinct trajectories",
+          Aggregate(_filters(_traces_with_columns(), AGENT_IMPLEMENTED_FIX),
+                    ("t.trajectory_id",)),
+          select=("t.trajectory_id",)),
+    Query("REL-AGENT-4", "score: recovered -> the 20 highest scores",
+          Fetch(Sort(Score(_traces_with_columns(), AGENT_RECOVERED,
+                           "recovered_score"),
+                     (("t.recovered_score", True), ("t.id", False))), 20),
+          select=("t", "t.recovered_score")),
+    Query("REL-AGENT-5", "traces that changed the code -> classify: test "
+          "result -> snapshots and trajectories per result, at least 50 "
+          "snapshots, most first",
+          Sort(Having(Aggregate(
+              _test_result(InList(_progress(_traces_with_columns()),
+                                  "progress", prompts.AGENT_CHANGED_CODE)),
+              ("t.test_result",),
+              (("n", "count", None),
+               ("trajectories", "count_distinct", "t.trajectory_id"))),
+              (("n", ">=", 50),)),
+               (("n", True), ("t.test_result", False))),
+          select=("t.test_result", "n", "trajectories")),
+    Query("REL-AGENT-6", "implemented a fix -> per trajectory: fixes, first "
+          "fix turn, longest trace; at least two fixes, earliest first, 50",
+          Fetch(Sort(Having(Aggregate(
+              _filters(_traces_with_columns(), AGENT_IMPLEMENTED_FIX),
+              ("t.trajectory_id",),
+              (("fixes", "count", None), ("first_fix", "min", "t.turn_index"),
+               ("longest", "max", "t.token_count"))),
+              (("fixes", ">=", 2),)),
+              (("first_fix", False), ("t.trajectory_id", False))), 50),
+          select=("t.trajectory_id", "fixes", "first_fix", "longest")),
+    Query("REL-AGENT-7", "score: implemented a fix -> per trajectory of at "
+          "least five snapshots: the mean score; the ten highest",
+          Fetch(Sort(Having(Aggregate(
+              Score(_traces_with_columns(), AGENT_IMPLEMENTED_FIX, "fix_score"),
+              ("t.trajectory_id",),
+              (("mean_fix_score", "avg", "t.fix_score"), ("n", "count", None))),
+              (("n", ">=", 5),)),
+              (("mean_fix_score", True), ("t.trajectory_id", False))), 10),
+          select=("t.trajectory_id", "mean_fix_score", "n")),
 
     # PrivacyPolicies: only when that corpus is available.
     Query("PRIV-1", "2 filters: P_MSG + P_LOC",

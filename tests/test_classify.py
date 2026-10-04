@@ -28,7 +28,7 @@ from tools.make_substrait_plans import (
 
 CLASSIFY_QUERIES = ("IMDB-11", "IMDB-12", "IMDB-13", "IMDB-14", "IMDB-15",
                     "BIO-5", "BIO-6", "FEV-11", "LEP-6", "AGENT-3", "AGENT-4",
-                    "AGENT-5")
+                    "AGENT-5", "REL-AGENT-5")
 
 
 def test_classification_queries_are_published():

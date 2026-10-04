@@ -24,6 +24,19 @@ scalar_functions:
           - name: right
             value: string
         return: boolean
+  - name: ai_score
+    description: >-
+      Return the model's belief that a document satisfies a
+      natural-language prompt, between 0 and 1: the probability of the
+      TRUE answer over the TRUE and FALSE answers.
+    impls:
+      - args:
+          - name: prompt
+            value: string
+            constant: true
+          - name: document
+            value: string
+        return: fp64
   - name: ai_classify
     description: >-
       Return the label the model scores highest for a document, or for a
