@@ -229,10 +229,11 @@ following question:", so an engine can reuse a document's KV across questions.
 
 ### Developing an adapter
 
-The 50 queries have several different shapes: which operators they have and
-how those operators are arranged in the plan. The table below lists one query
-for each mechanism an adapter needs, from simplest to most complex. Test your
-adapter on these queries first, then run it on all 50.
+The 50 queries have several different shapes: how many filters, joins,
+classifications, and relational operators they have, and how those operators
+are arranged in the plan. The table below lists one query for each distinct
+shape, from simplest to most complex. Test your adapter on these queries first,
+then run it on all 50.
 
 | Query | Shape | What it tests |
 | --- | --- | --- |
