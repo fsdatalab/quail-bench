@@ -299,12 +299,6 @@ to 1, that the document answers a filter prompt TRUE.
 | REL-AGENT-6 | Trajectories with at least two fixes, earliest first | `ai_filter`, `GROUP BY`, `MIN`, `MAX`, `HAVING`, `ORDER BY`, `LIMIT` |
 | REL-AGENT-7 | Ten trajectories of at least five snapshots with the highest mean fix score | `ai_score`, `GROUP BY`, `AVG`, `HAVING`, `ORDER BY`, `LIMIT` |
 
-The reference result applies the same steps to the saved labels. A score is 1.0
-for a document labeled TRUE and 0.0 otherwise. REL-AGENT-1, 2, 3, 5, and 6 are
-scored by their rows: precision, recall, exact match, and ordered match when the
-query sorts. REL-AGENT-4 and 7 are scored by precision at k, ties included. The
-score queries report no token minimum. These queries run on Quail only.
-
 ## Scale factors
 
 Scale factors 0.1, 0.5, and 1.0 sample 10%, 50%, and 100% of each dataset's
