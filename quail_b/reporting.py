@@ -245,7 +245,8 @@ def report(run_dir, *, rescore=True, cache_dir=None, root=None):
             output = _read_output(query_directory, item, rows=False)
             if (output.filter_answers is None or output.join_answers is None
                     or (spec._info.classifies
-                        and output.classify_answers is None)):
+                        and output.classify_answers is None)
+                    or spec._info.relational):
                 output = _read_output(query_directory, item)
             item["metrics"] = _score(
                 spec, output, suite, record["gpu_count"],
