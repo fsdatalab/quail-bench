@@ -282,20 +282,22 @@ prompt, the answer tables, and label accuracy.
 ### Relational queries
 
 The seven `REL-AGENT` queries add relational operators over the agent traces:
-column tests, `ORDER BY` with `OFFSET` and `LIMIT`, `DISTINCT`, `GROUP BY` with
-`COUNT`, `COUNT(DISTINCT)`, `SUM`, `AVG`, `MIN`, `MAX`, and `HAVING`. Two of them
-use a fourth AI function, `ai_score(prompt, document) -> fp64`. It returns the
-model's belief, from 0 to 1, that the document answers a filter prompt TRUE.
+a column test (a `WHERE` condition on a stored column, such as
+`turn_index >= 10`, applied before any model call), `ORDER BY` with `OFFSET`
+and `LIMIT`, `DISTINCT`, `GROUP BY` with `COUNT`, `COUNT(DISTINCT)`, `SUM`,
+`AVG`, `MIN`, `MAX`, and `HAVING`. Two of them use a fourth AI function,
+`ai_score(prompt, document) -> fp64`. It returns the model's belief, from 0
+to 1, that the document answers a filter prompt TRUE.
 
 | Query | Question | Operators |
 | --- | --- | --- |
-| REL-AGENT-1 | Recovered snapshots at turn 10 or later, of at most 6,000 tokens | Column tests, filter |
-| REL-AGENT-2 | Second page of ten recovered snapshots, shortest first | Filter, sort, fetch |
-| REL-AGENT-3 | Trajectories with a plausible fix | Filter, distinct |
-| REL-AGENT-4 | The 20 snapshots with the highest recovery score | Score, sort, fetch |
-| REL-AGENT-5 | Snapshots and trajectories per test outcome, at least 50 snapshots | Two classifies, group by, count, count distinct, having, sort |
-| REL-AGENT-6 | Trajectories with at least two fixes, earliest first | Filter, group by, min, max, having, sort, fetch |
-| REL-AGENT-7 | Ten trajectories of at least five snapshots with the highest mean fix score | Score, group by, avg, having, sort, fetch |
+| REL-AGENT-1 | Recovered snapshots at turn 10 or later, of at most 6,000 tokens | Two column tests, `ai_filter` |
+| REL-AGENT-2 | Second page of ten recovered snapshots, shortest first | `ai_filter`, `ORDER BY`, `OFFSET`, `LIMIT` |
+| REL-AGENT-3 | Trajectories with a plausible fix | `ai_filter`, `DISTINCT` |
+| REL-AGENT-4 | The 20 snapshots with the highest recovery score | `ai_score`, `ORDER BY`, `LIMIT` |
+| REL-AGENT-5 | Snapshots and trajectories per test outcome, at least 50 snapshots | Two `ai_classify`, `GROUP BY`, `COUNT`, `COUNT(DISTINCT)`, `HAVING`, `ORDER BY` |
+| REL-AGENT-6 | Trajectories with at least two fixes, earliest first | `ai_filter`, `GROUP BY`, `MIN`, `MAX`, `HAVING`, `ORDER BY`, `LIMIT` |
+| REL-AGENT-7 | Ten trajectories of at least five snapshots with the highest mean fix score | `ai_score`, `GROUP BY`, `AVG`, `HAVING`, `ORDER BY`, `LIMIT` |
 
 The reference result applies the same steps to the saved labels. A score is 1.0
 for a document labeled TRUE and 0.0 otherwise. REL-AGENT-1, 2, 3, 5, and 6 are
