@@ -42,7 +42,7 @@ from quail_b.prompts import (
     SERIOUS_ADVERSE_EVENT,
     SUPPORT,
 )
-from quail_b.substrait import _inspect_plan
+from quail_b.substrait import PlanInfo, inspect_plan
 
 # Fixed planner inputs from the sf=0.1 Qwen3 32B fp8 labels.
 # They apply at every scale factor so query planning does not read answers.
@@ -107,7 +107,7 @@ class QuerySpec:
             plan.ParseFromString(self.plan_bytes)
         except DecodeError as error:
             raise ValueError(f"{self.id}: invalid Substrait plan bytes") from error
-        _inspect_plan(plan)
+        inspect_plan(plan)
         object.__setattr__(
             self,
             "plan_bytes",
@@ -134,8 +134,9 @@ class QuerySpec:
         return plan_pb2.Plan.FromString(self.plan_bytes)
 
     @cached_property
-    def _info(self):
-        return _inspect_plan(self.plan)
+    def info(self) -> PlanInfo:
+        """Return the benchmark reading of the plan: its relations and steps."""
+        return inspect_plan(self.plan)
 
 
 @cache

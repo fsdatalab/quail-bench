@@ -4,7 +4,7 @@ import pyarrow as pa
 import pytest
 
 import quail_b
-from quail_b import prompts
+from quail_b import prompts, substrait
 from quail_b.labels import GroundTruthCollection, PredicateLabels
 from quail_b.queries import get_query
 from quail_b.relational import (
@@ -16,7 +16,6 @@ from quail_b.relational import (
 )
 from quail_b.run import _query_hash, _validate_output
 from quail_b.scoring import evaluate, output_columns
-from quail_b.substrait import _Aggregate, _Fetch, _Having, _Sort
 from tools.make_substrait_plans import Fetch, Scan, Score, Sort, build_plan
 
 TRACES = pa.table({
@@ -65,9 +64,9 @@ CORPUS = {"agent_traces": TRACES}
 
 def test_relational_plans_read_back_their_steps():
     spec = get_query("REL-AGENT-6")
-    info = spec._info
-    assert [type(step) for step in info.tail] == [_Aggregate, _Having, _Sort,
-                                                  _Fetch]
+    info = spec.info
+    assert [type(step) for step in info.tail] == [
+        substrait.Aggregate, substrait.Having, substrait.Sort, substrait.Fetch]
     assert info.aggregate.keys == ("t.trajectory_id",)
     assert info.aggregate.measures == (
         ("fixes", "count", None), ("first_fix", "min", "t.turn_index"),
@@ -77,15 +76,15 @@ def test_relational_plans_read_back_their_steps():
     assert (info.fetch.offset, info.fetch.count) == (0, 50)
     assert output_columns(spec) == ["trajectory_id", "fixes", "first_fix",
                                     "longest"]
-    tests = get_query("REL-AGENT-1")._info.column_tests
+    tests = get_query("REL-AGENT-1").info.column_tests
     assert [(t.column, t.comparison, t.value) for t in tests] == [
         ("turn_index", ">=", 10), ("token_count", "<=", 6000)]
-    score = get_query("REL-AGENT-4")._info.scores[0]
+    score = get_query("REL-AGENT-4").info.scores[0]
     assert (score.relation, score.output, score.prompt) == (
         "t", "recovered_score", prompts.AGENT_RECOVERED)
     assert score_fields(get_query("REL-AGENT-7")) == {
         "t.fix_score", "mean_fix_score"}
-    assert get_query("REL-AGENT-5")._info.aggregate.measures[1] == (
+    assert get_query("REL-AGENT-5").info.aggregate.measures[1] == (
         "trajectories", "count_distinct", "t.trajectory_id")
     # the published hashes of the other queries do not change
     assert _query_hash(get_query("IMDB-2")) == (

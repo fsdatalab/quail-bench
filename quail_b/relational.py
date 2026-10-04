@@ -15,7 +15,7 @@ import pyarrow as pa
 
 from quail_b.data import _ids
 from quail_b.queries import QuerySpec
-from quail_b.substrait import _Aggregate, _Fetch, _Having, _Sort, output_name
+from quail_b.substrait import Aggregate, Fetch, Having, Sort, output_name
 
 _COMPARE = {
     "=": pd.Series.eq, "<>": pd.Series.ne, "<": pd.Series.lt,
@@ -37,7 +37,7 @@ def reference_table(spec: QuerySpec, ground_truth, corpus_rows) -> pd.DataFrame:
     Raises:
         KeyError: A document the query reads has no label.
     """
-    info = spec._info
+    info = spec.info
     (relation,) = info.relations
     rows = corpus_rows[relation.table]
     table = (rows.to_pandas() if isinstance(rows, pa.Table)
@@ -76,7 +76,7 @@ def reference_table(spec: QuerySpec, ground_truth, corpus_rows) -> pd.DataFrame:
     return table.reset_index(drop=True)
 
 
-def _aggregate(table: pd.DataFrame, step: _Aggregate) -> pd.DataFrame:
+def _aggregate(table: pd.DataFrame, step: Aggregate) -> pd.DataFrame:
     """Group a table by the step's keys and compute its measures."""
     if not step.measures:
         return table[list(step.keys)].drop_duplicates().reset_index(drop=True)
@@ -112,26 +112,26 @@ def apply_tail(table: pd.DataFrame, spec: QuerySpec,
         spec: The query.
         fetch: Whether to apply the fetch step.
     """
-    for step in spec._info.tail:
-        if isinstance(step, _Aggregate):
+    for step in spec.info.tail:
+        if isinstance(step, Aggregate):
             table = _aggregate(table, step)
-        elif isinstance(step, _Having):
+        elif isinstance(step, Having):
             for name, comparison, value in step.tests:
                 table = table[_COMPARE[comparison](table[name], value)]
-        elif isinstance(step, _Sort):
+        elif isinstance(step, Sort):
             table = table.sort_values(
                 [name for name, _ in step.keys],
                 ascending=[not descending for _, descending in step.keys],
                 kind="stable", na_position="last")
-        elif isinstance(step, _Fetch) and fetch:
+        elif isinstance(step, Fetch) and fetch:
             table = table.iloc[step.offset:step.offset + step.count]
     return table.reset_index(drop=True)
 
 
 def _select(table: pd.DataFrame, spec: QuerySpec) -> pd.DataFrame:
-    selected = table[list(spec._info.select)]
+    selected = table[list(spec.info.select)]
     return selected.rename(columns={
-        name: output_name(name) for name in spec._info.select})
+        name: output_name(name) for name in spec.info.select})
 
 
 def expected_result(spec: QuerySpec, ground_truth, corpus_rows) -> pa.Table:
@@ -142,8 +142,8 @@ def expected_result(spec: QuerySpec, ground_truth, corpus_rows) -> pa.Table:
 
 def score_fields(spec: QuerySpec) -> set[str]:
     """Return the fields whose values come from a score: scores and their measures."""
-    fields = {f"{score.relation}.{score.output}" for score in spec._info.scores}
-    aggregate = spec._info.aggregate
+    fields = {f"{score.relation}.{score.output}" for score in spec.info.scores}
+    aggregate = spec.info.aggregate
     if aggregate is not None:
         fields.update(name for name, _function, argument in aggregate.measures
                       if argument in fields)
@@ -187,7 +187,7 @@ def relational_accuracy(spec: QuerySpec, rows: pa.Table, ground_truth,
     least as well as the fetch's last row under the reference scores:
     precision at k.
     """
-    info = spec._info
+    info = spec.info
     columns = [output_name(name) for name in info.select]
     scored = score_fields(spec)
     sort_scored = info.sort is not None and any(

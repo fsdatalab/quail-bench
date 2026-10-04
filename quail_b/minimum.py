@@ -113,7 +113,7 @@ def validate_prompt_pieces(spec, pieces) -> dict:
     checked = {"tokenizer": pieces["tokenizer"],
                "preamble": _token_list(pieces.get("preamble", ()), "preamble"),
                "filters": [], "joins": [], "classifies": []}
-    stages = {filter_spec.id for filter_spec in spec._info.filters}
+    stages = {filter_spec.id for filter_spec in spec.info.filters}
     for item in pieces.get("filters", ()):
         operator_id = item.get("id")
         if operator_id not in stages:
@@ -128,7 +128,7 @@ def validate_prompt_pieces(spec, pieces) -> dict:
         raise ValueError(
             f"prompt pieces: missing filter operators {sorted(stages)}"
         )
-    joins = {join.id: join for join in spec._info.joins}
+    joins = {join.id: join for join in spec.info.joins}
     operator_ids = set(joins)
     for item in pieces.get("joins", ()):
         operator_id = item.get("id")
@@ -143,7 +143,7 @@ def validate_prompt_pieces(spec, pieces) -> dict:
         raise ValueError(
             f"prompt pieces: missing join operators {sorted(operator_ids)}"
         )
-    classifies = {operator.id: operator for operator in spec._info.classifies}
+    classifies = {operator.id: operator for operator in spec.info.classifies}
     operator_ids = set(classifies)
     for item in pieces.get("classifies", ()):
         operator_id = item.get("id")
@@ -324,7 +324,7 @@ def minimum_input_tokens(spec, pieces, filter_answers, join_answers,
     """
     sets = {
         relation.alias: (relation.table, relation.text_column)
-        for relation in spec._info.relations
+        for relation in spec.info.relations
     }
     pre = _tokens(pieces["preamble"])
     records: dict = {}
@@ -337,7 +337,7 @@ def minimum_input_tokens(spec, pieces, filter_answers, join_answers,
 
     tails = {item["id"]: tuple(item["tail"]) for item in pieces["filters"]}
     filters = {
-        filter_spec.id: filter_spec for filter_spec in spec._info.filters
+        filter_spec.id: filter_spec for filter_spec in spec.info.filters
     }
     for operator_id, table in filter_answers.items():
         alias = filters[operator_id].relation
@@ -346,9 +346,9 @@ def minimum_input_tokens(spec, pieces, filter_answers, join_answers,
         for row_id in ids.to_pylist():
             record(alias, row_id).suffixes.add(question)
     pairs = {item["id"]: item for item in pieces["joins"]}
-    relations = {join.id: join.relations for join in spec._info.joins}
+    relations = {join.id: join.relations for join in spec.info.joins}
     pair_answers = dict(join_answers)
-    classifies = {operator.id: operator for operator in spec._info.classifies}
+    classifies = {operator.id: operator for operator in spec.info.classifies}
     for piece in pieces["classifies"]:
         table = (classify_answers or {}).get(piece["id"])
         if table is None:
@@ -443,7 +443,7 @@ def input_tokens(spec, pieces, filter_answers, join_answers,
     """Count full prompt inputs, or return None for missing answer tables."""
     sets = {
         relation.alias: (relation.table, relation.text_column)
-        for relation in spec._info.relations
+        for relation in spec.info.relations
     }
 
     def document_tokens(table, alias):
@@ -456,7 +456,7 @@ def input_tokens(spec, pieces, filter_answers, join_answers,
 
     total = 0
     preamble = len(pieces["preamble"])
-    filters = {item.id: item for item in spec._info.filters}
+    filters = {item.id: item for item in spec.info.filters}
     for piece in pieces["filters"]:
         table = filter_answers.get(piece["id"])
         if table is None:
@@ -464,7 +464,7 @@ def input_tokens(spec, pieces, filter_answers, join_answers,
         alias = filters[piece["id"]].relation
         total += len(table) * (preamble + len(piece["tail"]))
         total += document_tokens(table, alias)
-    joins = {item.id: item for item in spec._info.joins}
+    joins = {item.id: item for item in spec.info.joins}
     for piece in pieces["joins"]:
         table = join_answers.get(piece["id"])
         if table is None:
@@ -473,7 +473,7 @@ def input_tokens(spec, pieces, filter_answers, join_answers,
             len(piece[name]) for name in ("frame", "label", "tail")))
         total += sum(document_tokens(table, alias)
                      for alias in joins[piece["id"]].relations)
-    classifies = {operator.id: operator for operator in spec._info.classifies}
+    classifies = {operator.id: operator for operator in spec.info.classifies}
     for piece in pieces["classifies"]:
         table = (classify_answers or {}).get(piece["id"])
         if table is None:
@@ -518,7 +518,7 @@ def token_metrics(spec, output, corpus_rows, stores=None) -> dict:
         raise ValueError("prompt pieces need a fresh_tokens measurement")
     if output.filter_answers is None or output.join_answers is None:
         raise ValueError("prompt pieces need filter and join answers")
-    if spec._info.classifies and output.classify_answers is None:
+    if spec.info.classifies and output.classify_answers is None:
         raise ValueError("prompt pieces need classify answers")
     pieces = validate_prompt_pieces(spec, output.prompt_pieces)
     stores = {} if stores is None else stores

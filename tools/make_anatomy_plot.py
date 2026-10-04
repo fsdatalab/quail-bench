@@ -46,7 +46,7 @@ from quail_b.queries import (
     QUERIES,
     QUERY_FAMILY_WORKLOADS,
 )
-from quail_b.substrait import _inspect_plan
+from quail_b.substrait import inspect_plan
 
 # ---- colors (self-contained, no external style dependency) ----
 
@@ -113,7 +113,7 @@ class Join:
 
 def _build_tree(spec):
     """Build a plan tree from one QuerySpec."""
-    details = _inspect_plan(spec.plan)
+    details = inspect_plan(spec.plan)
     subtrees = {}
     for relation in details.relations:
         node = Scan(relation.table, relation.alias)
@@ -276,13 +276,13 @@ def main():
                + (len(family_metas) - 1) * domain_y_gap)
 
     n_queries = len(QUERIES)
-    n_predicates = len({f.prompt for s in QUERIES for f in s._info.filters}
-                       | {j.prompt for s in QUERIES for j in s._info.joins})
+    n_predicates = len({f.prompt for s in QUERIES for f in s.info.filters}
+                       | {j.prompt for s in QUERIES for j in s.info.joins})
     n_families = len(family_metas)
     n_tables = len({
         relation.table
         for spec in QUERIES
-        for relation in spec._info.relations
+        for relation in spec.info.relations
     })
 
     scale = 0.65
