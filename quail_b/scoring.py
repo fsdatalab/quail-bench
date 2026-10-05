@@ -57,6 +57,10 @@ class RunOutput:
             column, one row per document or joined row the engine
             classified. A document or joined row with no row cannot
             pass an IN-list filter or appear with its label.
+        score_answers: Score operator ID to a table with the relation's
+            alias column and a float `score` column, one row per
+            document the engine scored. Token metrics need it for a
+            query with a score.
     """
 
     filter_answers: dict[str, pa.Table] | None
@@ -66,6 +70,7 @@ class RunOutput:
     measurements: dict = field(default_factory=dict)
     prompt_pieces: dict | None = None
     classify_answers: dict[str, pa.Table] | None = None
+    score_answers: dict[str, pa.Table] | None = None
 
 
 def output_columns(spec: QuerySpec) -> list[str]:

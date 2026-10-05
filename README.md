@@ -430,6 +430,7 @@ results/vllm_qwen3_4b/
     ├── filters-0.parquet # optional filter answers
     ├── joins-0.parquet   # optional join answers
     ├── classifications-0.parquet  # optional classification answers
+    ├── scores-0.parquet  # optional score answers
     └── prompt_pieces.json
 ```
 

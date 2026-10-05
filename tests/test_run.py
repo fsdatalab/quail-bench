@@ -283,3 +283,27 @@ def test_saved_answers_survive_scoring_failure_and_can_move(tmp_path):
     with pytest.raises(ValueError, match="loaded 1 rows"):
         quail_b.report(tmp_path / "pinned", root=tmp_path)
     assert (tmp_path / "pinned/IMDB-4/rows.parquet").exists()
+
+
+def test_score_answers_are_saved_read_back_and_checked(tmp_path):
+    from quail_b.run import _read_output, _save_output, _validate_output
+
+    spec = quail_b.get_query("REL-AGENT-4")
+    scores = pa.table({"t": ["tr0", "tr1"], "score": [0.9, 0.1]})
+    rows = pa.table({"t": ["tr0"], "recovered_score": [0.9]})
+    output = quail_b.RunOutput({}, {}, rows, runtime_s=1.0,
+                               score_answers={"score-1": scores})
+    paths = _save_output(tmp_path / "q", output, spec)
+    assert paths["scores"] == [{"key": "score-1", "path": "scores-0.parquet"}]
+    loaded = _read_output(tmp_path / "q", {"files": paths})
+    assert loaded.score_answers["score-1"].equals(scores)
+    tables = {"agent_traces": pa.table({"id": ["tr0", "tr1"]})}
+    with pytest.raises(ValueError, match="unknown score operator"):
+        _validate_output(spec, quail_b.RunOutput(
+            {}, {}, rows, runtime_s=1.0,
+            score_answers={"score-9": scores}), tables)
+    with pytest.raises(ValueError, match="non-null floats"):
+        _validate_output(spec, quail_b.RunOutput(
+            {}, {}, rows, runtime_s=1.0, score_answers={"score-1": pa.table(
+                {"t": ["tr0"], "score": [1]})}), tables)
+

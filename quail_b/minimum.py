@@ -102,7 +102,9 @@ def validate_prompt_pieces(spec, pieces) -> dict:
             "tail"}`, read as for a join, for a classification of
             joined rows. A classification's pieces are those of the
             reference prompt (`render_classify_prompt`), whatever prompt
-            the engine sent; its tail ends with the answer cue.
+            the engine sent; its tail ends with the answer cue. A query
+            with scores also needs `scores`: a list of `{"id", "tail"}`,
+            read as for a filter.
 
     Returns:
         The pieces as plain lists, with every stage of the query named.
@@ -112,7 +114,7 @@ def validate_prompt_pieces(spec, pieces) -> dict:
         raise ValueError("prompt pieces need a tokenizer name")
     checked = {"tokenizer": pieces["tokenizer"],
                "preamble": _token_list(pieces.get("preamble", ()), "preamble"),
-               "filters": [], "joins": [], "classifies": []}
+               "filters": [], "joins": [], "classifies": [], "scores": []}
     stages = {filter_spec.id for filter_spec in spec.info.filters}
     for item in pieces.get("filters", ()):
         operator_id = item.get("id")
@@ -162,6 +164,19 @@ def validate_prompt_pieces(spec, pieces) -> dict:
     if operator_ids:
         raise ValueError(
             f"prompt pieces: missing classify operators {sorted(operator_ids)}")
+    operator_ids = {operator.id for operator in spec.info.scores}
+    for item in pieces.get("scores", ()):
+        operator_id = item.get("id")
+        if operator_id not in operator_ids:
+            raise ValueError(
+                f"prompt pieces: unknown score operator {operator_id!r}")
+        operator_ids.remove(operator_id)
+        checked["scores"].append({
+            "id": operator_id,
+            "tail": _token_list(item.get("tail", ()), "score tail")})
+    if operator_ids:
+        raise ValueError(
+            f"prompt pieces: missing score operators {sorted(operator_ids)}")
     return checked
 
 
@@ -301,7 +316,7 @@ def _encoded(column) -> tuple[np.ndarray, pa.Array]:
 
 def minimum_input_tokens(spec, pieces, filter_answers, join_answers,
                          documents: DocumentTokens,
-                         classify_answers=None) -> int:
+                         classify_answers=None, score_answers=None) -> int:
     """Return the fewest input tokens the run's requests need.
 
     A join can hold tens of millions of pairs, so the pairs are
@@ -318,6 +333,8 @@ def minimum_input_tokens(spec, pieces, filter_answers, join_answers,
         classify_answers: Classify operator ID to a table with one ID
             column per classified alias, one row per document or joined
             row classified.
+        score_answers: Score operator ID to a table with the relation's
+            alias column, one row per document scored.
 
     Returns:
         The token count.
@@ -345,6 +362,17 @@ def minimum_input_tokens(spec, pieces, filter_answers, join_answers,
         ids = pc.unique(pc.cast(table.column(alias), pa.string()))
         for row_id in ids.to_pylist():
             record(alias, row_id).suffixes.add(question)
+    # a score asks a filter question and reads its belief, so it is a
+    # suffix of the document like a filter
+    scores = {operator.id: operator for operator in spec.info.scores}
+    for piece in pieces["scores"]:
+        table = (score_answers or {}).get(piece["id"])
+        if table is None:
+            continue
+        alias = scores[piece["id"]].relation
+        ids = pc.unique(pc.cast(table.column(alias), pa.string()))
+        for row_id in ids.to_pylist():
+            record(alias, row_id).suffixes.add(tuple(piece["tail"]))
     pairs = {item["id"]: item for item in pieces["joins"]}
     relations = {join.id: join.relations for join in spec.info.joins}
     pair_answers = dict(join_answers)
@@ -439,7 +467,7 @@ def _reported_input_tokens(measurements) -> int | None:
 
 def input_tokens(spec, pieces, filter_answers, join_answers,
                  documents: DocumentTokens,
-                 classify_answers=None) -> int | None:
+                 classify_answers=None, score_answers=None) -> int | None:
     """Count full prompt inputs, or return None for missing answer tables."""
     sets = {
         relation.alias: (relation.table, relation.text_column)
@@ -483,6 +511,13 @@ def input_tokens(spec, pieces, filter_answers, join_answers,
             len(piece.get(name, ())) for name in ("frame", "label", "tail")))
         total += sum(document_tokens(table, alias)
                      for alias in operator.relations)
+    scores = {operator.id: operator for operator in spec.info.scores}
+    for piece in pieces["scores"]:
+        table = (score_answers or {}).get(piece["id"])
+        if table is None:
+            return None
+        total += len(table) * (preamble + len(piece["tail"]))
+        total += document_tokens(table, scores[piece["id"]].relation)
     return total
 
 
@@ -520,13 +555,15 @@ def token_metrics(spec, output, corpus_rows, stores=None) -> dict:
         raise ValueError("prompt pieces need filter and join answers")
     if spec.info.classifies and output.classify_answers is None:
         raise ValueError("prompt pieces need classify answers")
+    if spec.info.scores and output.score_answers is None:
+        raise ValueError("prompt pieces need score answers")
     pieces = validate_prompt_pieces(spec, output.prompt_pieces)
     stores = {} if stores is None else stores
     name = pieces["tokenizer"]
     if name not in stores:
         stores[name] = DocumentTokens(corpus_rows, load_tokenizer(name))
     answers = (output.filter_answers, output.join_answers, stores[name],
-               output.classify_answers)
+               output.classify_answers, output.score_answers)
     minimum = minimum_input_tokens(spec, pieces, *answers)
     piece_input = input_tokens(spec, pieces, *answers)
     if reported_input is not None:

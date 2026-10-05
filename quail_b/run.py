@@ -167,9 +167,12 @@ def _save_output(directory, output, spec):
     }
     if output.classify_answers is not None:
         paths["classifications"] = None
+    if output.score_answers is not None:
+        paths["scores"] = None
     for kind, answers in (
             ("filters", output.filter_answers), ("joins", output.join_answers),
-            ("classifications", output.classify_answers)):
+            ("classifications", output.classify_answers),
+            ("scores", output.score_answers)):
         if answers is None:
             continue
         paths[kind] = []
@@ -195,6 +198,7 @@ def _read_output(directory, record, rows=True):
     filters = paths["filters"]
     joins = paths["joins"]
     classifications = paths.get("classifications")
+    scores = paths.get("scores")
     pieces = paths.get("prompt_pieces")
     return RunOutput(
         None if filters is None else {
@@ -207,7 +211,10 @@ def _read_output(directory, record, rows=True):
         None if pieces is None else json.loads(file(pieces).read_text()),
         None if classifications is None else {
             item["key"]: pq.read_table(file(item["path"]))
-            for item in classifications})
+            for item in classifications},
+        None if scores is None else {
+            item["key"]: pq.read_table(file(item["path"]))
+            for item in scores})
 
 
 ROW_SAMPLE = 100_000    # rows of a traced result checked one by one
@@ -347,6 +354,14 @@ def _validate_output(spec, output, tables):
                 operator.output if name == "label" else name
                 for name in table.column_names]),
             [operator.output])
+    scores = {operator.id: operator for operator in spec.info.scores}
+    for operator_id, table in (output.score_answers or {}).items():
+        if operator_id not in scores:
+            raise ValueError(f"unknown score operator {operator_id!r}")
+        validate_ids(table, [scores[operator_id].relation])
+        if table["score"].null_count or not pa.types.is_floating(
+                table["score"].type):
+            raise ValueError("scores must be non-null floats")
 
 
 def _score(spec, output, suite, gpu_count, gpu_hourly_rate_usd, tokens=None):

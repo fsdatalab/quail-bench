@@ -17,7 +17,14 @@ from quail_b.minimum import (
 )
 from quail_b.queries import QuerySpec
 from quail_b.scoring import RunOutput
-from tools.make_substrait_plans import Classify, Filter, Join, Scan, build_plan
+from tools.make_substrait_plans import (
+    Classify,
+    Filter,
+    Join,
+    Scan,
+    Score,
+    build_plan,
+)
 
 
 def _spec(query_id, description, tree, select=None):
@@ -436,3 +443,48 @@ def test_token_metrics_count_label_reading_as_regret(monkeypatch):
         "regret_approximate": False}
     with pytest.raises(ValueError, match="classify answers"):
         metrics({"fresh_tokens": prompt}, classify_answers=None)
+
+
+def test_score_pieces_and_answers_count_a_score_as_a_document_suffix(
+        monkeypatch):
+    monkeypatch.setattr("quail_b.minimum.load_tokenizer", lambda _: _encode)
+    spec = _spec(
+        "TEST-7",
+        "one score",
+        Score(Scan("docs", "d", "body"), "useful {0}", "useful_score"),
+        ("d", "d.useful_score"),
+    )
+    with pytest.raises(ValueError, match="missing score operators"):
+        validate_prompt_pieces(spec, {"tokenizer": "test"})
+    with pytest.raises(ValueError, match="unknown score operator"):
+        validate_prompt_pieces(spec, {"tokenizer": "test", "scores": [
+            {"id": "score-1", "tail": [1]}, {"id": "score-2"}]})
+    pieces = validate_prompt_pieces(spec, {
+        "tokenizer": "test", "preamble": PRE,
+        "scores": [{"id": "score-1", "tail": QUESTION}]})
+    assert pieces["scores"] == [{"id": "score-1", "tail": QUESTION}]
+    corpus = {"docs": pa.table({
+        "id": ["a", "b"], "body": ["same start one", "same start two"]})}
+    scores = {"score-1": pa.table({"d": ["a", "b"], "score": [0.9, 0.1]})}
+    documents = DocumentTokens(corpus, _encode)
+    # the two documents share the preamble and "same start " (11
+    # tokens); each gets the question once
+    assert minimum_input_tokens(spec, pieces, {}, {}, documents,
+                                score_answers=scores) == (
+        len(PRE) + 11 + 3 + 3 + 2 * len(QUESTION))
+    assert input_tokens(spec, pieces, {}, {}, documents,
+                        score_answers=scores) == (
+        2 * (len(PRE) + len(QUESTION)) + 14 + 14)
+    assert input_tokens(spec, pieces, {}, {}, documents) is None
+    rows = pa.table({"d": ["a"], "useful_score": [0.9]})
+    with pytest.raises(ValueError, match="score answers"):
+        token_metrics(spec, RunOutput(
+            {}, {}, rows, runtime_s=1.0, measurements={"fresh_tokens": 100},
+            prompt_pieces=pieces), corpus)
+    metrics = token_metrics(spec, RunOutput(
+        {}, {}, rows, runtime_s=1.0, measurements={"fresh_tokens": 100},
+        prompt_pieces=pieces, score_answers=scores), corpus)
+    assert metrics["input_tokens"] == 2 * (len(PRE) + len(QUESTION)) + 28
+    assert metrics["minimum_tokens"] == len(PRE) + 17 + 2 * len(QUESTION)
+    assert metrics["regret_tokens"] == 100 - metrics["minimum_tokens"]
+
