@@ -162,6 +162,7 @@ the labels.
 | `measurements` | `dict` | Optional engine measurements |
 | `prompt_pieces` | `dict \| None` | Token and KV metrics |
 | `classify_answers` | `dict[str, pa.Table] \| None` | Label accuracy and token metrics |
+| `score_answers` | `dict[str, pa.Table] \| None` | Token metrics of a query with a score |
 
 ### Result rows
 
@@ -204,8 +205,8 @@ REL-AGENT-6 returns `trajectory_id`, `fixes`, `first_fix`, and `longest`. The
 harness rejects more rows than the query's `LIMIT` and ids absent from the
 input table. The reference rows apply the query's relational steps to the saved
 labels, with a score of 1.0 for a document labeled TRUE; a query sorted by a
-score is scored by precision at k. Omit `prompt_pieces` for a query with a
-score.
+score is scored by precision at k. A query with a score reports its token
+metrics from `score_answers` and the `scores` prompt pieces.
 
 ### Runtime
 
@@ -424,6 +425,21 @@ classify_answers = {
 A joined row with no answer has no label, so it does not appear in the
 result, even when the join kept it.
 
+`score_answers` maps each score operator ID to a table with the relation's
+alias column and a float `score` column, one row per document the engine
+scored. It does not change the result rows, which carry the scores the
+query selects; QUAIL-B reads it for the token metrics of a query with a
+score. For REL-AGENT-4:
+
+```python
+score_answers = {
+    "score-1": pa.table({
+        "t": ["tr17", "tr42"],
+        "score": [0.91, 0.08],
+    }),
+}
+```
+
 With answer tables for every operator, `rows` must match the rows the answers
 imply, label columns included.
 
@@ -485,6 +501,7 @@ must compute.
 | `filters` | `list[dict]` | One `id` and `tail` token list per filter |
 | `joins` | `list[dict]` | One join description per join |
 | `classifies` | `list[dict]` | One description per classification |
+| `scores` | `list[dict]` | One `id` and `tail` token list per score, as for a filter |
 
 Each filter description has:
 
@@ -537,7 +554,7 @@ minimum tokens, recomputed tokens, and KV regret.
 | Label accuracy | Classification answers |
 | Fresh tokens | `measurements["fresh_tokens"]` |
 | Input tokens and their throughput | Prompt pieces, or reported input tokens |
-| Minimum tokens and KV regret | All answer tables, prompt pieces, and fresh tokens |
+| Minimum tokens and KV regret | All answer tables, score answers included, prompt pieces, and fresh tokens |
 | GPU cost | `gpu_count` and `gpu_hourly_rate_usd` |
 | Cost per million input tokens | GPU cost and a positive input token count |
 
