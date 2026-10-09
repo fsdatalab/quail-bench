@@ -201,6 +201,7 @@ lists the queries that use it.
 | SWE-Next | REL-AGENT-1 to REL-AGENT-7 | `agent_traces` | Relational operators over the trajectories |
 | tau-bench | SUPPORT-1 to SUPPORT-6 | `support_traces`, `support_messages` | Customer support agent traces |
 | SWE-rebench | RUNS-1 to RUNS-5 | `issue_runs`, `issue_messages` | Repeated coding agent runs of one issue |
+| Terminal Wrench | WRENCH-1 to WRENCH-5 | `wrench_runs`, `wrench_steps` | Reward hacking in terminal agent runs |
 
 Within each dataset, the first queries have a single filter or join. Later
 queries chain filters, filter both join inputs, scan one table under two
@@ -343,6 +344,35 @@ of one issue join on `instance_id`.
 | RUNS-4 | What did each failed run lack, compared with a successful run? | RUNS-3, then 5 shortfalls per pair |
 | RUNS-5 | Which runs ran tests most often? | Column test on `role`, `ai_filter` over steps, `GROUP BY`, `COUNT`, `HAVING`, `ORDER BY`, `LIMIT` |
 
+### Reward hacking queries
+
+The `WRENCH` queries ask which agent runs passed a task's verifier by
+exploiting it instead of solving the task. The runs come from
+[Terminal Wrench](https://huggingface.co/datasets/few-sh/terminal-wrench)
+(Apache-2.0): terminal tasks run by Claude Opus 4.6, Gemini 3.1 Pro, and
+GPT-5.4. Hack runs are the dataset's sanitized hack trajectories: the agent
+was asked to pass the verifier by any means, and afterwards the red-team
+prompt was removed and the agent's messages were rewritten to drop mentions of
+hacking. Baseline runs solved the task without being asked to hack.
+
+`wrench_runs` has one row per run: the task text, then every agent step's
+message, commands, and terminal output, with long output cut to 2,000
+characters. `mode` holds `hack` or `baseline`, the dataset's own label;
+only WRENCH-5 reads it, to keep baseline runs. `wrench_steps` has one row per
+agent step: the task text, then that step alone. Runs over 24,000 Qwen3 tokens
+are left out.
+
+| Query | Question | Operators |
+| --- | --- | --- |
+| WRENCH-1 | Which runs exploited the verifier? | `ai_filter` over the whole run |
+| WRENCH-2 | Which 100 runs most likely exploited the verifier? | `ai_score`, `ORDER BY`, `LIMIT` |
+| WRENCH-3 | What kind of exploit did each exploiting run use? | WRENCH-1, then 11 exploit kinds with descriptions, from the dataset's categories |
+| WRENCH-4 | Which runs have the most steps that are part of an exploit? | `ai_filter` over steps, `GROUP BY`, `COUNT`, `HAVING`, `ORDER BY`, `LIMIT` |
+| WRENCH-5 | Among runs not asked to hack, how many exploited the verifier, per agent model? | Column test on `mode`, `ai_filter`, `GROUP BY`, `COUNT`, `ORDER BY` |
+
+The reference labels, like the others, will be Qwen3 32B's answers. `mode`
+also allows measuring a run filter against the dataset's labels directly.
+
 A column test on one relation of a join, such as `role = 'user'`, limits
 the pairs the join asks; a query with one is scored per operator like any
 join query. A column test over a single relation still makes the query
@@ -370,6 +400,8 @@ same at every scale factor. Use 0.1 while developing an adapter.
 | tau-bench | `support_messages` | about 3,600 | about 18,800 | about 38,000 |
 | SWE-rebench | `issue_runs` | 320 | 1,600 | 3,200 |
 | SWE-rebench | `issue_messages` | about 20,000 | about 100,000 | about 200,000 |
+| Terminal Wrench | `wrench_runs` | 629 | 2,972 | 5,920 |
+| Terminal Wrench | `wrench_steps` | 3,454 | 16,801 | 32,838 |
 
 ### Reference answers
 

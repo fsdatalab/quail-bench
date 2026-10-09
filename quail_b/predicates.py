@@ -174,6 +174,14 @@ PREDICATES = (
     PredicateSpec(
         "quailb.runs.step.runs_tests", "runs", "step_runs_tests", "filter",
         prompts.RUNS_TEST_STEP, "step", "issue_messages", "content"),
+    PredicateSpec(
+        "quailb.wrench.run.exploited_verifier", "wrench",
+        "run_exploited_verifier", "filter", prompts.WRENCH_EXPLOITED,
+        "agent_run", "wrench_runs", "transcript"),
+    PredicateSpec(
+        "quailb.wrench.step.exploits_verifier", "wrench",
+        "step_exploits_verifier", "filter", prompts.WRENCH_STEP_EXPLOIT,
+        "agent_step", "wrench_steps", "text"),
 )
 
 # Classification predicates. Their labels are not in the published
@@ -258,6 +266,11 @@ CLASSIFY_PREDICATES = (
         labels=prompts.RUNS_SHORTFALL_LABELS,
         descriptions=prompts.RUNS_SHORTFALL_DESCRIPTIONS,
         pair_columns=("instance_id", "instance_id")),
+    PredicateSpec(
+        "quailb.wrench.run.exploit_kind", "wrench", "exploit_kind",
+        "classify", prompts.WRENCH_EXPLOIT_KIND, "agent_run", "wrench_runs",
+        "transcript", labels=prompts.WRENCH_EXPLOIT_KIND_LABELS,
+        descriptions=prompts.WRENCH_EXPLOIT_KIND_DESCRIPTIONS),
 )
 
 PREDICATE_BY_KEY = {p.key: p for p in PREDICATES + CLASSIFY_PREDICATES}

@@ -19,6 +19,9 @@ from quail_b.data import (
     SETS,
     SUPPORT_TASKS,
     SUPPORT_TRACES_PER_TASK,
+    WRENCH_MAX_TOKENS,
+    WRENCH_OUTPUT_CHARS,
+    WRENCH_TASKS,
     _agent_snapshot_boundaries,
     _agent_trace_rows,
     _issue_run_candidates,
@@ -29,11 +32,14 @@ from quail_b.data import (
     _n_issue_run_issues,
     _n_lepard_pairs,
     _n_support_tasks,
+    _n_wrench_tasks,
     _request,
     _sample_lepard_pairs,
     _select_agent_snapshots,
     _support_rows,
     _transcript,
+    _wrench_rows,
+    _wrench_tasks,
 )
 
 
@@ -269,3 +275,69 @@ def test_trace_set_sizes_scale_with_the_scale_factor():
     assert set(CORPUS_COLUMNS) >= {
         "support_traces", "support_messages", "issue_runs", "issue_messages"}
     assert CORPUS_COLUMNS["support_messages"] == CORPUS_COLUMNS["issue_messages"]
+
+
+def _wrench_trajectory(commands, output="ok"):
+    steps = [{"step_id": 1, "source": "user", "message": "harness rules"}]
+    for number, command in enumerate(commands, start=2):
+        steps.append({
+            "step_id": number, "source": "agent",
+            "message": f"Analysis: step {number}",
+            "tool_calls": [{"function_name": "bash_command",
+                            "arguments": {"keystrokes": command + "\n"}}],
+            "observation": {"results": [
+                {"content": "New Terminal Output:\n" + output}]},
+        })
+    return steps
+
+
+def test_wrench_rows_render_runs_and_steps_of_chosen_tasks():
+    class _WordTokenizer:
+        def encode(self, text, add_special_tokens=False):
+            return text.split()
+
+    index = [
+        {"task_id": "t2", "model": "gpt-5.4", "trajectory_path": "a",
+         "instruction": "Fix the server. ", "mode": "hack"},
+        {"task_id": "t1", "model": "gpt-5.4", "trajectory_path": "b",
+         "instruction": "Sort the file.", "mode": "baseline"},
+        {"task_id": "t2", "model": "gemini-3.1-pro", "trajectory_path": "c",
+         "instruction": "Fix the server.", "mode": "baseline"},
+        {"task_id": "t2", "model": "claude-opus-4.6", "trajectory_path": "d",
+         "instruction": "Fix the server.", "mode": "hack"},
+    ]
+    trajectories = {
+        "a": _wrench_trajectory(["cat check.sh", "echo PASS > out"],
+                                "x" * (WRENCH_OUTPUT_CHARS + 30)),
+        "b": _wrench_trajectory(["sort f"]),
+        "c": _wrench_trajectory(["systemctl restart app"]),
+        "d": _wrench_trajectory(["word " * WRENCH_MAX_TOKENS]),
+    }
+
+    runs, steps = _wrench_rows(index, ["t2", "t1"], trajectories.get,
+                               _WordTokenizer())
+
+    assert [(run["id"], run["task_id"], run["mode"]) for run in runs] == [
+        ("wr00000", "t2", "hack"), ("wr00001", "t2", "baseline"),
+        ("wr00002", "t1", "baseline")]
+    first = runs[0]["transcript"]
+    assert first.startswith("[TASK]\nFix the server.\n\n[AGENT]\nAnalysis")
+    assert "harness rules" not in first
+    assert "[COMMANDS]\ncat check.sh" in first
+    assert "characters cut ...]" in first
+    assert runs[0]["step_count"] == 2
+    assert runs[0]["token_count"] == len(first.split())
+    assert [step["id"] for step in steps[:3]] == [
+        "wr00000/1", "wr00000/2", "wr00001/1"]
+    assert steps[1]["text"].startswith("[TASK]\nFix the server.\n\n[STEP]\n")
+    assert "echo PASS > out" in steps[1]["text"]
+    assert "cat check.sh" not in steps[1]["text"]
+    assert steps[1]["run_id"] == "wr00000" and steps[1]["step_index"] == 2
+
+
+def test_wrench_tasks_are_seeded_and_scale():
+    index = [{"task_id": f"t{i}"} for i in range(50)] * 2
+    assert _wrench_tasks(index, 5) == _wrench_tasks(index, 10)[:5]
+    assert len(set(_wrench_tasks(index, 50))) == 50
+    assert WRENCH_TASKS == 331
+    assert _n_wrench_tasks(0.1) == 33 and _n_wrench_tasks(1.0) == 331

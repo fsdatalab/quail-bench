@@ -467,8 +467,8 @@ filter stores its boolean `answer`. The manifest's predicate lists the
 A query marked `labels_pending` in the catalog has no published labels yet.
 `quail_b.queries()` leaves it out; `queries(include_pending=True)` and
 `get_query` return it. Running one needs a label collection that includes its
-predicates, passed with `root` or `collection_id`. The `SUPPORT-` and `RUNS-`
-queries are pending.
+predicates, passed with `root` or `collection_id`. The `SUPPORT-`, `RUNS-`,
+and `WRENCH-` queries are pending.
 
 ## Measurements
 

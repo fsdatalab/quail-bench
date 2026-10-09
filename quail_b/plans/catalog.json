@@ -316,6 +316,36 @@
     "labels_pending": true
   },
   {
+    "id": "WRENCH-1",
+    "description": "filter: runs that exploited the verifier",
+    "privacy": false,
+    "labels_pending": true
+  },
+  {
+    "id": "WRENCH-2",
+    "description": "score: exploited the verifier -> the 100 highest scores",
+    "privacy": false,
+    "labels_pending": true
+  },
+  {
+    "id": "WRENCH-3",
+    "description": "exploited the verifier -> classify: the kind of exploit",
+    "privacy": false,
+    "labels_pending": true
+  },
+  {
+    "id": "WRENCH-4",
+    "description": "agent steps -> filter: part of an exploit -> per run: flagged steps, at least two, most first, 50",
+    "privacy": false,
+    "labels_pending": true
+  },
+  {
+    "id": "WRENCH-5",
+    "description": "column test: baseline runs -> filter: exploited the verifier -> flagged runs per agent model, most first",
+    "privacy": false,
+    "labels_pending": true
+  },
+  {
     "id": "PRIV-1",
     "description": "2 filters: P_MSG + P_LOC",
     "privacy": true

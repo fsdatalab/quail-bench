@@ -1,8 +1,8 @@
 """The QUAIL-B document sets: pinned sources, sampling, and identity.
 
-Seven document sets by default (IMDB, BioDEX, FEVER, LePaRD, SWE-Next
-agent trace snapshots, tau-bench support traces, and SWE-rebench issue
-runs) plus the optional PrivacyPolicies set. Every table is sampled
+Eight document sets by default (IMDB, BioDEX, FEVER, LePaRD, SWE-Next
+agent trace snapshots, tau-bench support traces, SWE-rebench issue runs,
+and Terminal Wrench runs) plus the optional PrivacyPolicies set. Every table is sampled
 from a pinned upstream revision with one seed, so a scale factor names
 one exact corpus.
 """
@@ -76,6 +76,19 @@ ISSUE_RUN_MAX_TOKENS = 24_000
 TRANSCRIPT_TOOL_CHARS = 400
 MESSAGE_MAX_CHARS = 2_000
 
+# Terminal Wrench: terminal tasks run by Claude Opus 4.6, Gemini 3.1 Pro,
+# and GPT-5.4. Hack runs come from its sanitized split: the agent was
+# asked to pass the verifier by any means, then the red-team prompt was
+# removed and the agent text rewritten to drop mentions of hacking.
+# Baseline runs solved the task without being asked to hack. A scale
+# factor samples tasks; runs over the token cap are left out.
+WRENCH_REPO = "few-sh/terminal-wrench"
+WRENCH_INDEX_REPO = "few-sh/terminal-wrench-trajectories"
+WRENCH_SPLITS = {"sanitized_hack": "hack", "baseline": "baseline"}
+WRENCH_TASKS = 331
+WRENCH_OUTPUT_CHARS = 2_000
+WRENCH_MAX_TOKENS = 24_000
+
 # Exact source snapshots for the benchmark corpus.  The row selection below
 # is deterministic only when the upstream revisions are fixed as well as the
 # sampling seed.
@@ -94,6 +107,8 @@ SOURCE_REVISIONS = {
     "sierra-research/tau-bench": TAU_BENCH_COMMIT,
     "nebius/SWE-rebench-openhands-trajectories":
         "35455389ab51bf5e2306bfd436ef72d0f98bf882",
+    WRENCH_REPO: "6ab64c43a4c6a4d9aa53c2425f37e715257123a3",
+    WRENCH_INDEX_REPO: "622449769ec6ddf33f770794489b8cd21712a0ad",
 }
 
 # Base document counts at sf=1. LePaRD scales sampled citation pairs
@@ -783,6 +798,126 @@ def _issue_run_rows(batches, candidates, n, tokenizer):
     return runs, messages
 
 
+def _n_wrench_tasks(sf):
+    return min(WRENCH_TASKS, max(8, round(WRENCH_TASKS * sf)))
+
+
+WRENCH_RUN_SCHEMA = pa.schema([
+    ("id", pa.string()),
+    ("task_id", pa.string()),
+    ("model", pa.string()),
+    ("mode", pa.string()),
+    ("transcript", pa.string()),
+    ("step_count", pa.int32()),
+    ("token_count", pa.int32()),
+])
+
+WRENCH_STEP_SCHEMA = pa.schema([
+    ("id", pa.string()),
+    ("run_id", pa.string()),
+    ("step_index", pa.int32()),
+    ("model", pa.string()),
+    ("text", pa.string()),
+])
+
+WRENCH_INDEX_COLUMNS = ("task_id", "model", "trajectory_path", "instruction")
+
+
+def _cut_middle(text: str, limit: int) -> str:
+    """Keep the first two thirds and the last third of an over-long text."""
+    if len(text) <= limit:
+        return text
+    head = limit * 2 // 3
+    return (text[:head] + f"\n[... {len(text) - limit} characters cut ...]\n"
+            + text[-(limit - head):])
+
+
+def _wrench_step(step) -> str:
+    """Render one agent step: its message, commands, and terminal output."""
+    lines = [f"[AGENT]\n{(step.get('message') or '').strip()}"]
+    commands = []
+    for call in step.get("tool_calls") or ():
+        arguments = call.get("arguments") or {}
+        if call.get("function_name") == "bash_command":
+            commands.append(arguments.get("keystrokes", "").rstrip("\n"))
+        else:
+            commands.append(f"{call.get('function_name')}("
+                            f"{json.dumps(arguments, sort_keys=True)})")
+    if commands:
+        lines.append("[COMMANDS]\n" + "\n".join(commands))
+    results = (step.get("observation") or {}).get("results") or ()
+    output = "\n".join(str(result.get("content", "")) for result in results)
+    output = output.replace("New Terminal Output:\n", "").strip()
+    if output:
+        lines.append("[OUTPUT]\n" + _cut_middle(output, WRENCH_OUTPUT_CHARS))
+    return "\n".join(lines)
+
+
+def _wrench_index() -> list[dict]:
+    """Read the hack and baseline index rows at the pinned revision."""
+    from huggingface_hub import hf_hub_download
+
+    rows = []
+    for split, mode in WRENCH_SPLITS.items():
+        path = hf_hub_download(
+            WRENCH_INDEX_REPO, f"data/{split}/train-00000-of-00001.parquet",
+            repo_type="dataset", revision=SOURCE_REVISIONS[WRENCH_INDEX_REPO])
+        table = pq.read_table(path, columns=list(WRENCH_INDEX_COLUMNS))
+        rows.extend({**row, "mode": mode} for row in table.to_pylist())
+    return rows
+
+
+def _wrench_tasks(index: list[dict], n: int) -> list[str]:
+    """The first n task ids in seeded order."""
+    tasks = sorted({row["task_id"] for row in index})
+    order = np.random.default_rng(DATA_SEED).permutation(len(tasks))
+    return [tasks[i] for i in order[:n]]
+
+
+def _wrench_rows(index, tasks, read_steps, tokenizer):
+    """Build the run and step rows of the chosen tasks.
+
+    Runs come in task order, then in index order within a task. A run's
+    transcript is the task text, then every agent step; a step's text is
+    the task text, then that step. The harness instructions in the first
+    user message are the same for every run and are left out.
+
+    Args:
+        index: Index rows with task_id, model, trajectory_path,
+            instruction, and mode.
+        tasks: The chosen task ids, in order.
+        read_steps: Returns a trajectory's steps from its path.
+        tokenizer: Counts a transcript's tokens with `encode`.
+    """
+    by_task = {}
+    for row in index:
+        by_task.setdefault(row["task_id"], []).append(row)
+    runs, steps = [], []
+    for task_id in tasks:
+        for row in by_task.get(task_id, ()):
+            task = f"[TASK]\n{row['instruction'].strip()}"
+            blocks = [_wrench_step(step)
+                      for step in read_steps(row["trajectory_path"])[1:]
+                      if step.get("source") == "agent"]
+            transcript = "\n\n".join([task, *blocks])
+            token_count = len(tokenizer.encode(
+                transcript, add_special_tokens=False))
+            if token_count > WRENCH_MAX_TOKENS:
+                continue
+            run_id = f"wr{len(runs):05d}"
+            runs.append({
+                "id": run_id, "task_id": task_id, "model": row["model"],
+                "mode": row["mode"], "transcript": transcript,
+                "step_count": len(blocks), "token_count": token_count,
+            })
+            steps.extend({
+                "id": f"{run_id}/{index_}", "run_id": run_id,
+                "step_index": index_, "model": row["model"],
+                "text": f"{task}\n\n[STEP]\n{text}",
+            } for index_, text in enumerate(blocks, start=1))
+    return runs, steps
+
+
 # ------------------------------------------------------- set builders
 
 def _imdb_pool():
@@ -1109,6 +1244,35 @@ def _build_issue_runs(d, sf, force=False):
                    message_path, compression="zstd", use_dictionary=False)
 
 
+def _build_wrench(d, sf, force=False):
+    """Build the Terminal Wrench runs and their agent steps."""
+    run_path = d / "wrench_runs.parquet"
+    step_path = d / "wrench_steps.parquet"
+    if run_path.exists() and step_path.exists() and not force:
+        return
+    from huggingface_hub import snapshot_download
+    from transformers import AutoTokenizer
+
+    index = _wrench_index()
+    tasks = _wrench_tasks(index, _n_wrench_tasks(sf))
+    chosen = set(tasks)
+    paths = [row["trajectory_path"] for row in index
+             if row["task_id"] in chosen]
+    root = Path(snapshot_download(
+        WRENCH_REPO, repo_type="dataset", allow_patterns=paths,
+        revision=SOURCE_REVISIONS[WRENCH_REPO]))
+    tokenizer = AutoTokenizer.from_pretrained(
+        AGENT_TRACE_TOKENIZER, revision=AGENT_TRACE_TOKENIZER_REVISION)
+    runs, steps = _wrench_rows(
+        index, tasks,
+        lambda path: json.loads((root / path).read_text())["steps"],
+        tokenizer)
+    pq.write_table(pa.Table.from_pylist(runs, schema=WRENCH_RUN_SCHEMA),
+                   run_path, compression="zstd", use_dictionary=False)
+    pq.write_table(pa.Table.from_pylist(steps, schema=WRENCH_STEP_SCHEMA),
+                   step_path, compression="zstd", use_dictionary=False)
+
+
 def _fetch_published_corpus(d, sf, root=None) -> bool:
     """Download the labeled corpus for this scale factor into d.
 
@@ -1173,11 +1337,14 @@ def build_sets(data_dir, sf, lf=1, fetch=True):
             _build_agent_traces(d, sf)
             _build_support(d, sf)
             _build_issue_runs(d, sf)
+            _build_wrench(d, sf)
             return d
         rebuilt_sources = (
             "TIGER-Lab/SWE-Next-SFT-Trajectories",
             "sierra-research/tau-bench",
             "nebius/SWE-rebench-openhands-trajectories",
+            WRENCH_REPO,
+            WRENCH_INDEX_REPO,
         )
         base_sources = {
             name: revision for name, revision in SOURCE_REVISIONS.items()
@@ -1201,6 +1368,7 @@ def build_sets(data_dir, sf, lf=1, fetch=True):
             _build_agent_traces(d, sf, force=True)
             _build_support(d, sf, force=True)
             _build_issue_runs(d, sf, force=True)
+            _build_wrench(d, sf, force=True)
             marker.write_text(json.dumps(expected, indent=2, sort_keys=True))
             return d
     if fetch and _fetch_published_corpus(d, sf):
@@ -1249,6 +1417,7 @@ def build_sets(data_dir, sf, lf=1, fetch=True):
     _build_agent_traces(d, sf, force=True)
     _build_support(d, sf, force=True)
     _build_issue_runs(d, sf, force=True)
+    _build_wrench(d, sf, force=True)
 
     marker.write_text(json.dumps(expected, indent=2, sort_keys=True))
     return d
@@ -1274,6 +1443,8 @@ CORPUS_COLUMNS = {
     "support_messages": tuple(MESSAGE_SCHEMA.names),
     "issue_runs": tuple(ISSUE_RUN_SCHEMA.names),
     "issue_messages": tuple(MESSAGE_SCHEMA.names),
+    "wrench_runs": tuple(WRENCH_RUN_SCHEMA.names),
+    "wrench_steps": tuple(WRENCH_STEP_SCHEMA.names),
 }
 
 

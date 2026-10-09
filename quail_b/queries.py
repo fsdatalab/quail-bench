@@ -192,6 +192,7 @@ QUERY_FAMILY_WORKLOADS = {
     "REL": "relational",
     "SUPPORT": "support",
     "RUNS": "runs",
+    "WRENCH": "wrench",
 }
 
 

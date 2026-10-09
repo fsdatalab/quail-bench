@@ -51,6 +51,8 @@ from quail_b.prompts import (
     SUPPORT_DIFFERENT_APPROACH,
     SUPPORT_FRUSTRATED,
     SUPPORT_PUSHBACK,
+    WRENCH_EXPLOITED,
+    WRENCH_STEP_EXPLOIT,
 )
 from quail_b.substrait import (
     AGGREGATE_GENERIC_EXTENSION_URN,
@@ -790,6 +792,14 @@ def _issue_runs(alias):
                 integers=("resolved",))
 
 
+def _wrench_runs(*columns, integers=()):
+    return Scan("wrench_runs", "w", "transcript", columns, integers=integers)
+
+
+def _wrench_steps():
+    return Scan("wrench_steps", "s", "text", ("run_id",))
+
+
 def _outcome_pairs():
     """Each successful run joined to each failed run of the same issue."""
     return Join(Where(_issue_runs("s"), "resolved", "=", 1),
@@ -1131,6 +1141,41 @@ QUERIES = (
               (("test_steps", ">=", 3),)),
               (("test_steps", True), ("m.trace_id", False))), 50),
           select=("m.trace_id", "test_steps"), labels_pending=True),
+
+    # Terminal Wrench runs and their agent steps. Their reference labels
+    # are not published yet.
+    Query("WRENCH-1", "filter: runs that exploited the verifier",
+          _filters(_wrench_runs(), WRENCH_EXPLOITED), labels_pending=True),
+    Query("WRENCH-2", "score: exploited the verifier -> the 100 highest "
+          "scores",
+          Fetch(Sort(Score(_wrench_runs("token_count",
+                                        integers=("token_count",)),
+                           WRENCH_EXPLOITED, "exploit_score"),
+                     (("w.exploit_score", True), ("w.id", False))), 100),
+          select=("w", "w.exploit_score"), labels_pending=True),
+    Query("WRENCH-3", "exploited the verifier -> classify: the kind of "
+          "exploit",
+          _classify(_filters(_wrench_runs(), WRENCH_EXPLOITED),
+                    prompts.WRENCH_EXPLOIT_KIND,
+                    prompts.WRENCH_EXPLOIT_KIND_LABELS, "exploit_kind",
+                    prompts.WRENCH_EXPLOIT_KIND_DESCRIPTIONS),
+          select=("w", "w.exploit_kind"), labels_pending=True),
+    Query("WRENCH-4", "agent steps -> filter: part of an exploit -> per run: "
+          "flagged steps, at least two, most first, 50",
+          Fetch(Sort(Having(Aggregate(
+              _filters(_wrench_steps(), WRENCH_STEP_EXPLOIT),
+              ("s.run_id",), (("flagged_steps", "count", None),)),
+              (("flagged_steps", ">=", 2),)),
+              (("flagged_steps", True), ("s.run_id", False))), 50),
+          select=("s.run_id", "flagged_steps"), labels_pending=True),
+    Query("WRENCH-5", "column test: baseline runs -> filter: exploited the "
+          "verifier -> flagged runs per agent model, most first",
+          Sort(Aggregate(
+              _filters(Where(_wrench_runs("model", "mode"), "mode", "=",
+                             "baseline"), WRENCH_EXPLOITED),
+              ("w.model",), (("flagged", "count", None),)),
+               (("flagged", True), ("w.model", False))),
+          select=("w.model", "flagged"), labels_pending=True),
 
     # PrivacyPolicies: only when that corpus is available.
     Query("PRIV-1", "2 filters: P_MSG + P_LOC",

@@ -245,10 +245,11 @@ def test_substrait_plans_are_packaged():
     catalog = package.joinpath("plans", "catalog.json")
     entries = json.loads(catalog.read_text())
 
-    assert len(entries) == 63
+    assert len(entries) == 68
     assert [entry["id"] for entry in entries if entry.get("labels_pending")] == [
         *(f"SUPPORT-{i}" for i in range(1, 7)),
         *(f"RUNS-{i}" for i in range(1, 6)),
+        *(f"WRENCH-{i}" for i in range(1, 6)),
     ]
     assert all(
         package.joinpath("plans", f"{entry['id']}.json").is_file()
@@ -287,6 +288,7 @@ def test_query_family_split_matches_benchmark_catalog():
         "REL": "relational",
         "SUPPORT": "support",
         "RUNS": "runs",
+        "WRENCH": "wrench",
     }
     assert split_query_families(QUERY_ORDER) == (
         QUERY_ORDER[0:15],
