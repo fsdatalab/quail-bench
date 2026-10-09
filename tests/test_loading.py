@@ -215,3 +215,64 @@ def test_bio_4_requires_category_labels_before_a_run(monkeypatch, tmp_path):
         "BIO-4", root=tmp_path, accuracy=False).ground_truth is None
     truth = collection(True)
     assert loading.load_benchmark("BIO-4", root=tmp_path).ground_truth is truth
+
+
+def _publish(root, corpus_id_for, tables, revisions):
+    """Write a published corpus the way the labeling pass does; returns its id."""
+    from quail_b.data import CORPUS_COLUMNS, DATA_SEED, corpus_identity
+
+    identity = corpus_identity(tables, 0.1, DATA_SEED, revisions)
+    directory = root / GROUND_TRUTH_ROOT / "corpora" / identity["corpus_id"]
+    directory.mkdir(parents=True)
+    for name, table in tables.items():
+        pq.write_table(table, directory / f"{name}.parquet")
+    columns = {name: list(CORPUS_COLUMNS[name]) for name in tables}
+    (directory / "manifest.json").write_text(
+        json.dumps({**identity, "columns": columns}))
+    corpus_id_for[0.1] = identity["corpus_id"]
+    return directory
+
+
+def test_fetch_checks_a_corpus_published_before_newer_tables(
+        monkeypatch, tmp_path):
+    from quail_b import data
+
+    published = {}
+    monkeypatch.setattr(data, "PUBLISHED_CORPORA", published)
+    tables = {"reviews": pa.table({"id": ["rv0", "rv1"],
+                                   "body": ["good", "bad"]})}
+    directory = _publish(tmp_path / "root", published, tables,
+                         {"stanfordnlp/imdb": "old"})
+    # the current code lists more tables and sources than that corpus had
+    assert "wrench_runs" in data.CORPUS_COLUMNS
+    assert data.SOURCE_REVISIONS != {"stanfordnlp/imdb": "old"}
+
+    target = tmp_path / "sf0.1"
+    assert data._fetch_published_corpus(target, 0.1, root=tmp_path / "root")
+    assert pq.read_table(target / "reviews.parquet").num_rows == 2
+
+    pq.write_table(pa.table({"id": ["rv0"], "body": ["changed"]}),
+                   directory / "reviews.parquet")
+    changed = tmp_path / "changed"
+    assert not data._fetch_published_corpus(changed, 0.1,
+                                            root=tmp_path / "root")
+    assert not (changed / "reviews.parquet").exists()
+
+
+def test_build_sets_builds_tables_newer_than_the_fetched_corpus(
+        monkeypatch, tmp_path):
+    from quail_b import data
+
+    built = []
+    monkeypatch.setattr(data, "_fetch_published_corpus",
+                        lambda d, sf: d.mkdir(parents=True) or True)
+    for name in ("_build_support", "_build_issue_runs", "_build_wrench"):
+        monkeypatch.setattr(data, name,
+                            lambda d, sf, force=False, name=name:
+                            built.append((name, force)))
+
+    directory = data.build_sets(tmp_path, 0.1)
+
+    assert built == [("_build_support", False), ("_build_issue_runs", False),
+                     ("_build_wrench", False)]
+    assert (directory / "DONE").exists()

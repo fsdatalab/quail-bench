@@ -1276,6 +1276,11 @@ def _build_wrench(d, sf, force=False):
 def _fetch_published_corpus(d, sf, root=None) -> bool:
     """Download the labeled corpus for this scale factor into d.
 
+    The download is checked against the published corpus id, using the
+    tables, columns, and source revisions its manifest records. Tables
+    added to the benchmark after that corpus was published are not in
+    it; the caller builds them from their sources.
+
     Returns False when no corpus is published for sf, the bucket is
     unreachable, or the downloaded tables do not hash to the published
     corpus id; the caller then builds from the sources.
@@ -1295,7 +1300,16 @@ def _fetch_published_corpus(d, sf, root=None) -> bool:
     d.mkdir(parents=True, exist_ok=True)
     for path in paths:
         (d / Path(path).name).write_bytes(_read_bytes(root, path))
-    identity = corpus_identity(read_corpus(d), sf, DATA_SEED, SOURCE_REVISIONS)
+    manifest = json.loads(_read_bytes(root, f"{prefix}/manifest.json"))
+    try:
+        published = {
+            table: pq.read_table(d / f"{table}.parquet", columns=list(columns))
+            for table, columns in manifest["columns"].items()}
+        identity = corpus_identity(published, sf, manifest["data_seed"],
+                                   manifest["source_revisions"])
+    except (OSError, KeyError, pa.ArrowInvalid) as error:
+        print(f"[data] cannot read the published corpus: {error}", flush=True)
+        identity = {"corpus_id": None}
     if identity["corpus_id"] != corpus_id:
         for path in paths:
             (d / Path(path).name).unlink()
@@ -1372,6 +1386,10 @@ def build_sets(data_dir, sf, lf=1, fetch=True):
             marker.write_text(json.dumps(expected, indent=2, sort_keys=True))
             return d
     if fetch and _fetch_published_corpus(d, sf):
+        # tables newer than the published corpus are built from their sources
+        _build_support(d, sf)
+        _build_issue_runs(d, sf)
+        _build_wrench(d, sf)
         marker.write_text(json.dumps(expected, indent=2, sort_keys=True))
         return d
     d.mkdir(parents=True, exist_ok=True)
