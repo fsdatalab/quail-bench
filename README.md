@@ -199,6 +199,8 @@ lists the queries that use it.
 | LePaRD | LEP-1 to LEP-6 | `citation_contexts`, `citation_passages` | Legal citations |
 | SWE-Next | AGENT-1 to AGENT-5 | `agent_traces` | Software agent trajectories |
 | SWE-Next | REL-AGENT-1 to REL-AGENT-7 | `agent_traces` | Relational operators over the trajectories |
+| tau-bench | SUPPORT-1 to SUPPORT-6 | `support_traces`, `support_messages` | Customer support agent traces |
+| SWE-rebench | RUNS-1 to RUNS-5 | `issue_runs`, `issue_messages` | Repeated coding agent runs of one issue |
 
 Within each dataset, the first queries have a single filter or join. Later
 queries chain filters, filter both join inputs, scan one table under two
@@ -308,6 +310,44 @@ to 1, that the document answers a filter prompt TRUE.
 | REL-AGENT-6 | Trajectories with at least two fixes, earliest first | `ai_filter`, `GROUP BY`, `MIN`, `MAX`, `HAVING`, `ORDER BY`, `LIMIT` |
 | REL-AGENT-7 | Ten trajectories of at least five snapshots with the highest mean fix score | `ai_score`, `GROUP BY`, `AVG`, `HAVING`, `ORDER BY`, `LIMIT` |
 
+### Agent trace analytics queries
+
+The `SUPPORT` and `RUNS` queries ask the questions a team that serves an
+agent asks of its traces: what users ask for, where users push back, what
+the disagreements are about, which runs of one task take different
+approaches, and which approaches succeed. Their reference labels are not
+published yet, so `quail_b.queries()` lists them only with
+`include_pending=True`, and a run names them with `--only`.
+
+Both corpora store a trace twice: one row per trace with its whole
+transcript, and one row per message with the ids of the message, the user
+message, and the assistant message before it. A question about one message
+reads one message, and a reply is joined to the message it answers with an
+equality condition, so the model reads one pair per reply rather than every
+pair. `support_traces` keeps each run's task, model, trial, and reward from
+tau-bench, so runs of one task join on `task_id`; `issue_runs` keeps each
+run's issue and whether its patch resolved it, so successful and failed runs
+of one issue join on `instance_id`.
+
+| Query | Question | Operators |
+| --- | --- | --- |
+| SUPPORT-1 | Which customer messages express frustration with the agent? | Column test on `role`, `ai_filter` |
+| SUPPORT-2 | Which customer replies push back on the agent message before them? | Column test, `ai_join` over pairs joined on `prev_assistant_id` |
+| SUPPORT-3 | What is each pushback about? | SUPPORT-2, then 6 kinds of disagreement per pair |
+| SUPPORT-4 | What do customers ask the agent to do, as conversations per intent? | 6 intents of the opening message, `GROUP BY`, `COUNT`, `ORDER BY` |
+| SUPPORT-5 | Which runs of the same task handle the request differently? | `ai_join` over pairs joined on `task_id` |
+| SUPPORT-6 | How does each way of handling a request score, as mean reward per outcome? | 5 outcomes, `GROUP BY`, `COUNT`, `AVG`, `HAVING`, `ORDER BY` |
+| RUNS-1 | Which runs reproduced the issue before changing code? | `ai_filter` |
+| RUNS-2 | Which kinds of change resolve the issue most often? | 6 kinds of change, `GROUP BY`, `COUNT`, `AVG`, `ORDER BY` |
+| RUNS-3 | Which successful and failed runs of one issue take different approaches? | Two column tests on `resolved`, `ai_join` over pairs joined on `instance_id` |
+| RUNS-4 | What did each failed run lack, compared with a successful run? | RUNS-3, then 5 shortfalls per pair |
+| RUNS-5 | Which runs ran tests most often? | Column test on `role`, `ai_filter` over steps, `GROUP BY`, `COUNT`, `HAVING`, `ORDER BY`, `LIMIT` |
+
+A column test on one relation of a join, such as `role = 'user'`, limits
+the pairs the join asks; a query with one is scored per operator like any
+join query. A column test over a single relation still makes the query
+relational, scored from its rows.
+
 ## Scale factors
 
 Scale factors 0.1, 0.5, and 1.0 sample 10%, 50%, and 100% of each dataset's
@@ -326,6 +366,10 @@ same at every scale factor. Use 0.1 while developing an adapter.
 | LePaRD | `citation_contexts` | 500 | 2,496 | 4,972 |
 | LePaRD | `citation_passages` | 433 | 1,756 | 2,991 |
 | SWE-Next | `agent_traces` | 1,772 | 8,859 | 17,711 |
+| tau-bench | `support_traces` | 128 | 656 | 1,320 |
+| tau-bench | `support_messages` | about 3,600 | about 18,800 | about 38,000 |
+| SWE-rebench | `issue_runs` | 320 | 1,600 | 3,200 |
+| SWE-rebench | `issue_messages` | about 20,000 | about 100,000 | about 200,000 |
 
 ### Reference answers
 

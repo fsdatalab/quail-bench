@@ -40,6 +40,9 @@ class PredicateSpec:
     source_policy: str = "qwen3_32b"
     labels: tuple[str, ...] = ()
     descriptions: tuple[str, ...] = ()
+    # a join labeled only over the pairs whose (left column, right
+    # column) values are equal, as the query's equality condition keeps
+    pair_columns: tuple[str, str] | None = None
 
 
 PREDICATES = (
@@ -143,6 +146,34 @@ PREDICATES = (
         "agent", "implemented_plausible_fix",
         "filter", prompts.AGENT_IMPLEMENTED_FIX,
         "agent_trace", "agent_traces", "trace"),
+    PredicateSpec(
+        "quailb.support.message.customer_frustrated", "support",
+        "customer_frustrated", "filter", prompts.SUPPORT_FRUSTRATED,
+        "customer_message", "support_messages", "content"),
+    PredicateSpec(
+        "quailb.support.message.customer_pushes_back", "support",
+        "customer_pushes_back", "join", prompts.SUPPORT_PUSHBACK,
+        "agent_message", "support_messages", "content",
+        "customer_message", "support_messages", "content",
+        pair_columns=("id", "prev_assistant_id")),
+    PredicateSpec(
+        "quailb.support.trace.different_approach", "support",
+        "different_approach", "join", prompts.SUPPORT_DIFFERENT_APPROACH,
+        "conversation", "support_traces", "transcript",
+        "other_conversation", "support_traces", "transcript",
+        pair_columns=("task_id", "task_id")),
+    PredicateSpec(
+        "quailb.runs.run.reproduced_issue", "runs", "reproduced_issue",
+        "filter", prompts.RUNS_REPRODUCED, "run", "issue_runs", "transcript"),
+    PredicateSpec(
+        "quailb.runs.run.different_approach", "runs", "different_approach",
+        "join", prompts.RUNS_DIFFERENT_APPROACH,
+        "successful_run", "issue_runs", "transcript",
+        "failed_run", "issue_runs", "transcript",
+        pair_columns=("instance_id", "instance_id")),
+    PredicateSpec(
+        "quailb.runs.step.runs_tests", "runs", "step_runs_tests", "filter",
+        prompts.RUNS_TEST_STEP, "step", "issue_messages", "content"),
 )
 
 # Classification predicates. Their labels are not in the published
@@ -197,6 +228,36 @@ CLASSIFY_PREDICATES = (
         "classify", prompts.AGENT_ROOT_CAUSE, "agent_trace", "agent_traces",
         "trace", labels=prompts.AGENT_ROOT_CAUSE_LABELS,
         descriptions=prompts.AGENT_ROOT_CAUSE_DESCRIPTIONS),
+    PredicateSpec(
+        "quailb.support.message.disagreement", "support",
+        "disagreement", "classify", prompts.SUPPORT_DISAGREEMENT,
+        "customer_message", "support_messages", "content",
+        "agent_message", "support_messages", "content",
+        labels=prompts.SUPPORT_DISAGREEMENT_LABELS,
+        descriptions=prompts.SUPPORT_DISAGREEMENT_DESCRIPTIONS,
+        pair_columns=("prev_assistant_id", "id")),
+    PredicateSpec(
+        "quailb.support.trace.intent", "support", "intent", "classify",
+        prompts.SUPPORT_INTENT, "conversation", "support_traces", "request",
+        labels=prompts.SUPPORT_INTENT_LABELS,
+        descriptions=prompts.SUPPORT_INTENT_DESCRIPTIONS),
+    PredicateSpec(
+        "quailb.support.trace.outcome", "support", "outcome", "classify",
+        prompts.SUPPORT_OUTCOME, "conversation", "support_traces",
+        "transcript", labels=prompts.SUPPORT_OUTCOME_LABELS,
+        descriptions=prompts.SUPPORT_OUTCOME_DESCRIPTIONS),
+    PredicateSpec(
+        "quailb.runs.run.strategy", "runs", "strategy", "classify",
+        prompts.RUNS_STRATEGY, "run", "issue_runs", "transcript",
+        labels=prompts.RUNS_STRATEGY_LABELS,
+        descriptions=prompts.RUNS_STRATEGY_DESCRIPTIONS),
+    PredicateSpec(
+        "quailb.runs.run.shortfall", "runs", "shortfall", "classify",
+        prompts.RUNS_SHORTFALL, "failed_run", "issue_runs", "transcript",
+        "successful_run", "issue_runs", "transcript",
+        labels=prompts.RUNS_SHORTFALL_LABELS,
+        descriptions=prompts.RUNS_SHORTFALL_DESCRIPTIONS,
+        pair_columns=("instance_id", "instance_id")),
 )
 
 PREDICATE_BY_KEY = {p.key: p for p in PREDICATES + CLASSIFY_PREDICATES}
@@ -278,6 +339,9 @@ def predicate_payload(spec: PredicateSpec) -> dict:
     if is_joined_classify(spec):
         payload.update(anchor_note=JOIN_ANCHOR_NOTE,
                        partner_label=JOIN_DOC_LABEL)
+    # published label sets predate this field, so it is left out when unset
+    if spec.pair_columns is not None:
+        payload["pair_columns"] = list(spec.pair_columns)
     return payload
 
 

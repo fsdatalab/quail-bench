@@ -196,6 +196,14 @@ The harness rejects:
 
 Scoring ignores column order and row order.
 
+A column test on one relation of a join, such as `u.role = 'user'` in
+SUPPORT-2, is applied before the join and limits the pairs the join asks. The
+query is scored per operator like any join query: its reference rows are the
+pairs that pass the column tests, the equality conditions, and the saved join
+labels. A join whose predicate names `pair_columns` has labels only for the
+pairs whose two columns are equal, which are the pairs the query can ask, so
+an answer for any other pair has no label and fails scoring.
+
 ### Rows of a relational query
 
 A `REL-` query selects fields of its last relational step. Its `rows` columns
@@ -459,7 +467,8 @@ filter stores its boolean `answer`. The manifest's predicate lists the
 A query marked `labels_pending` in the catalog has no published labels yet.
 `quail_b.queries()` leaves it out; `queries(include_pending=True)` and
 `get_query` return it. Running one needs a label collection that includes its
-predicates, passed with `root` or `collection_id`. No query is pending.
+predicates, passed with `root` or `collection_id`. The `SUPPORT-` and `RUNS-`
+queries are pending.
 
 ## Measurements
 

@@ -250,6 +250,72 @@
     "privacy": false
   },
   {
+    "id": "SUPPORT-1",
+    "description": "customer messages -> filter: frustrated with the agent",
+    "privacy": false,
+    "labels_pending": true
+  },
+  {
+    "id": "SUPPORT-2",
+    "description": "join over pairs: each customer reply x the agent message before it, pushback",
+    "privacy": false,
+    "labels_pending": true
+  },
+  {
+    "id": "SUPPORT-3",
+    "description": "pushback pairs -> classify: what the disagreement is about",
+    "privacy": false,
+    "labels_pending": true
+  },
+  {
+    "id": "SUPPORT-4",
+    "description": "classify each opening request: intent -> conversations per intent, most first",
+    "privacy": false,
+    "labels_pending": true
+  },
+  {
+    "id": "SUPPORT-5",
+    "description": "join over pairs: runs of the same task that handle the request differently",
+    "privacy": false,
+    "labels_pending": true
+  },
+  {
+    "id": "SUPPORT-6",
+    "description": "classify each conversation: how the agent handled the request -> per outcome: conversations and mean reward, at least five, best first",
+    "privacy": false,
+    "labels_pending": true
+  },
+  {
+    "id": "RUNS-1",
+    "description": "filter: reproduced the issue before changing the code",
+    "privacy": false,
+    "labels_pending": true
+  },
+  {
+    "id": "RUNS-2",
+    "description": "classify each run: the kind of change -> per kind: runs and the share resolved, most runs first",
+    "privacy": false,
+    "labels_pending": true
+  },
+  {
+    "id": "RUNS-3",
+    "description": "join over pairs: each successful run x each failed run of the same issue, different approach",
+    "privacy": false,
+    "labels_pending": true
+  },
+  {
+    "id": "RUNS-4",
+    "description": "different-approach pairs -> classify: what the failed run lacked",
+    "privacy": false,
+    "labels_pending": true
+  },
+  {
+    "id": "RUNS-5",
+    "description": "agent steps -> filter: runs tests -> per run: test steps, at least three, most first, 50",
+    "privacy": false,
+    "labels_pending": true
+  },
+  {
     "id": "PRIV-1",
     "description": "2 filters: P_MSG + P_LOC",
     "privacy": true

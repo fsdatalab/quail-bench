@@ -1,9 +1,10 @@
 """The QUAIL-B document sets: pinned sources, sampling, and identity.
 
-Five document sets by default (IMDB, BioDEX, FEVER, LePaRD, SWE-Next
-agent trace snapshots) plus the optional PrivacyPolicies set. Every
-table is sampled from a pinned upstream revision with one seed, so a
-scale factor names one exact corpus.
+Seven document sets by default (IMDB, BioDEX, FEVER, LePaRD, SWE-Next
+agent trace snapshots, tau-bench support traces, and SWE-rebench issue
+runs) plus the optional PrivacyPolicies set. Every table is sampled
+from a pinned upstream revision with one seed, so a scale factor names
+one exact corpus.
 """
 
 import hashlib
@@ -25,7 +26,7 @@ from quail_b._files import (
 from quail_b._files import PUBLIC_BUCKET as PUBLIC_BUCKET
 
 DATA_SEED = 20260818
-CACHE_SCHEMA_VERSION = 9
+CACHE_SCHEMA_VERSION = 10
 # The labeled corpus for each scale factor, saved beside its labels in
 # the public bucket. build_sets downloads it instead of rebuilding from
 # the sources; the corpus id is checked after download.
@@ -46,6 +47,35 @@ AGENT_TRACE_TOKENIZER_REVISION = (
     "96b30dc13593a244a5e59e84687309f53c375cfa"
 )
 
+# tau-bench's historical trajectories: two models, four trials per task,
+# on the airline (50 tasks) and retail (115 tasks) domains. The agent
+# policy is the system prompt of every trace and is left out of the
+# transcript.
+TAU_BENCH_COMMIT = "59a200c6d575d595120f1cb70fea53cef0632f6b"
+TAU_BENCH_RUNS = (
+    ("gpt-4o", "airline"), ("gpt-4o", "retail"),
+    ("sonnet-35-new", "airline"), ("sonnet-35-new", "retail"),
+)
+TAU_BENCH_URL = (
+    "https://raw.githubusercontent.com/sierra-research/tau-bench/"
+    "{commit}/historical_trajectories/{model}-{domain}.json"
+)
+SUPPORT_TASKS = 165
+SUPPORT_TRACES_PER_TASK = 8
+
+# SWE-rebench OpenHands runs: issues with at least ISSUE_RUN_SOURCE_RUNS
+# runs, of which the first ISSUE_RUNS_PER_ISSUE whose transcript fits
+# the token cap are kept. Tool output is cut in the transcript, and
+# every message is cut in the messages table, so one run reads like an
+# agent_traces snapshot. With tool output cut to 400 characters, the
+# median run is about 20,000 Qwen3 tokens and seven in ten fit the cap.
+ISSUE_RUN_ISSUES = 400
+ISSUE_RUNS_PER_ISSUE = 8
+ISSUE_RUN_SOURCE_RUNS = 12
+ISSUE_RUN_MAX_TOKENS = 24_000
+TRANSCRIPT_TOOL_CHARS = 400
+MESSAGE_MAX_CHARS = 2_000
+
 # Exact source snapshots for the benchmark corpus.  The row selection below
 # is deterministic only when the upstream revisions are fixed as well as the
 # sampling seed.
@@ -61,6 +91,9 @@ SOURCE_REVISIONS = {
         "e378a60ddd7050fe9519a31a4d41d4872eeec6ac",
     "mukund/PrivacyPolicies":
         "8fd6abfc7ca99d1f95c7f3f3a5dd5ea0cf9b7deb",
+    "sierra-research/tau-bench": TAU_BENCH_COMMIT,
+    "nebius/SWE-rebench-openhands-trajectories":
+        "35455389ab51bf5e2306bfd436ef72d0f98bf882",
 }
 
 # Base document counts at sf=1. LePaRD scales sampled citation pairs
@@ -485,6 +518,271 @@ def _agent_rows(n, full=False):
     return _select_agent_snapshots(snapshots, n, full)
 
 
+
+# ------------------------------------------------ trace tables
+
+def _message_text(message, tool_chars=None) -> str:
+    """Render a message's content, then each tool call on its own line.
+
+    Args:
+        message: A chat message with a role, content, and optional
+            tool calls.
+        tool_chars: Cut a tool message's content to this many
+            characters and mark the cut, or None to keep it whole.
+    """
+    content = message.get("content")
+    if content is None:
+        content = ""
+    elif not isinstance(content, str):
+        content = json.dumps(content, sort_keys=True, separators=(",", ":"),
+                             ensure_ascii=False)
+    if (tool_chars is not None and message.get("role") == "tool"
+            and len(content) > tool_chars):
+        content = (content[:tool_chars]
+                   + f"\n[cut {len(content) - tool_chars} characters]")
+    lines = [content] if content else []
+    for call in message.get("tool_calls") or ():
+        function = call.get("function") or call
+        arguments = function.get("arguments", "")
+        if not isinstance(arguments, str):
+            arguments = json.dumps(arguments, sort_keys=True,
+                                   separators=(",", ":"), ensure_ascii=False)
+        lines.append(f"[tool call] {function.get('name', '')}({arguments})")
+    return "\n".join(lines)
+
+
+def _transcript(messages, tool_chars=None) -> str:
+    """Render every message but the system prompt under a [ROLE] heading."""
+    return "\n\n".join(
+        f"[{str(message.get('role', '')).upper()}]\n"
+        f"{_message_text(message, tool_chars)}"
+        for message in messages if message.get("role") != "system")
+
+
+def _message_rows(trace_id, messages) -> list[dict]:
+    """Build one row per message, linked to the messages before it.
+
+    The layout is the one `quail.trace_tables` writes: the id is the
+    trace id and turn index, and the prev columns hold the id of the
+    message, user message, and assistant message before this one.
+    """
+    rows = []
+    prev_id = prev_user = prev_assistant = None
+    for turn_index, message in enumerate(messages):
+        role = str(message.get("role", ""))
+        message_id = f"{trace_id}/{turn_index}"
+        content = _message_text(message)
+        if len(content) > MESSAGE_MAX_CHARS:
+            content = (content[:MESSAGE_MAX_CHARS]
+                       + f"\n[cut {len(content) - MESSAGE_MAX_CHARS} characters]")
+        tool_call_id = message.get("tool_call_id")
+        rows.append({
+            "id": message_id, "trace_id": trace_id, "turn_index": turn_index,
+            "role": role, "content": content,
+            "tool_call_id": None if tool_call_id is None else str(tool_call_id),
+            "prev_id": prev_id, "prev_user_id": prev_user,
+            "prev_assistant_id": prev_assistant,
+        })
+        prev_id = message_id
+        if role == "user":
+            prev_user = message_id
+        elif role == "assistant":
+            prev_assistant = message_id
+    return rows
+
+
+def _request(messages) -> str:
+    """The first user message of a trace, or an empty string."""
+    for message in messages:
+        if message.get("role") == "user":
+            return _message_text(message)
+    return ""
+
+
+MESSAGE_SCHEMA = pa.schema([
+    ("id", pa.string()),
+    ("trace_id", pa.string()),
+    ("turn_index", pa.int32()),
+    ("role", pa.string()),
+    ("content", pa.string()),
+    ("tool_call_id", pa.string()),
+    ("prev_id", pa.string()),
+    ("prev_user_id", pa.string()),
+    ("prev_assistant_id", pa.string()),
+])
+
+SUPPORT_TRACE_SCHEMA = pa.schema([
+    ("id", pa.string()),
+    ("request", pa.string()),
+    ("transcript", pa.string()),
+    ("message_count", pa.int32()),
+    ("task_id", pa.string()),
+    ("domain", pa.string()),
+    ("model", pa.string()),
+    ("trial", pa.int32()),
+    ("reward", pa.float64()),
+])
+
+ISSUE_RUN_SCHEMA = pa.schema([
+    ("id", pa.string()),
+    ("request", pa.string()),
+    ("transcript", pa.string()),
+    ("message_count", pa.int32()),
+    ("instance_id", pa.string()),
+    ("repo", pa.string()),
+    ("resolved", pa.int32()),
+    ("token_count", pa.int32()),
+])
+
+
+def _n_support_tasks(sf):
+    return min(SUPPORT_TASKS, max(8, round(SUPPORT_TASKS * sf)))
+
+
+def _n_issue_run_issues(sf):
+    return min(ISSUE_RUN_ISSUES, max(8, round(ISSUE_RUN_ISSUES * sf)))
+
+
+def _download(url: str) -> Path:
+    """Fetch a source file once into the benchmark cache."""
+    from urllib.request import urlopen
+
+    from quail_b._files import _cache_directory
+
+    cached = _cache_directory() / hashlib.sha256(url.encode()).hexdigest()
+    if not cached.exists():
+        with urlopen(url) as stream:
+            data = stream.read()
+        temporary = cached.with_suffix(".part")
+        temporary.write_bytes(data)
+        temporary.replace(cached)
+    return cached
+
+
+def _support_source_tasks() -> list[tuple[str, list[dict]]]:
+    """Read tau-bench's trajectories, grouped by task, in seeded order."""
+    tasks = {}
+    for model, domain in TAU_BENCH_RUNS:
+        path = _download(TAU_BENCH_URL.format(
+            commit=TAU_BENCH_COMMIT, model=model, domain=domain))
+        for record in json.loads(path.read_text()):
+            tasks.setdefault(f"{domain}-{record['task_id']}", []).append({
+                "domain": domain, "model": model,
+                "trial": int(record["trial"]),
+                "reward": float(record["reward"]),
+                "messages": record["traj"],
+            })
+    keys = sorted(tasks)
+    order = np.random.default_rng(DATA_SEED).permutation(len(keys))
+    return [(keys[index], tasks[keys[index]]) for index in order]
+
+
+def _support_rows(tasks, n) -> tuple[list[dict], list[dict]]:
+    """Build the support trace and message rows of the first n tasks.
+
+    Raises:
+        ValueError: A task has other than SUPPORT_TRACES_PER_TASK runs,
+            or fewer than n tasks exist.
+    """
+    if len(tasks) < n:
+        raise ValueError(f"tau-bench has {len(tasks)} tasks, expected {n}")
+    traces, messages = [], []
+    for task_id, runs in tasks[:n]:
+        if len(runs) != SUPPORT_TRACES_PER_TASK:
+            raise ValueError(
+                f"task {task_id} has {len(runs)} runs, expected "
+                f"{SUPPORT_TRACES_PER_TASK}")
+        for run in sorted(runs, key=lambda run: (run["model"], run["trial"])):
+            trace_id = f"sp{len(traces):04d}"
+            traces.append({
+                "id": trace_id,
+                "request": _request(run["messages"]),
+                "transcript": _transcript(run["messages"]),
+                "message_count": len(run["messages"]),
+                "task_id": task_id, "domain": run["domain"],
+                "model": run["model"], "trial": run["trial"],
+                "reward": run["reward"],
+            })
+            messages.extend(_message_rows(trace_id, run["messages"]))
+    return traces, messages
+
+
+def _issue_run_source():
+    """Open SWE-rebench's trajectory file at the pinned revision."""
+    from huggingface_hub import hf_hub_download
+
+    name = "nebius/SWE-rebench-openhands-trajectories"
+    path = hf_hub_download(name, "trajectories.parquet", repo_type="dataset",
+                           revision=SOURCE_REVISIONS[name])
+    return pq.ParquetFile(path)
+
+
+def _issue_run_candidates(instance_ids, n) -> list[str]:
+    """Pick the issues to read: 2n with enough runs, in seeded order."""
+    counts = {}
+    for instance_id in instance_ids:
+        counts[instance_id] = counts.get(instance_id, 0) + 1
+    issues = sorted(issue for issue, count in counts.items()
+                    if count >= ISSUE_RUN_SOURCE_RUNS)
+    order = np.random.default_rng(DATA_SEED).permutation(len(issues))
+    return [issues[index] for index in order[:2 * n]]
+
+
+def _issue_run_rows(batches, candidates, n, tokenizer):
+    """Build the issue run and message rows from streamed source batches.
+
+    Each run of a candidate issue is rendered as it arrives; a run
+    whose transcript is over ISSUE_RUN_MAX_TOKENS is skipped, and an
+    issue keeps its first ISSUE_RUNS_PER_ISSUE fitting runs in file
+    order. The first n candidates, in candidate order, with that many
+    fitting runs make the tables.
+
+    Args:
+        batches: Source record batches or tables with instance_id,
+            repo, trajectory, and resolved columns.
+        candidates: The issues to read, in seeded order.
+        n: The number of issues wanted.
+        tokenizer: Counts a transcript's tokens with `encode`.
+
+    Raises:
+        ValueError: Fewer than n candidates have enough fitting runs.
+    """
+    wanted = set(candidates)
+    kept = {issue: [] for issue in candidates}
+    for batch in batches:
+        for row in batch.to_pylist():
+            issue = row["instance_id"]
+            if issue not in wanted or len(kept[issue]) >= ISSUE_RUNS_PER_ISSUE:
+                continue
+            messages = row["trajectory"]
+            if isinstance(messages, str):
+                messages = json.loads(messages)
+            transcript = _transcript(messages, TRANSCRIPT_TOOL_CHARS)
+            token_count = len(tokenizer.encode(
+                transcript, add_special_tokens=False))
+            if token_count > ISSUE_RUN_MAX_TOKENS:
+                continue
+            kept[issue].append({
+                "request": _request(messages), "transcript": transcript,
+                "message_count": len(messages), "instance_id": issue,
+                "repo": row["repo"], "resolved": int(row["resolved"]),
+                "token_count": token_count, "messages": messages,
+            })
+    complete = [issue for issue in candidates
+                if len(kept[issue]) == ISSUE_RUNS_PER_ISSUE]
+    if len(complete) < n:
+        raise ValueError(
+            f"{len(complete)} issues have {ISSUE_RUNS_PER_ISSUE} fitting "
+            f"runs, expected {n}")
+    runs, messages = [], []
+    for issue in complete[:n]:
+        for run in kept[issue]:
+            run_id = f"ir{len(runs):05d}"
+            messages.extend(_message_rows(run_id, run.pop("messages")))
+            runs.append({"id": run_id, **run})
+    return runs, messages
+
+
 # ------------------------------------------------------- set builders
 
 def _imdb_pool():
@@ -772,6 +1070,45 @@ def _build_agent_traces(d, sf, force=False):
     )
 
 
+def _build_support(d, sf, force=False):
+    """Build the tau-bench support traces and their messages."""
+    trace_path = d / "support_traces.parquet"
+    message_path = d / "support_messages.parquet"
+    if trace_path.exists() and message_path.exists() and not force:
+        return
+    traces, messages = _support_rows(_support_source_tasks(),
+                                     _n_support_tasks(sf))
+    pq.write_table(pa.Table.from_pylist(traces, schema=SUPPORT_TRACE_SCHEMA),
+                   trace_path, compression="zstd", use_dictionary=False)
+    pq.write_table(pa.Table.from_pylist(messages, schema=MESSAGE_SCHEMA),
+                   message_path, compression="zstd", use_dictionary=False)
+
+
+def _build_issue_runs(d, sf, force=False):
+    """Build the SWE-rebench issue runs and their messages."""
+    run_path = d / "issue_runs.parquet"
+    message_path = d / "issue_messages.parquet"
+    if run_path.exists() and message_path.exists() and not force:
+        return
+    from transformers import AutoTokenizer
+
+    n = _n_issue_run_issues(sf)
+    source = _issue_run_source()
+    candidates = _issue_run_candidates(
+        source.read(columns=["instance_id"]).column("instance_id").to_pylist(),
+        n)
+    tokenizer = AutoTokenizer.from_pretrained(
+        AGENT_TRACE_TOKENIZER, revision=AGENT_TRACE_TOKENIZER_REVISION)
+    batches = source.iter_batches(
+        batch_size=64,
+        columns=["instance_id", "repo", "trajectory", "resolved"])
+    runs, messages = _issue_run_rows(batches, candidates, n, tokenizer)
+    pq.write_table(pa.Table.from_pylist(runs, schema=ISSUE_RUN_SCHEMA),
+                   run_path, compression="zstd", use_dictionary=False)
+    pq.write_table(pa.Table.from_pylist(messages, schema=MESSAGE_SCHEMA),
+                   message_path, compression="zstd", use_dictionary=False)
+
+
 def _fetch_published_corpus(d, sf, root=None) -> bool:
     """Download the labeled corpus for this scale factor into d.
 
@@ -834,10 +1171,17 @@ def build_sets(data_dir, sf, lf=1, fetch=True):
         if current == expected:
             _build_lepard(d, sf)
             _build_agent_traces(d, sf)
+            _build_support(d, sf)
+            _build_issue_runs(d, sf)
             return d
+        rebuilt_sources = (
+            "TIGER-Lab/SWE-Next-SFT-Trajectories",
+            "sierra-research/tau-bench",
+            "nebius/SWE-rebench-openhands-trajectories",
+        )
         base_sources = {
             name: revision for name, revision in SOURCE_REVISIONS.items()
-            if name != "TIGER-Lab/SWE-Next-SFT-Trajectories"
+            if name not in rebuilt_sources
         }
         same_sources = (
             current
@@ -855,6 +1199,8 @@ def build_sets(data_dir, sf, lf=1, fetch=True):
                                 for name in other_tables):
             _build_lepard(d, sf, force=True)
             _build_agent_traces(d, sf, force=True)
+            _build_support(d, sf, force=True)
+            _build_issue_runs(d, sf, force=True)
             marker.write_text(json.dumps(expected, indent=2, sort_keys=True))
             return d
     if fetch and _fetch_published_corpus(d, sf):
@@ -901,6 +1247,8 @@ def build_sets(data_dir, sf, lf=1, fetch=True):
 
     _build_lepard(d, sf, force=True)
     _build_agent_traces(d, sf, force=True)
+    _build_support(d, sf, force=True)
+    _build_issue_runs(d, sf, force=True)
 
     marker.write_text(json.dumps(expected, indent=2, sort_keys=True))
     return d
@@ -922,6 +1270,10 @@ CORPUS_COLUMNS = {
     "citation_passages": ("id", "passage_text", "passage_ids"),
     "agent_traces": ("id", "trace", "trajectory_id", "turn_index",
                      "token_count"),
+    "support_traces": tuple(SUPPORT_TRACE_SCHEMA.names),
+    "support_messages": tuple(MESSAGE_SCHEMA.names),
+    "issue_runs": tuple(ISSUE_RUN_SCHEMA.names),
+    "issue_messages": tuple(MESSAGE_SCHEMA.names),
 }
 
 

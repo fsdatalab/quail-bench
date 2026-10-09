@@ -42,9 +42,15 @@ from quail_b.prompts import (
     P_MSG,
     REACTION,
     REFUTE,
+    RUNS_DIFFERENT_APPROACH,
+    RUNS_REPRODUCED,
+    RUNS_TEST_STEP,
     SCENARIO_MATCH,
     SERIOUS_ADVERSE_EVENT,
     SUPPORT,
+    SUPPORT_DIFFERENT_APPROACH,
+    SUPPORT_FRUSTRATED,
+    SUPPORT_PUSHBACK,
 )
 from quail_b.substrait import (
     AGGREGATE_GENERIC_EXTENSION_URN,
@@ -111,6 +117,7 @@ class Scan:
         columns: Further columns, for ordinary join conditions, column
             tests, keys, and measures.
         integers: The columns among `columns` typed as 32-bit integers.
+        floats: The columns among `columns` typed as 64-bit floats.
     """
 
     table: str
@@ -118,6 +125,7 @@ class Scan:
     text: str
     columns: tuple[str, ...] = ()
     integers: tuple[str, ...] = ()
+    floats: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -391,6 +399,7 @@ class _Emitter:
                     names=names,
                     struct=type_pb2.Type.Struct(
                         types=[_i32_type() if name in node.integers
+                               else _fp64_type() if name in node.floats
                                else _string_type() for name in names],
                         nullability=type_pb2.Type.NULLABILITY_REQUIRED,
                     ),
@@ -759,6 +768,35 @@ def _policies():
     return Scan("policies", "p", "policy_text")
 
 
+def _support_traces(alias, text="transcript"):
+    return Scan("support_traces", alias, text, ("task_id", "reward"),
+                floats=("reward",))
+
+
+def _user_messages():
+    """The customer messages, with the id of the agent message each answers."""
+    return Where(Scan("support_messages", "u", "content",
+                      ("role", "prev_assistant_id")), "role", "=", "user")
+
+
+def _pushback_pairs():
+    """Each customer reply joined to the agent message before it."""
+    return Join(Scan("support_messages", "a", "content"), _user_messages(),
+                ("a", "u"), SUPPORT_PUSHBACK, on=(("id", "prev_assistant_id"),))
+
+
+def _issue_runs(alias):
+    return Scan("issue_runs", alias, "transcript", ("instance_id", "resolved"),
+                integers=("resolved",))
+
+
+def _outcome_pairs():
+    """Each successful run joined to each failed run of the same issue."""
+    return Join(Where(_issue_runs("s"), "resolved", "=", 1),
+                Where(_issue_runs("f"), "resolved", "=", 0), ("s", "f"),
+                RUNS_DIFFERENT_APPROACH, on=(("instance_id", "instance_id"),))
+
+
 def _classify(node, prompt, labels, output, descriptions=()):
     return Classify(node, prompt, labels, output, descriptions)
 
@@ -1020,6 +1058,79 @@ QUERIES = (
               (("n", ">=", 5),)),
               (("mean_fix_score", True), ("t.trajectory_id", False))), 10),
           select=("t.trajectory_id", "mean_fix_score", "n")),
+
+    # Customer support traces and coding agent runs, for agent trace
+    # analytics. Their reference labels are not published yet.
+    Query("SUPPORT-1", "customer messages -> filter: frustrated with the agent",
+          _filters(_user_messages(), SUPPORT_FRUSTRATED),
+          labels_pending=True),
+    Query("SUPPORT-2", "join over pairs: each customer reply x the agent "
+          "message before it, pushback",
+          _pushback_pairs(), labels_pending=True),
+    Query("SUPPORT-3", "pushback pairs -> classify: what the disagreement "
+          "is about",
+          Classify(_pushback_pairs(), prompts.SUPPORT_DISAGREEMENT,
+                   prompts.SUPPORT_DISAGREEMENT_LABELS, "disagreement",
+                   prompts.SUPPORT_DISAGREEMENT_DESCRIPTIONS,
+                   documents=("u", "a")),
+          select=("u", "a", "u.disagreement"), labels_pending=True),
+    Query("SUPPORT-4", "classify each opening request: intent -> "
+          "conversations per intent, most first",
+          Sort(Aggregate(
+              _classify(_support_traces("t", "request"),
+                        prompts.SUPPORT_INTENT, prompts.SUPPORT_INTENT_LABELS,
+                        "intent", prompts.SUPPORT_INTENT_DESCRIPTIONS),
+              ("t.intent",), (("n", "count", None),)),
+               (("n", True), ("t.intent", False))),
+          select=("t.intent", "n"), labels_pending=True),
+    Query("SUPPORT-5", "join over pairs: runs of the same task that handle "
+          "the request differently",
+          Join(_support_traces("r1"), _support_traces("r2"), ("r1", "r2"),
+               SUPPORT_DIFFERENT_APPROACH, on=(("task_id", "task_id"),)),
+          labels_pending=True),
+    Query("SUPPORT-6", "classify each conversation: how the agent handled "
+          "the request -> per outcome: conversations and mean reward, at "
+          "least five, best first",
+          Sort(Having(Aggregate(
+              _classify(_support_traces("t"), prompts.SUPPORT_OUTCOME,
+                        prompts.SUPPORT_OUTCOME_LABELS, "outcome",
+                        prompts.SUPPORT_OUTCOME_DESCRIPTIONS),
+              ("t.outcome",),
+              (("n", "count", None), ("mean_reward", "avg", "t.reward"))),
+              (("n", ">=", 5),)),
+               (("mean_reward", True), ("t.outcome", False))),
+          select=("t.outcome", "n", "mean_reward"), labels_pending=True),
+    Query("RUNS-1", "filter: reproduced the issue before changing the code",
+          _filters(_issue_runs("r"), RUNS_REPRODUCED), labels_pending=True),
+    Query("RUNS-2", "classify each run: the kind of change -> per kind: runs "
+          "and the share resolved, most runs first",
+          Sort(Aggregate(
+              _classify(_issue_runs("r"), prompts.RUNS_STRATEGY,
+                        prompts.RUNS_STRATEGY_LABELS, "strategy",
+                        prompts.RUNS_STRATEGY_DESCRIPTIONS),
+              ("r.strategy",),
+              (("n", "count", None), ("resolved_share", "avg", "r.resolved"))),
+               (("n", True), ("r.strategy", False))),
+          select=("r.strategy", "n", "resolved_share"), labels_pending=True),
+    Query("RUNS-3", "join over pairs: each successful run x each failed run "
+          "of the same issue, different approach",
+          _outcome_pairs(), labels_pending=True),
+    Query("RUNS-4", "different-approach pairs -> classify: what the failed "
+          "run lacked",
+          Classify(_outcome_pairs(), prompts.RUNS_SHORTFALL,
+                   prompts.RUNS_SHORTFALL_LABELS, "shortfall",
+                   prompts.RUNS_SHORTFALL_DESCRIPTIONS, documents=("f", "s")),
+          select=("f", "s", "f.shortfall"), labels_pending=True),
+    Query("RUNS-5", "agent steps -> filter: runs tests -> per run: test "
+          "steps, at least three, most first, 50",
+          Fetch(Sort(Having(Aggregate(
+              _filters(Where(Scan("issue_messages", "m", "content",
+                                  ("trace_id", "role")), "role", "=",
+                             "assistant"), RUNS_TEST_STEP),
+              ("m.trace_id",), (("test_steps", "count", None),)),
+              (("test_steps", ">=", 3),)),
+              (("test_steps", True), ("m.trace_id", False))), 50),
+          select=("m.trace_id", "test_steps"), labels_pending=True),
 
     # PrivacyPolicies: only when that corpus is available.
     Query("PRIV-1", "2 filters: P_MSG + P_LOC",

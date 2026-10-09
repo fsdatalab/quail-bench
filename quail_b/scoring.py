@@ -628,14 +628,25 @@ def _check_joined_labels(spec: QuerySpec, ground_truth, survivors: dict,
                     f"{pc.sum(unknown).as_py()} pairs of {join.id}")
 
 
+_COMPARE = {
+    "=": pc.equal, "<>": pc.not_equal, "<": pc.less, "<=": pc.less_equal,
+    ">": pc.greater, ">=": pc.greater_equal,
+}
+
+
 def expected_survivors(spec: QuerySpec, ground_truth, corpus_rows
                        ) -> dict[str, list[str]]:
-    """Return, per alias, the ids that pass every filter on it."""
+    """Return, per alias, the ids that pass every column test and filter on it."""
     survivors = {}
     for relation in spec.info.relations:
-        ids = pa.array(
-            [str(row_id) for row_id in _ids(corpus_rows[relation.table])],
-            pa.string())
+        rows = corpus_rows[relation.table]
+        ids = pa.array([str(row_id) for row_id in _ids(rows)], pa.string())
+        for test in spec.info.column_tests:
+            if test.relation != relation.alias:
+                continue
+            passed = _COMPARE[test.comparison](
+                _column_by_id(rows, test.column, ids), test.value)
+            ids = ids.filter(pc.fill_null(passed, False))
         for filter_spec in spec.info.filters:
             if filter_spec.relation != relation.alias:
                 continue

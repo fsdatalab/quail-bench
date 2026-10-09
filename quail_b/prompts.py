@@ -321,3 +321,142 @@ AGENT_ROOT_CAUSE_DESCRIPTIONS = (
     "a dependency, version, build, or packaging setting is wrong",
     "documentation, comments, or messages are wrong",
 )
+
+# tau-bench support traces: a filter over one customer message, a join
+# of a customer reply to the agent message before it, a classification
+# of that pair, and classifications and a join over whole runs.
+SUPPORT_FRUSTRATED = (
+    "Judge strictly from the customer message above whether the customer "
+    "expresses frustration or dissatisfaction with the agent, such as "
+    "repeating a request, objecting to a refusal, or complaining about the "
+    "service.\n\n{0}\n\nInstruction: answer TRUE if the customer expresses "
+    "frustration or dissatisfaction with the agent, FALSE otherwise."
+)
+
+SUPPORT_PUSHBACK = (
+    "Does the customer's reply in DOCUMENT {1} disagree with, correct, or "
+    "push back on what the agent said in DOCUMENT {0}? Answer TRUE if the "
+    "reply objects to the agent's statement, rejects its proposal, or says "
+    "the agent got something wrong, FALSE otherwise."
+)
+
+# A classification of joined rows: the customer's reply is DOCUMENT {0}
+# and the agent message it answers is DOCUMENT {1}.
+SUPPORT_DISAGREEMENT = (
+    "Judge strictly from the customer's reply in DOCUMENT {0} to the agent "
+    "message in DOCUMENT {1} what the disagreement is about."
+)
+SUPPORT_DISAGREEMENT_LABELS = (
+    "policy refusal", "misunderstood request", "wrong details",
+    "repeated question", "changed mind", "other",
+)
+SUPPORT_DISAGREEMENT_DESCRIPTIONS = (
+    "the agent declined the request citing policy and the customer objects",
+    "the agent acted on or proposed something other than what was asked",
+    "the agent stated wrong order, booking, price, or account details",
+    "the agent asked for information or confirmation the customer already "
+    "gave",
+    "the customer withdraws or changes their own earlier request",
+    "none of the above",
+)
+
+SUPPORT_INTENT = (
+    "Judge strictly from the customer's opening message above what the "
+    "customer wants the agent to do.\n\n{0}"
+)
+SUPPORT_INTENT_LABELS = (
+    "cancel", "change", "return or exchange", "refund or compensation",
+    "information", "other",
+)
+SUPPORT_INTENT_DESCRIPTIONS = (
+    "cancel an order, flight, or reservation",
+    "modify an order or reservation, such as items, flights, seats, "
+    "baggage, or address",
+    "return delivered items or exchange them for others",
+    "get money back or compensation without changing the order",
+    "ask about an order, reservation, product, or policy",
+    "none of the above",
+)
+
+SUPPORT_DIFFERENT_APPROACH = (
+    "Do the two conversations in DOCUMENT {0} and DOCUMENT {1}, which start "
+    "from the same customer request, handle it in different ways? Answer "
+    "TRUE if the agent takes different actions or the customer ends up with "
+    "a different outcome, FALSE if the actions and outcome are the same."
+)
+
+SUPPORT_OUTCOME = (
+    "Judge strictly from the conversation above how the agent handled the "
+    "customer's request.\n\n{0}"
+)
+SUPPORT_OUTCOME_LABELS = (
+    "completed the request", "refused under policy", "offered an alternative",
+    "transferred to a human", "unresolved",
+)
+SUPPORT_OUTCOME_DESCRIPTIONS = (
+    "did what the customer asked",
+    "declined the request citing policy and did nothing else",
+    "did not do what was asked but proposed and carried out something else",
+    "handed the customer to a human agent",
+    "the conversation ended with the request neither handled nor refused",
+)
+
+# SWE-rebench issue runs: filters over one run and over one step, a
+# classification of each run's change, and a join of a successful run
+# to a failed run of the same issue, with a classification of the pair.
+RUNS_REPRODUCED = (
+    "Judge strictly from the agent run above whether the agent wrote and "
+    "ran a script or test that reproduces the reported issue before "
+    "changing the project's code.\n\n{0}\n\nInstruction: answer TRUE if the "
+    "agent reproduced the issue before changing the code, FALSE otherwise."
+)
+
+RUNS_STRATEGY = (
+    "Judge strictly from the agent run above what kind of change the agent "
+    "made to fix the issue.\n\n{0}"
+)
+RUNS_STRATEGY_LABELS = (
+    "targeted fix", "broad rewrite", "special case", "new feature",
+    "tests or config only", "no change",
+)
+RUNS_STRATEGY_DESCRIPTIONS = (
+    "changed the lines that cause the issue and little else",
+    "restructured or rewrote a function, class, or module",
+    "added a check or branch for the reported input only",
+    "added a function, option, or class the issue asked for",
+    "changed tests, documentation, or configuration, not the code",
+    "made no change to the project's code",
+)
+
+RUNS_DIFFERENT_APPROACH = (
+    "Does the run in DOCUMENT {1} take a different approach to the issue "
+    "from the run in DOCUMENT {0}? Answer TRUE if the two runs change "
+    "different code or fix the issue in different ways, FALSE if they make "
+    "essentially the same change."
+)
+
+# A classification of joined rows: the failed run is DOCUMENT {0} and
+# a successful run of the same issue is DOCUMENT {1}.
+RUNS_SHORTFALL = (
+    "Judge strictly from the failed run in DOCUMENT {0}, compared with the "
+    "successful run of the same issue in DOCUMENT {1}, what the failed run "
+    "lacked."
+)
+RUNS_SHORTFALL_LABELS = (
+    "no reproduction", "wrong location", "incomplete fix",
+    "broke other behavior", "ran out of steps",
+)
+RUNS_SHORTFALL_DESCRIPTIONS = (
+    "never reproduced the issue, so could not check its change",
+    "changed code that does not cause the issue",
+    "changed the right code but missed cases the issue covers",
+    "fixed the issue but broke other tests or behavior",
+    "stopped before finishing its change",
+)
+
+RUNS_TEST_STEP = (
+    "Judge strictly from the agent step above whether it runs the "
+    "project's tests or a reproduction script.\n\n{0}\n\nInstruction: "
+    "answer TRUE if the step runs tests or a reproduction script, FALSE "
+    "otherwise."
+)

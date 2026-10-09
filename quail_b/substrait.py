@@ -241,8 +241,14 @@ class PlanInfo:
 
     @property
     def relational(self) -> bool:
-        """Whether the query has a column test, a score, or a tail step."""
-        return bool(self.scores or self.column_tests or self.tail)
+        """Whether the query is scored from its rows rather than per operator.
+
+        A score or a tail step makes a query relational, and so does a
+        column test over the one relation it reads. A column test on
+        one relation of a join only limits the pairs the join asks.
+        """
+        return bool(self.scores or self.tail
+                    or (self.column_tests and len(self.relations) == 1))
 
     @property
     def aggregate(self) -> Aggregate | None:
@@ -892,7 +898,7 @@ def _validate_info(info: PlanInfo) -> None:
                     f"classification {operator.id!r} of joined rows must follow the "
                     "join of its two relations")
         elif (
-            isinstance(operator, (Filter, Classify, InList))
+            isinstance(operator, (Filter, Classify, InList, ColumnTest))
             and index > first_join[operator.relation]
         ):
             raise ValueError(
