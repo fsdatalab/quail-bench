@@ -25,8 +25,9 @@ Read `README.md` for the public benchmark contract and metric definitions.
 - Do not add engine runtime code, GPU infrastructure, or experiment reports
   here.
 - The AI operators are `ai_filter`, `ai_join`, `ai_classify`, and `ai_score`.
-  Relational operators appear only in the `REL-` queries. Do not add maps,
-  speculation, or forking unless the task changes the benchmark scope.
+  Relational operators appear in the `REL-` queries and the agent trace
+  queries (`SUPPORT-`, `RUNS-`, `WRENCH-`). Do not add maps, speculation, or
+  forking unless the task changes the benchmark scope.
 - Preserve query IDs, operator IDs, prompt text, corpus identities, scale
   factors, and label identities unless the task explicitly changes that
   public contract.
