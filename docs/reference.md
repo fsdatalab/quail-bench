@@ -196,6 +196,22 @@ The harness rejects:
 
 Scoring ignores column order and row order.
 
+A join query can also filter one of its tables with a `WHERE` condition on a
+stored column. E.g., SUPPORT-2 keeps only the customer messages with
+`u.role = 'user'`. The condition does not call the model. The engine applies it
+before the join, so the join asks fewer pairs. QUAIL-B scores this query per
+operator, like any other join query. Its reference rows are the pairs that pass
+the `WHERE` conditions and the equality conditions, and that the saved join
+labels answer TRUE.
+
+A join predicate can name `pair_columns`. Its labels then cover only the pairs
+whose two columns are equal. These pairs are the ones that the query's equality
+condition keeps. The predicate can also name `left_where` and `right_where`, a
+column and a value that each left or right row must equal. E.g., the RUNS-3
+predicate keeps successful runs on the left and failed runs on the right, as
+the query's `WHERE` conditions do. An answer for any other pair has no label,
+so the answer fails scoring.
+
 ### Rows of a relational query
 
 A `REL-` query selects fields of its last relational step. Its `rows` columns
@@ -459,7 +475,8 @@ filter stores its boolean `answer`. The manifest's predicate lists the
 A query marked `labels_pending` in the catalog has no published labels yet.
 `quail_b.queries()` leaves it out; `queries(include_pending=True)` and
 `get_query` return it. Running one needs a label collection that includes its
-predicates, passed with `root` or `collection_id`. No query is pending.
+predicates, passed with `root` or `collection_id`. The `SUPPORT-`, `RUNS-`,
+`WRENCH-`, and `SALES-` queries are pending.
 
 ## Measurements
 

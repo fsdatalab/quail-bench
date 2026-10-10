@@ -190,6 +190,10 @@ QUERY_FAMILY_WORKLOADS = {
     "LEP": "lepard",
     "AGENT": "agent",
     "REL": "relational",
+    "SUPPORT": "support",
+    "RUNS": "runs",
+    "WRENCH": "wrench",
+    "SALES": "sales",
 }
 
 

@@ -1,0 +1,311 @@
+{
+  "extension_urns": [
+    {
+      "extension_urn_anchor": 1,
+      "urn": "extension:org.fsdatalab.quail_b:functions_ai"
+    },
+    {
+      "extension_urn_anchor": 4,
+      "urn": "extension:io.substrait:functions_aggregate_generic"
+    }
+  ],
+  "extensions": [
+    {
+      "extension_function": {
+        "extension_urn_reference": 1,
+        "function_anchor": 5,
+        "name": "ai_classify:str_str_list_list"
+      }
+    },
+    {
+      "extension_function": {
+        "extension_urn_reference": 4,
+        "function_anchor": 13,
+        "name": "count:any"
+      }
+    }
+  ],
+  "relations": [
+    {
+      "root": {
+        "input": {
+          "project": {
+            "common": {
+              "emit": {
+                "output_mapping": [
+                  2,
+                  3
+                ]
+              }
+            },
+            "expressions": [
+              {
+                "selection": {
+                  "direct_reference": {
+                    "struct_field": {}
+                  },
+                  "root_reference": {}
+                }
+              },
+              {
+                "selection": {
+                  "direct_reference": {
+                    "struct_field": {
+                      "field": 1
+                    }
+                  },
+                  "root_reference": {}
+                }
+              }
+            ],
+            "input": {
+              "sort": {
+                "common": {
+                  "direct": {},
+                  "hint": {
+                    "alias": "sort-1"
+                  }
+                },
+                "input": {
+                  "aggregate": {
+                    "common": {
+                      "direct": {},
+                      "hint": {
+                        "alias": "aggregate-1",
+                        "output_names": [
+                          "t.intent",
+                          "n"
+                        ]
+                      }
+                    },
+                    "grouping_expressions": [
+                      {
+                        "selection": {
+                          "direct_reference": {
+                            "struct_field": {
+                              "field": 4
+                            }
+                          },
+                          "root_reference": {}
+                        }
+                      }
+                    ],
+                    "groupings": [
+                      {
+                        "expression_references": [
+                          0
+                        ]
+                      }
+                    ],
+                    "input": {
+                      "project": {
+                        "common": {
+                          "direct": {},
+                          "hint": {
+                            "alias": "classify-1",
+                            "output_names": [
+                              "t.id",
+                              "t.request",
+                              "t.task_id",
+                              "t.reward",
+                              "t.intent"
+                            ]
+                          }
+                        },
+                        "expressions": [
+                          {
+                            "scalar_function": {
+                              "arguments": [
+                                {
+                                  "value": {
+                                    "literal": {
+                                      "string": "Judge strictly from the customer's opening message above what the customer wants the agent to do.\n\n{0}"
+                                    }
+                                  }
+                                },
+                                {
+                                  "value": {
+                                    "selection": {
+                                      "direct_reference": {
+                                        "struct_field": {
+                                          "field": 1
+                                        }
+                                      },
+                                      "root_reference": {}
+                                    }
+                                  }
+                                },
+                                {
+                                  "value": {
+                                    "literal": {
+                                      "list": {
+                                        "values": [
+                                          {
+                                            "string": "cancel"
+                                          },
+                                          {
+                                            "string": "change"
+                                          },
+                                          {
+                                            "string": "return or exchange"
+                                          },
+                                          {
+                                            "string": "refund or compensation"
+                                          },
+                                          {
+                                            "string": "information"
+                                          },
+                                          {
+                                            "string": "other"
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  }
+                                },
+                                {
+                                  "value": {
+                                    "literal": {
+                                      "list": {
+                                        "values": [
+                                          {
+                                            "string": "cancel an order, flight, or reservation"
+                                          },
+                                          {
+                                            "string": "modify an order or reservation, such as items, flights, seats, baggage, or address"
+                                          },
+                                          {
+                                            "string": "return delivered items or exchange them for others"
+                                          },
+                                          {
+                                            "string": "get money back or compensation without changing the order"
+                                          },
+                                          {
+                                            "string": "ask about an order, reservation, product, or policy"
+                                          },
+                                          {
+                                            "string": "none of the above"
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  }
+                                }
+                              ],
+                              "function_reference": 5,
+                              "output_type": {
+                                "string": {
+                                  "nullability": "NULLABILITY_REQUIRED"
+                                }
+                              }
+                            }
+                          }
+                        ],
+                        "input": {
+                          "read": {
+                            "base_schema": {
+                              "names": [
+                                "id",
+                                "request",
+                                "task_id",
+                                "reward"
+                              ],
+                              "struct": {
+                                "nullability": "NULLABILITY_REQUIRED",
+                                "types": [
+                                  {
+                                    "string": {
+                                      "nullability": "NULLABILITY_REQUIRED"
+                                    }
+                                  },
+                                  {
+                                    "string": {
+                                      "nullability": "NULLABILITY_REQUIRED"
+                                    }
+                                  },
+                                  {
+                                    "string": {
+                                      "nullability": "NULLABILITY_REQUIRED"
+                                    }
+                                  },
+                                  {
+                                    "fp64": {
+                                      "nullability": "NULLABILITY_REQUIRED"
+                                    }
+                                  }
+                                ]
+                              }
+                            },
+                            "common": {
+                              "direct": {},
+                              "hint": {
+                                "alias": "t"
+                              }
+                            },
+                            "named_table": {
+                              "names": [
+                                "support_traces"
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "measures": [
+                      {
+                        "measure": {
+                          "function_reference": 13,
+                          "invocation": "AGGREGATION_INVOCATION_ALL",
+                          "output_type": {
+                            "i64": {
+                              "nullability": "NULLABILITY_REQUIRED"
+                            }
+                          },
+                          "phase": "AGGREGATION_PHASE_INITIAL_TO_RESULT"
+                        }
+                      }
+                    ]
+                  }
+                },
+                "sorts": [
+                  {
+                    "direction": "SORT_DIRECTION_DESC_NULLS_LAST",
+                    "expr": {
+                      "selection": {
+                        "direct_reference": {
+                          "struct_field": {
+                            "field": 1
+                          }
+                        },
+                        "root_reference": {}
+                      }
+                    }
+                  },
+                  {
+                    "direction": "SORT_DIRECTION_ASC_NULLS_LAST",
+                    "expr": {
+                      "selection": {
+                        "direct_reference": {
+                          "struct_field": {}
+                        },
+                        "root_reference": {}
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "names": [
+          "intent",
+          "n"
+        ]
+      }
+    }
+  ],
+  "version": {
+    "minor_number": 103,
+    "producer": "quail-b"
+  }
+}

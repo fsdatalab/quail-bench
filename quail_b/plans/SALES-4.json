@@ -1,0 +1,169 @@
+{
+  "extension_urns": [
+    {
+      "extension_urn_anchor": 1,
+      "urn": "extension:org.fsdatalab.quail_b:functions_ai"
+    }
+  ],
+  "extensions": [
+    {
+      "extension_function": {
+        "extension_urn_reference": 1,
+        "function_anchor": 1,
+        "name": "ai_filter:str_str"
+      }
+    }
+  ],
+  "relations": [
+    {
+      "root": {
+        "input": {
+          "project": {
+            "common": {
+              "emit": {
+                "output_mapping": [
+                  2
+                ]
+              }
+            },
+            "expressions": [
+              {
+                "selection": {
+                  "direct_reference": {
+                    "struct_field": {}
+                  },
+                  "root_reference": {}
+                }
+              }
+            ],
+            "input": {
+              "filter": {
+                "common": {
+                  "direct": {},
+                  "hint": {
+                    "alias": "filter-2"
+                  }
+                },
+                "condition": {
+                  "scalar_function": {
+                    "arguments": [
+                      {
+                        "value": {
+                          "literal": {
+                            "string": "Judge strictly from the sales call above whether the customer commits to buying, such as accepting the terms, agreeing to sign, or asking for the contract or paperwork. Interest, questions, or agreeing to another meeting do not count.\n\n{0}\n\nInstruction: answer TRUE if the customer commits to buying, FALSE otherwise."
+                          }
+                        }
+                      },
+                      {
+                        "value": {
+                          "selection": {
+                            "direct_reference": {
+                              "struct_field": {
+                                "field": 1
+                              }
+                            },
+                            "root_reference": {}
+                          }
+                        }
+                      }
+                    ],
+                    "function_reference": 1,
+                    "output_type": {
+                      "bool": {
+                        "nullability": "NULLABILITY_REQUIRED"
+                      }
+                    }
+                  }
+                },
+                "input": {
+                  "filter": {
+                    "common": {
+                      "direct": {},
+                      "hint": {
+                        "alias": "filter-1"
+                      }
+                    },
+                    "condition": {
+                      "scalar_function": {
+                        "arguments": [
+                          {
+                            "value": {
+                              "literal": {
+                                "string": "Judge strictly from the sales call above whether the sales rep offers the customer a discount, a lower price, or another price concession, such as free add-ons or better financing terms.\n\n{0}\n\nInstruction: answer TRUE if the sales rep offers a discount or price concession, FALSE otherwise."
+                              }
+                            }
+                          },
+                          {
+                            "value": {
+                              "selection": {
+                                "direct_reference": {
+                                  "struct_field": {
+                                    "field": 1
+                                  }
+                                },
+                                "root_reference": {}
+                              }
+                            }
+                          }
+                        ],
+                        "function_reference": 1,
+                        "output_type": {
+                          "bool": {
+                            "nullability": "NULLABILITY_REQUIRED"
+                          }
+                        }
+                      }
+                    },
+                    "input": {
+                      "read": {
+                        "base_schema": {
+                          "names": [
+                            "id",
+                            "transcript"
+                          ],
+                          "struct": {
+                            "nullability": "NULLABILITY_REQUIRED",
+                            "types": [
+                              {
+                                "string": {
+                                  "nullability": "NULLABILITY_REQUIRED"
+                                }
+                              },
+                              {
+                                "string": {
+                                  "nullability": "NULLABILITY_REQUIRED"
+                                }
+                              }
+                            ]
+                          }
+                        },
+                        "common": {
+                          "direct": {},
+                          "hint": {
+                            "alias": "c"
+                          }
+                        },
+                        "named_table": {
+                          "names": [
+                            "sales_calls"
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "names": [
+          "c"
+        ]
+      }
+    }
+  ],
+  "version": {
+    "minor_number": 103,
+    "producer": "quail-b"
+  }
+}
