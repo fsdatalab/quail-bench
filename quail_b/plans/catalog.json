@@ -359,7 +359,7 @@
   },
   {
     "id": "SALES-3",
-    "description": "join over pairs: each call x the next call of the same deal, the rep follows up",
+    "description": "join over pairs: each call x the next call of the same deal, the customer raises an earlier concern again",
     "privacy": false,
     "labels_pending": true
   },

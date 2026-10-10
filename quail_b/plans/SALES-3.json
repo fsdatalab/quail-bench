@@ -87,7 +87,7 @@
                               {
                                 "value": {
                                   "literal": {
-                                    "string": "DOCUMENT {1} is the next call about the same deal as the sales call in DOCUMENT {0}. Does the sales rep in DOCUMENT {1} follow up on a concern, question, or request the customer raised in DOCUMENT {0}? Answer TRUE if the rep returns to it with an answer, a change, or promised material, FALSE if the later call takes up nothing the customer raised."
+                                    "string": "DOCUMENT {1} is the next call about the same deal as the sales call in DOCUMENT {0}. Does the customer in DOCUMENT {1} raise again a concern or objection that the customer already raised in DOCUMENT {0}? Answer TRUE if the customer brings up the same concern again, FALSE if the customer raises only new concerns or none."
                                   }
                                 }
                               },
