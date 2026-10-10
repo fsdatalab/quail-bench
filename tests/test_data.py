@@ -1,5 +1,7 @@
 """CPU checks for the QUAIL-B document sets."""
 
+import json
+
 import pyarrow as pa
 import pytest
 
@@ -20,6 +22,7 @@ from quail_b.data import (
     SETS,
     SUPPORT_TASKS,
     SUPPORT_TRACES_PER_TASK,
+    SUPPORT_TRIALS_PER_MODEL,
     WRENCH_MAX_TOKENS,
     WRENCH_OUTPUT_CHARS,
     WRENCH_TASKS,
@@ -40,6 +43,7 @@ from quail_b.data import (
     _sample_lepard_pairs,
     _select_agent_snapshots,
     _support_rows,
+    _support_source_tasks,
     _transcript,
     _wrench_rows,
     _wrench_tasks,
@@ -378,3 +382,22 @@ def test_sales_deals_scale_per_company():
     assert SALES_DEALS == {"b2b": 1_170, "b2c": 2_290}
     assert _n_sales_deals("b2b", 0.1) == 117
     assert _n_sales_deals("b2c", 1.0) == 2_290
+
+
+def test_support_source_keeps_the_first_trials_of_each_model(
+        monkeypatch, tmp_path):
+    def download(url):
+        trials = 8 if "sonnet" in url else 4
+        path = tmp_path / url.rsplit("/", 1)[1]
+        path.write_text(json.dumps([
+            {"task_id": task, "trial": trial, "reward": 1.0, "traj": []}
+            for task in range(3) for trial in range(trials)]))
+        return path
+
+    monkeypatch.setattr("quail_b.data._download", download)
+    tasks = _support_source_tasks()
+
+    assert len(tasks) == 6
+    for _, runs in tasks:
+        assert len(runs) == SUPPORT_TRACES_PER_TASK
+        assert max(run["trial"] for run in runs) == SUPPORT_TRIALS_PER_MODEL - 1

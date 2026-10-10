@@ -48,7 +48,9 @@ AGENT_TRACE_TOKENIZER_REVISION = (
 )
 
 # tau-bench's historical trajectories: two models, four trials per task,
-# on the airline (50 tasks) and retail (115 tasks) domains. The agent
+# on the airline (50 tasks) and retail (115 tasks) domains. The pinned
+# files hold eight trials of each task for sonnet-35-new and four for
+# gpt-4o, so only the first four trials of each model are kept. The agent
 # policy is the system prompt of every trace and is left out of the
 # transcript.
 TAU_BENCH_COMMIT = "59a200c6d575d595120f1cb70fea53cef0632f6b"
@@ -61,7 +63,8 @@ TAU_BENCH_URL = (
     "{commit}/historical_trajectories/{model}-{domain}.json"
 )
 SUPPORT_TASKS = 165
-SUPPORT_TRACES_PER_TASK = 8
+SUPPORT_TRIALS_PER_MODEL = 4
+SUPPORT_TRACES_PER_TASK = SUPPORT_TRIALS_PER_MODEL * 2
 
 # SWE-rebench OpenHands runs: issues with at least ISSUE_RUN_SOURCE_RUNS
 # runs, of which the first ISSUE_RUNS_PER_ISSUE whose transcript fits
@@ -694,6 +697,8 @@ def _support_source_tasks() -> list[tuple[str, list[dict]]]:
         path = _download(TAU_BENCH_URL.format(
             commit=TAU_BENCH_COMMIT, model=model, domain=domain))
         for record in json.loads(path.read_text()):
+            if int(record["trial"]) >= SUPPORT_TRIALS_PER_MODEL:
+                continue
             tasks.setdefault(f"{domain}-{record['task_id']}", []).append({
                 "domain": domain, "model": model,
                 "trial": int(record["trial"]),

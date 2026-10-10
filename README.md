@@ -438,7 +438,7 @@ same at every scale factor. Use 0.1 while developing an adapter.
 | LePaRD | `citation_passages` | 433 | 1,756 | 2,991 |
 | SWE-Next | `agent_traces` | 1,772 | 8,859 | 17,711 |
 | tau-bench | `support_traces` | 128 | 656 | 1,320 |
-| tau-bench | `support_messages` | about 3,600 | about 18,800 | about 38,000 |
+| tau-bench | `support_messages` | 3,442 | 18,310 | 37,906 |
 | SWE-rebench | `issue_runs` | 320 | 1,600 | 3,200 |
 | SWE-rebench | `issue_messages` | about 20,000 | about 100,000 | about 200,000 |
 | Terminal Wrench | `wrench_runs` | 629 | 2,972 | 5,920 |
