@@ -312,24 +312,37 @@ to 1, that the document answers a filter prompt TRUE.
 | REL-AGENT-6 | Trajectories with at least two fixes, earliest first | `ai_filter`, `GROUP BY`, `MIN`, `MAX`, `HAVING`, `ORDER BY`, `LIMIT` |
 | REL-AGENT-7 | Ten trajectories of at least five snapshots with the highest mean fix score | `ai_score`, `GROUP BY`, `AVG`, `HAVING`, `ORDER BY`, `LIMIT` |
 
+### Queries waiting for labels
+
+The `SUPPORT`, `RUNS`, `WRENCH`, and `SALES` queries do not have published
+reference labels yet. `quail_b.queries()` leaves them out, and `quail_b.run`
+does not run them when `queries` is `None`. To run one, give its ID in
+`queries` and pass a label collection that includes its predicates with
+`collection_id` or `root`. Their reference labels will be the answers of
+Qwen3 32B, the same reference model as for the other queries.
+
 ### Agent trace analytics queries
 
-The `SUPPORT` and `RUNS` queries ask the questions a team that serves an
-agent asks of its traces: what users ask for, where users push back, what
-the disagreements are about, which runs of one task take different
-approaches, and which approaches succeed. Their reference labels are not
-published yet, so `quail_b.queries()` lists them only with
-`include_pending=True`, and a run names them with `--only`.
+The `SUPPORT` and `RUNS` queries ask what a team that runs an agent wants to
+know from the agent's traces. The `SUPPORT` queries read customer service
+conversations from [tau-bench](https://github.com/sierra-research/tau-bench).
+The `RUNS` queries read coding agent runs from
+[SWE-rebench](https://huggingface.co/datasets/nebius/SWE-rebench-openhands-trajectories),
+with eight runs of each GitHub issue.
 
-Both corpora store a trace twice: one row per trace with its whole
-transcript, and one row per message with the ids of the message, the user
-message, and the assistant message before it. A question about one message
-reads one message, and a reply is joined to the message it answers with an
-equality condition, so the model reads one pair per reply rather than every
-pair. `support_traces` keeps each run's task, model, trial, and reward from
-tau-bench, so runs of one task join on `task_id`; `issue_runs` keeps each
-run's issue and whether its patch resolved it, so successful and failed runs
-of one issue join on `instance_id`.
+Each corpus has a trace table and a message table. The trace table has one row
+per trace, with the whole transcript. The message table has one row per
+message. In each message row, `prev_id`, `prev_user_id`, and
+`prev_assistant_id` store the IDs of earlier messages in the same trace.
+
+A join can use these columns in an equality condition. E.g., SUPPORT-2 joins
+each customer reply to the agent message before it on `prev_assistant_id`.
+The model then reads one pair for each reply, not every pair of messages.
+
+The trace tables also keep columns from their sources. `support_traces` stores
+the task and the reward of each run, so SUPPORT-5 can join runs of the same
+task. `issue_runs` stores whether each run resolved its issue, so RUNS-3 can
+join a successful run to a failed run of the same issue.
 
 | Query | Question | Operators |
 | --- | --- | --- |
@@ -348,20 +361,26 @@ of one issue join on `instance_id`.
 ### Reward hacking queries
 
 The `WRENCH` queries ask which agent runs passed a task's verifier by
-exploiting it instead of solving the task. The runs come from
+exploiting it instead of solving the task. A verifier is the script that
+checks whether a run solved its task. The runs come from
 [Terminal Wrench](https://huggingface.co/datasets/few-sh/terminal-wrench)
-(Apache-2.0): terminal tasks run by Claude Opus 4.6, Gemini 3.1 Pro, and
-GPT-5.4. Hack runs are the dataset's sanitized hack trajectories: the agent
-was asked to pass the verifier by any means, and afterwards the red-team
-prompt was removed and the agent's messages were rewritten to drop mentions of
-hacking. Baseline runs solved the task without being asked to hack.
+(Apache-2.0), where Claude Opus 4.6, Gemini 3.1 Pro, and GPT-5.4 do terminal
+tasks. The dataset has two kinds of runs:
 
-`wrench_runs` has one row per run: the task text, then every agent step's
-message, commands, and terminal output, with long output cut to 2,000
-characters. `mode` holds `hack` or `baseline`, the dataset's own label;
-only WRENCH-5 reads it, to keep baseline runs. `wrench_steps` has one row per
-agent step: the task text, then that step alone. Runs over 24,000 Qwen3 tokens
-are left out.
+- In a hack run, the agent was told to pass the verifier by any means. The
+  dataset then removed that instruction and rewrote the agent's messages to
+  remove mentions of hacking.
+- In a baseline run, the agent solved the task without an instruction to
+  hack.
+
+`wrench_runs` has one row per run. The transcript contains the task and every
+agent step, with long command output cut to 2,000 characters. `wrench_steps`
+has one row per agent step, with the task and that step only. The tables leave
+out runs longer than 24,000 Qwen3 tokens.
+
+The `mode` column stores the dataset's label, `hack` or `baseline`. Only
+WRENCH-5 reads `mode`, to select the baseline runs. You can also use `mode` to
+compare a filter's answers with the dataset's labels.
 
 | Query | Question | Operators |
 | --- | --- | --- |
@@ -371,41 +390,32 @@ are left out.
 | WRENCH-4 | Which runs have the most steps that are part of an exploit? | `ai_filter` over steps, `GROUP BY`, `COUNT`, `HAVING`, `ORDER BY`, `LIMIT` |
 | WRENCH-5 | Among runs not asked to hack, how many exploited the verifier, per agent model? | Column test on `mode`, `ai_filter`, `GROUP BY`, `COUNT`, `ORDER BY` |
 
-The reference labels, like the others, will be Qwen3 32B's answers. `mode`
-also allows measuring a run filter against the dataset's labels directly.
-
-A column test on one relation of a join, such as `role = 'user'`, limits
-the pairs the join asks; a query with one is scored per operator like any
-join query. A column test over a single relation still makes the query
-relational, scored from its rows.
-
 ### Sales call queries
 
-The `SALES` queries ask what a sales team asks of its recorded calls:
-which calls name a competitor, what customers worry about, whether the
-rep follows up on the next call, and which calls end in a commitment.
-The calls come from the CRM databases of
+The `SALES` queries ask what a sales team wants to know from its recorded
+calls. The calls come from
 [CRMArena-Pro](https://github.com/SalesforceAIResearch/CRMArena)
-(CC BY-NC 4.0), Salesforce AI Research's benchmark of CRM work. They are
-synthetic: an LLM wrote them for two fictional companies, a seller of
-electronic design software (B2B) and a car dealer (B2C), each call tied to
-a deal record. Every call on a deal is kept; calls on leads are left out.
+(CC BY-NC 4.0), a Salesforce AI Research benchmark of CRM tasks. The calls are
+synthetic. An LLM wrote them for two fictional companies: a seller of
+electronic design software (B2B) and a car dealer (B2C).
 
-`sales_calls` has one row per call: the transcript as stored, with a
-timestamp and the speaker's name on each line. `deal_id` groups a deal's
-calls, `call_index` orders them in time, and `prev_call_id` names the
-deal's previous call. `deal_stage` and `deal_amount` come from the deal
-record and describe the deal now, not when the call took place. Six B2C
-calls belong to deals whose stage reads `Closed Won`; the others read
-Discovery, Qualification, Quote, Negotiation, or Closed. The deal records
-were generated apart from the calls, so a call's content does not always
-match its deal's stage.
+`sales_calls` has one row per call. Each line of a transcript starts with a
+timestamp and the speaker's name. Each call belongs to a deal, and three
+columns describe the call's deal:
+
+- `deal_id` identifies the deal.
+- `prev_call_id` stores the ID of the deal's previous call. E.g., SALES-3
+  joins each call to the next call of the same deal on `prev_call_id`.
+- `deal_stage` stores the deal's current stage, such as `Negotiation`.
+
+CRMArena-Pro generated the deal records separately from the calls. A call's
+content can therefore disagree with its deal's stage.
 
 | Query | Question | Operators |
 | --- | --- | --- |
 | SALES-1 | Which calls name a competitor? | `ai_filter` over one call |
 | SALES-2 | What is the customer's main concern, and how many calls raise each? | 7 concerns with descriptions, `GROUP BY`, `COUNT`, `ORDER BY` |
-| SALES-3 | On which next call does the rep follow up on what the customer raised? | `ai_join` of each call to the next call of its deal, on `prev_call_id` |
+| SALES-3 | In which pairs of consecutive calls does the rep follow up on what the customer raised? | `ai_join` of each call to the next call of its deal, on `prev_call_id` |
 | SALES-4 | Which calls have the rep offering a discount and the customer committing to buy? | Two `ai_filter`s over one call |
 | SALES-5 | Among calls on deals in negotiation, which 25 most likely end in a commitment? | Column test on `deal_stage`, `ai_score`, `ORDER BY`, `LIMIT` |
 

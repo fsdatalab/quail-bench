@@ -196,13 +196,17 @@ The harness rejects:
 
 Scoring ignores column order and row order.
 
-A column test on one relation of a join, such as `u.role = 'user'` in
-SUPPORT-2, is applied before the join and limits the pairs the join asks. The
-query is scored per operator like any join query: its reference rows are the
-pairs that pass the column tests, the equality conditions, and the saved join
-labels. A join whose predicate names `pair_columns` has labels only for the
-pairs whose two columns are equal, which are the pairs the query can ask, so
-an answer for any other pair has no label and fails scoring.
+A column test can apply to one relation of a join. E.g., SUPPORT-2 tests
+`u.role = 'user'` on the customer messages. The engine applies the column test
+before the join, so the join asks fewer pairs. QUAIL-B scores this query per
+operator, like any other join query. Its reference rows are the pairs that pass
+the column tests and the equality conditions, and that the saved join labels
+answer TRUE.
+
+A join predicate can name `pair_columns`. Its labels then cover only the pairs
+whose two columns are equal. These pairs are the ones that the query's equality
+condition keeps. An answer for any other pair has no label, so the answer fails
+scoring.
 
 ### Rows of a relational query
 
