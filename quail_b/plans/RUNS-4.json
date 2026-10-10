@@ -95,11 +95,11 @@
                     "alias": "classify-1",
                     "output_names": [
                       "s.id",
-                      "s.transcript",
+                      "s.patch",
                       "s.instance_id",
                       "s.resolved",
                       "f.id",
-                      "f.transcript",
+                      "f.patch",
                       "f.instance_id",
                       "f.resolved",
                       "f.shortfall"
@@ -113,7 +113,7 @@
                         {
                           "value": {
                             "literal": {
-                              "string": "Judge strictly from the failed run in DOCUMENT {0}, compared with the successful run of the same issue in DOCUMENT {1}, what the failed run lacked."
+                              "string": "Judge strictly from the failed run's patch in DOCUMENT {0}, compared with the patch of a successful run of the same issue in DOCUMENT {1}, what the failed patch lacks."
                             }
                           }
                         },
@@ -147,19 +147,19 @@
                               "list": {
                                 "values": [
                                   {
-                                    "string": "no reproduction"
-                                  },
-                                  {
                                     "string": "wrong location"
                                   },
                                   {
                                     "string": "incomplete fix"
                                   },
                                   {
-                                    "string": "broke other behavior"
+                                    "string": "special case"
                                   },
                                   {
-                                    "string": "ran out of steps"
+                                    "string": "no change"
+                                  },
+                                  {
+                                    "string": "other"
                                   }
                                 ]
                               }
@@ -172,19 +172,19 @@
                               "list": {
                                 "values": [
                                   {
-                                    "string": "never reproduced the issue, so could not check its change"
+                                    "string": "changes code that does not cause the issue"
                                   },
                                   {
-                                    "string": "changed code that does not cause the issue"
+                                    "string": "changes the right code but misses cases the successful patch covers"
                                   },
                                   {
-                                    "string": "changed the right code but missed cases the issue covers"
+                                    "string": "handles only the reported input instead of the general case"
                                   },
                                   {
-                                    "string": "fixed the issue but broke other tests or behavior"
+                                    "string": "changes none of the project's code"
                                   },
                                   {
-                                    "string": "stopped before finishing its change"
+                                    "string": "none of the above"
                                   }
                                 ]
                               }
@@ -219,7 +219,7 @@
                                   {
                                     "value": {
                                       "literal": {
-                                        "string": "Does the run in DOCUMENT {1} take a different approach to the issue from the run in DOCUMENT {0}? Answer TRUE if the two runs change different code or fix the issue in different ways, FALSE if they make essentially the same change."
+                                        "string": "DOCUMENT {0} and DOCUMENT {1} are the patches of two agent runs on the same issue. Does the patch in DOCUMENT {1} take a different approach from the patch in DOCUMENT {0}? Answer TRUE if the two patches change different code or fix the issue in different ways, FALSE if they make essentially the same change."
                                       }
                                     }
                                   },
@@ -348,7 +348,7 @@
                             "base_schema": {
                               "names": [
                                 "id",
-                                "transcript",
+                                "patch",
                                 "instance_id",
                                 "resolved"
                               ],
@@ -437,7 +437,7 @@
                             "base_schema": {
                               "names": [
                                 "id",
-                                "transcript",
+                                "patch",
                                 "instance_id",
                                 "resolved"
                               ],

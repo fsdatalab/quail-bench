@@ -77,6 +77,10 @@ ISSUE_RUNS_PER_ISSUE = 8
 ISSUE_RUN_SOURCE_RUNS = 12
 ISSUE_RUN_MAX_TOKENS = 24_000
 TRANSCRIPT_TOOL_CHARS = 400
+# RUNS-3 and RUNS-4 read two patches in one prompt, which must fit one
+# forward pass of the reference judge (41,943 tokens for Qwen3 32B on
+# one H100), so a longer patch keeps its start and end.
+ISSUE_PATCH_MAX_CHARS = 40_000
 MESSAGE_MAX_CHARS = 2_000
 
 # Terminal Wrench: terminal tasks run by Claude Opus 4.6, Gemini 3.1 Pro,
@@ -658,6 +662,7 @@ ISSUE_RUN_SCHEMA = pa.schema([
     ("id", pa.string()),
     ("request", pa.string()),
     ("transcript", pa.string()),
+    ("patch", pa.string()),
     ("message_count", pa.int32()),
     ("instance_id", pa.string()),
     ("repo", pa.string()),
@@ -772,7 +777,7 @@ def _issue_run_rows(batches, candidates, n, tokenizer):
 
     Args:
         batches: Source record batches or tables with instance_id,
-            repo, trajectory, and resolved columns.
+            repo, trajectory, model_patch, and resolved columns.
         candidates: The issues to read, in seeded order.
         n: The number of issues wanted.
         tokenizer: Counts a transcript's tokens with `encode`.
@@ -797,6 +802,8 @@ def _issue_run_rows(batches, candidates, n, tokenizer):
                 continue
             kept[issue].append({
                 "request": _request(messages), "transcript": transcript,
+                "patch": _cut_middle(row.get("model_patch") or "",
+                                     ISSUE_PATCH_MAX_CHARS),
                 "message_count": len(messages), "instance_id": issue,
                 "repo": row["repo"], "resolved": int(row["resolved"]),
                 "token_count": token_count, "messages": messages,
@@ -1331,7 +1338,8 @@ def _build_issue_runs(d, sf, force=False):
         AGENT_TRACE_TOKENIZER, revision=AGENT_TRACE_TOKENIZER_REVISION)
     batches = source.iter_batches(
         batch_size=64,
-        columns=["instance_id", "repo", "trajectory", "resolved"])
+        columns=["instance_id", "repo", "trajectory", "model_patch",
+                 "resolved"])
     runs, messages = _issue_run_rows(batches, candidates, n, tokenizer)
     pq.write_table(pa.Table.from_pylist(runs, schema=ISSUE_RUN_SCHEMA),
                    run_path, compression="zstd", use_dictionary=False)

@@ -429,29 +429,29 @@ RUNS_STRATEGY_DESCRIPTIONS = (
 )
 
 RUNS_DIFFERENT_APPROACH = (
-    "Does the run in DOCUMENT {1} take a different approach to the issue "
-    "from the run in DOCUMENT {0}? Answer TRUE if the two runs change "
+    "DOCUMENT {0} and DOCUMENT {1} are the patches of two agent runs on the "
+    "same issue. Does the patch in DOCUMENT {1} take a different approach "
+    "from the patch in DOCUMENT {0}? Answer TRUE if the two patches change "
     "different code or fix the issue in different ways, FALSE if they make "
     "essentially the same change."
 )
 
-# A classification of joined rows: the failed run is DOCUMENT {0} and
-# a successful run of the same issue is DOCUMENT {1}.
+# A classification of joined rows: the failed run's patch is DOCUMENT
+# {0} and the patch of a successful run of the same issue is DOCUMENT {1}.
 RUNS_SHORTFALL = (
-    "Judge strictly from the failed run in DOCUMENT {0}, compared with the "
-    "successful run of the same issue in DOCUMENT {1}, what the failed run "
-    "lacked."
+    "Judge strictly from the failed run's patch in DOCUMENT {0}, compared "
+    "with the patch of a successful run of the same issue in DOCUMENT {1}, "
+    "what the failed patch lacks."
 )
 RUNS_SHORTFALL_LABELS = (
-    "no reproduction", "wrong location", "incomplete fix",
-    "broke other behavior", "ran out of steps",
+    "wrong location", "incomplete fix", "special case", "no change", "other",
 )
 RUNS_SHORTFALL_DESCRIPTIONS = (
-    "never reproduced the issue, so could not check its change",
-    "changed code that does not cause the issue",
-    "changed the right code but missed cases the issue covers",
-    "fixed the issue but broke other tests or behavior",
-    "stopped before finishing its change",
+    "changes code that does not cause the issue",
+    "changes the right code but misses cases the successful patch covers",
+    "handles only the reported input instead of the general case",
+    "changes none of the project's code",
+    "none of the above",
 )
 
 RUNS_TEST_STEP = (

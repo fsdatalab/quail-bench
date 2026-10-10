@@ -11,6 +11,7 @@ from quail_b.data import (
     AGENT_TRACE_TURN_INTERVAL,
     ASPECTS,
     CORPUS_COLUMNS,
+    ISSUE_PATCH_MAX_CHARS,
     ISSUE_RUN_ISSUES,
     ISSUE_RUN_MAX_TOKENS,
     ISSUE_RUN_SOURCE_RUNS,
@@ -240,7 +241,9 @@ def test_issue_run_rows_keep_fitting_runs_of_candidate_issues():
             messages.append({"role": "assistant", "content": f"step {turn}"})
             messages.append({"role": "tool", "content": "out " * 200})
         return {"instance_id": issue, "repo": "r", "resolved": resolved,
-                "trajectory": messages}
+                "trajectory": messages,
+                "model_patch": "+" * (ISSUE_PATCH_MAX_CHARS + 10)
+                if resolved else None}
 
     class _WordTokenizer:
         def encode(self, text, add_special_tokens=False):
@@ -248,6 +251,7 @@ def test_issue_run_rows_keep_fitting_runs_of_candidate_issues():
 
     rows = [run("a", 2, 1) for _ in range(ISSUE_RUN_SOURCE_RUNS)]
     rows[1] = run("a", ISSUE_RUN_MAX_TOKENS, 0)    # too long, skipped
+    rows[2] = run("a", 2, 0)                       # no patch
     rows += [run("b", ISSUE_RUN_MAX_TOKENS, 0)
              for _ in range(ISSUE_RUN_SOURCE_RUNS)]
     rows += [run("c", 1, 1) for _ in range(ISSUE_RUN_SOURCE_RUNS)]
@@ -266,6 +270,8 @@ def test_issue_run_rows_keep_fitting_runs_of_candidate_issues():
     assert runs[0]["resolved"] == 1 and runs[0]["message_count"] == 6
     assert runs[0]["token_count"] == len(runs[0]["transcript"].split())
     assert "[cut" in runs[0]["transcript"]
+    assert "characters cut" in runs[0]["patch"]
+    assert runs[1]["resolved"] == 0 and runs[1]["patch"] == ""
     assert len(messages) == (6 + 4) * ISSUE_RUNS_PER_ISSUE
     assert messages[0]["trace_id"] == "ir00000"
     with pytest.raises(ValueError, match="expected 3"):

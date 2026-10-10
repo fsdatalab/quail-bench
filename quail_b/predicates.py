@@ -172,8 +172,8 @@ PREDICATES = (
     PredicateSpec(
         "quailb.runs.run.different_approach", "runs", "different_approach",
         "join", prompts.RUNS_DIFFERENT_APPROACH,
-        "successful_run", "issue_runs", "transcript",
-        "failed_run", "issue_runs", "transcript",
+        "successful_run", "issue_runs", "patch",
+        "failed_run", "issue_runs", "patch",
         pair_columns=("instance_id", "instance_id"),
         left_where=("resolved", 1), right_where=("resolved", 0)),
     PredicateSpec(
@@ -284,8 +284,8 @@ CLASSIFY_PREDICATES = (
         descriptions=prompts.RUNS_STRATEGY_DESCRIPTIONS),
     PredicateSpec(
         "quailb.runs.run.shortfall", "runs", "shortfall", "classify",
-        prompts.RUNS_SHORTFALL, "failed_run", "issue_runs", "transcript",
-        "successful_run", "issue_runs", "transcript",
+        prompts.RUNS_SHORTFALL, "failed_run", "issue_runs", "patch",
+        "successful_run", "issue_runs", "patch",
         labels=prompts.RUNS_SHORTFALL_LABELS,
         descriptions=prompts.RUNS_SHORTFALL_DESCRIPTIONS,
         pair_columns=("instance_id", "instance_id"),

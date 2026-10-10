@@ -87,7 +87,7 @@
                               {
                                 "value": {
                                   "literal": {
-                                    "string": "Does the run in DOCUMENT {1} take a different approach to the issue from the run in DOCUMENT {0}? Answer TRUE if the two runs change different code or fix the issue in different ways, FALSE if they make essentially the same change."
+                                    "string": "DOCUMENT {0} and DOCUMENT {1} are the patches of two agent runs on the same issue. Does the patch in DOCUMENT {1} take a different approach from the patch in DOCUMENT {0}? Answer TRUE if the two patches change different code or fix the issue in different ways, FALSE if they make essentially the same change."
                                   }
                                 }
                               },
@@ -216,7 +216,7 @@
                         "base_schema": {
                           "names": [
                             "id",
-                            "transcript",
+                            "patch",
                             "instance_id",
                             "resolved"
                           ],
@@ -305,7 +305,7 @@
                         "base_schema": {
                           "names": [
                             "id",
-                            "transcript",
+                            "patch",
                             "instance_id",
                             "resolved"
                           ],

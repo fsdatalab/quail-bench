@@ -791,8 +791,8 @@ def _pushback_pairs():
                 ("a", "u"), SUPPORT_PUSHBACK, on=(("id", "prev_assistant_id"),))
 
 
-def _issue_runs(alias):
-    return Scan("issue_runs", alias, "transcript", ("instance_id", "resolved"),
+def _issue_runs(alias, text="transcript"):
+    return Scan("issue_runs", alias, text, ("instance_id", "resolved"),
                 integers=("resolved",))
 
 
@@ -816,9 +816,9 @@ def _next_call_pairs():
 
 
 def _outcome_pairs():
-    """Each successful run joined to each failed run of the same issue."""
-    return Join(Where(_issue_runs("s"), "resolved", "=", 1),
-                Where(_issue_runs("f"), "resolved", "=", 0), ("s", "f"),
+    """Each successful run's patch joined to each failed run's patch."""
+    return Join(Where(_issue_runs("s", "patch"), "resolved", "=", 1),
+                Where(_issue_runs("f", "patch"), "resolved", "=", 0), ("s", "f"),
                 RUNS_DIFFERENT_APPROACH, on=(("instance_id", "instance_id"),))
 
 
@@ -1137,11 +1137,11 @@ QUERIES = (
               (("n", "count", None), ("resolved_share", "avg", "r.resolved"))),
                (("n", True), ("r.strategy", False))),
           select=("r.strategy", "n", "resolved_share"), labels_pending=True),
-    Query("RUNS-3", "join over pairs: each successful run x each failed run "
-          "of the same issue, different approach",
+    Query("RUNS-3", "join over pairs: each successful run's patch x each "
+          "failed run's patch for the same issue, different approach",
           _outcome_pairs(), labels_pending=True),
     Query("RUNS-4", "different-approach pairs -> classify: what the failed "
-          "run lacked",
+          "patch lacks",
           Classify(_outcome_pairs(), prompts.RUNS_SHORTFALL,
                    prompts.RUNS_SHORTFALL_LABELS, "shortfall",
                    prompts.RUNS_SHORTFALL_DESCRIPTIONS, documents=("f", "s")),

@@ -299,13 +299,13 @@
   },
   {
     "id": "RUNS-3",
-    "description": "join over pairs: each successful run x each failed run of the same issue, different approach",
+    "description": "join over pairs: each successful run's patch x each failed run's patch for the same issue, different approach",
     "privacy": false,
     "labels_pending": true
   },
   {
     "id": "RUNS-4",
-    "description": "different-approach pairs -> classify: what the failed run lacked",
+    "description": "different-approach pairs -> classify: what the failed patch lacks",
     "privacy": false,
     "labels_pending": true
   },
