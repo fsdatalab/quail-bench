@@ -346,17 +346,17 @@ join a successful run to a failed run of the same issue.
 
 | Query | Question | Operators |
 | --- | --- | --- |
-| SUPPORT-1 | Which customer messages express frustration with the agent? | Column test on `role`, `ai_filter` |
-| SUPPORT-2 | Which customer replies push back on the agent message before them? | Column test, `ai_join` over pairs joined on `prev_assistant_id` |
+| SUPPORT-1 | Which customer messages express frustration with the agent? | `WHERE role = 'user'`, `ai_filter` |
+| SUPPORT-2 | Which customer replies push back on the agent message before them? | `WHERE u.role = 'user'`, `ai_join` over pairs joined on `prev_assistant_id` |
 | SUPPORT-3 | What is each pushback about? | SUPPORT-2, then 6 kinds of disagreement per pair |
 | SUPPORT-4 | What do customers ask the agent to do, as conversations per intent? | 6 intents of the opening message, `GROUP BY`, `COUNT`, `ORDER BY` |
 | SUPPORT-5 | Which runs of the same task handle the request differently? | `ai_join` over pairs joined on `task_id` |
 | SUPPORT-6 | How does each way of handling a request score, as mean reward per outcome? | 5 outcomes, `GROUP BY`, `COUNT`, `AVG`, `HAVING`, `ORDER BY` |
 | RUNS-1 | Which runs reproduced the issue before changing code? | `ai_filter` |
 | RUNS-2 | Which kinds of change resolve the issue most often? | 6 kinds of change, `GROUP BY`, `COUNT`, `AVG`, `ORDER BY` |
-| RUNS-3 | Which successful and failed runs of one issue take different approaches? | Two column tests on `resolved`, `ai_join` over pairs joined on `instance_id` |
+| RUNS-3 | Which successful and failed runs of one issue take different approaches? | `WHERE s.resolved = 1 AND f.resolved = 0`, `ai_join` over pairs joined on `instance_id` |
 | RUNS-4 | What did each failed run lack, compared with a successful run? | RUNS-3, then 5 shortfalls per pair |
-| RUNS-5 | Which runs ran tests most often? | Column test on `role`, `ai_filter` over steps, `GROUP BY`, `COUNT`, `HAVING`, `ORDER BY`, `LIMIT` |
+| RUNS-5 | Which runs ran tests most often? | `WHERE role = 'assistant'`, `ai_filter` over steps, `GROUP BY`, `COUNT`, `HAVING`, `ORDER BY`, `LIMIT` |
 
 ### Reward hacking queries
 
@@ -388,7 +388,7 @@ compare a filter's answers with the dataset's labels.
 | WRENCH-2 | Which 100 runs most likely exploited the verifier? | `ai_score`, `ORDER BY`, `LIMIT` |
 | WRENCH-3 | What kind of exploit did each exploiting run use? | WRENCH-1, then 11 exploit kinds with descriptions, from the dataset's categories |
 | WRENCH-4 | Which runs have the most steps that are part of an exploit? | `ai_filter` over steps, `GROUP BY`, `COUNT`, `HAVING`, `ORDER BY`, `LIMIT` |
-| WRENCH-5 | Among runs not asked to hack, how many exploited the verifier, per agent model? | Column test on `mode`, `ai_filter`, `GROUP BY`, `COUNT`, `ORDER BY` |
+| WRENCH-5 | Among runs not asked to hack, how many exploited the verifier, per agent model? | `WHERE mode = 'baseline'`, `ai_filter`, `GROUP BY`, `COUNT`, `ORDER BY` |
 
 ### Sales call queries
 
@@ -417,7 +417,7 @@ content can therefore disagree with its deal's stage.
 | SALES-2 | What is the customer's main concern, and how many calls raise each? | 7 concerns with descriptions, `GROUP BY`, `COUNT`, `ORDER BY` |
 | SALES-3 | In which pairs of consecutive calls does the rep quote a different price or discount? | `ai_join` of each call to the next call of its deal, on `prev_call_id` |
 | SALES-4 | Which calls have the rep offering a discount and the customer committing to buy? | Two `ai_filter`s over one call |
-| SALES-5 | Among calls on deals in negotiation, which 25 most likely end in a commitment? | Column test on `deal_stage`, `ai_score`, `ORDER BY`, `LIMIT` |
+| SALES-5 | Among calls on deals in negotiation, which 25 most likely end in a commitment? | `WHERE deal_stage = 'Negotiation'`, `ai_score`, `ORDER BY`, `LIMIT` |
 
 ## Scale factors
 

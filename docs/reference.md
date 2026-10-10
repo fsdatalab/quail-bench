@@ -196,12 +196,13 @@ The harness rejects:
 
 Scoring ignores column order and row order.
 
-A column test can apply to one relation of a join. E.g., SUPPORT-2 tests
-`u.role = 'user'` on the customer messages. The engine applies the column test
+A join query can also filter one of its tables with a `WHERE` condition on a
+stored column. E.g., SUPPORT-2 keeps only the customer messages with
+`u.role = 'user'`. The condition does not call the model. The engine applies it
 before the join, so the join asks fewer pairs. QUAIL-B scores this query per
 operator, like any other join query. Its reference rows are the pairs that pass
-the column tests and the equality conditions, and that the saved join labels
-answer TRUE.
+the `WHERE` conditions and the equality conditions, and that the saved join
+labels answer TRUE.
 
 A join predicate can name `pair_columns`. Its labels then cover only the pairs
 whose two columns are equal. These pairs are the ones that the query's equality
