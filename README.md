@@ -431,7 +431,7 @@ same at every scale factor. Use 0.1 while developing an adapter.
 | tau-bench | `support_traces` | 128 | 656 | 1,320 |
 | tau-bench | `support_messages` | 3,442 | 18,310 | 37,906 |
 | SWE-rebench | `issue_runs` | 320 | 1,600 | 3,200 |
-| SWE-rebench | `issue_messages` | about 20,000 | about 100,000 | about 200,000 |
+| SWE-rebench | `issue_messages` | about 36,000 | about 177,000 | 351,011 |
 | Terminal Wrench | `wrench_runs` | 629 | 2,972 | 5,920 |
 | Terminal Wrench | `wrench_steps` | 3,454 | 16,801 | 32,838 |
 | CRMArena-Pro | `sales_calls` | 985 | 5,088 | 10,088 |
