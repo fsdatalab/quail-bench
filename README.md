@@ -252,7 +252,7 @@ then run it on all 50.
 | FEV-11 | Classification returned and filtered | A label column, and an IN-list filter on it |
 | AGENT-4 | Two classifications in a chain | Label descriptions, and a label filter feeding a classification |
 | IMDB-15 | Classification of joined rows | A label of two documents, returned per pair |
-| REL-AGENT-1 | Two column tests, then a filter | Column tests before the model |
+| REL-AGENT-1 | Two `WHERE` conditions, then a filter | Conditions on stored columns before the model |
 | REL-AGENT-2 | Filter, sort, offset, limit | Ordered and paged rows |
 | REL-AGENT-4 | Score, sort, limit | `ai_score` and top-k |
 | REL-AGENT-5 | Classify, group by a label, having | `COUNT`, `COUNT(DISTINCT)`, `HAVING`, label keys |
@@ -295,8 +295,8 @@ prompt, the answer tables, and label accuracy.
 ### Relational queries
 
 The seven `REL-AGENT` queries add relational operators over the agent traces:
-a column test (a `WHERE` condition on a stored column, such as
-`turn_index >= 10`, applied before any model call), `ORDER BY` with `OFFSET`
+a `WHERE` condition on a stored column (such as `turn_index >= 10`,
+applied before any model call), `ORDER BY` with `OFFSET`
 and `LIMIT`, `DISTINCT`, `GROUP BY` with `COUNT`, `COUNT(DISTINCT)`, `SUM`,
 `AVG`, `MIN`, `MAX`, and `HAVING`. Two of them use a fourth AI function,
 `ai_score(prompt, document) -> fp64`. It returns the model's belief, from 0
@@ -304,7 +304,7 @@ to 1, that the document answers a filter prompt TRUE.
 
 | Query | Question | Operators |
 | --- | --- | --- |
-| REL-AGENT-1 | Recovered snapshots at turn 10 or later, of at most 6,000 tokens | Two column tests, `ai_filter` |
+| REL-AGENT-1 | Recovered snapshots at turn 10 or later, of at most 6,000 tokens | `WHERE turn_index >= 10 AND token_count <= 6000`, `ai_filter` |
 | REL-AGENT-2 | Second page of ten recovered snapshots, shortest first | `ai_filter`, `ORDER BY`, `OFFSET`, `LIMIT` |
 | REL-AGENT-3 | Trajectories with a plausible fix | `ai_filter`, `DISTINCT` |
 | REL-AGENT-4 | The 20 snapshots with the highest recovery score | `ai_score`, `ORDER BY`, `LIMIT` |

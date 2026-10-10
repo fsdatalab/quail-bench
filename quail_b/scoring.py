@@ -636,7 +636,7 @@ _COMPARE = {
 
 def expected_survivors(spec: QuerySpec, ground_truth, corpus_rows
                        ) -> dict[str, list[str]]:
-    """Return, per alias, the ids that pass every column test and filter on it."""
+    """Return, per alias, the ids that pass every WHERE condition and filter on it."""
     survivors = {}
     for relation in spec.info.relations:
         rows = corpus_rows[relation.table]

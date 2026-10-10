@@ -216,7 +216,7 @@
   },
   {
     "id": "REL-AGENT-1",
-    "description": "column tests: snapshots past turn 10 of at most 6,000 tokens -> filter: recovered",
+    "description": "where: snapshots past turn 10 of at most 6,000 tokens -> filter: recovered",
     "privacy": false
   },
   {
@@ -341,7 +341,7 @@
   },
   {
     "id": "WRENCH-5",
-    "description": "column test: baseline runs -> filter: exploited the verifier -> flagged runs per agent model, most first",
+    "description": "where: baseline runs -> filter: exploited the verifier -> flagged runs per agent model, most first",
     "privacy": false,
     "labels_pending": true
   },
@@ -371,7 +371,7 @@
   },
   {
     "id": "SALES-5",
-    "description": "column test: deals in negotiation -> score: the customer commits to buying -> the 25 highest scores",
+    "description": "where: deals in negotiation -> score: the customer commits to buying -> the 25 highest scores",
     "privacy": false,
     "labels_pending": true
   },

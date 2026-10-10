@@ -312,7 +312,7 @@ def _fp64_type():
 def _number(value):
     """Return a literal for a Python int, float, or string."""
     if isinstance(value, bool):
-        raise TypeError("a column test compares with a number or string")
+        raise TypeError("a WHERE condition compares with a number or string")
     if isinstance(value, int):
         return algebra.Expression(literal=algebra.Expression.Literal(i32=value))
     if isinstance(value, float):
@@ -1032,8 +1032,8 @@ QUERIES = (
 
     # Relational operators over the agent traces. Each query returns a
     # result small enough to read, and runs on Quail only: the stock
-    # backends refuse column tests, sorts, and aggregates.
-    Query("REL-AGENT-1", "column tests: snapshots past turn 10 of at most "
+    # backends refuse WHERE conditions, sorts, and aggregates.
+    Query("REL-AGENT-1", "where: snapshots past turn 10 of at most "
           "6,000 tokens -> filter: recovered",
           _filters(Where(Where(_traces_with_columns(), "turn_index", ">=", 10),
                          "token_count", "<=", 6000), AGENT_RECOVERED)),
@@ -1183,7 +1183,7 @@ QUERIES = (
               (("flagged_steps", ">=", 2),)),
               (("flagged_steps", True), ("s.run_id", False))), 50),
           select=("s.run_id", "flagged_steps"), labels_pending=True),
-    Query("WRENCH-5", "column test: baseline runs -> filter: exploited the "
+    Query("WRENCH-5", "where: baseline runs -> filter: exploited the "
           "verifier -> flagged runs per agent model, most first",
           Sort(Aggregate(
               _filters(Where(_wrench_runs("model", "mode"), "mode", "=",
@@ -1212,7 +1212,7 @@ QUERIES = (
           "commits to buying",
           _filters(_sales_calls(), SALES_DISCOUNT, SALES_COMMITS),
           labels_pending=True),
-    Query("SALES-5", "column test: deals in negotiation -> score: the "
+    Query("SALES-5", "where: deals in negotiation -> score: the "
           "customer commits to buying -> the 25 highest scores",
           Fetch(Sort(Score(Where(_sales_calls("c", "deal_stage"),
                                  "deal_stage", "=", "Negotiation"),
