@@ -312,15 +312,6 @@ to 1, that the document answers a filter prompt TRUE.
 | REL-AGENT-6 | Trajectories with at least two fixes, earliest first | `ai_filter`, `GROUP BY`, `MIN`, `MAX`, `HAVING`, `ORDER BY`, `LIMIT` |
 | REL-AGENT-7 | Ten trajectories of at least five snapshots with the highest mean fix score | `ai_score`, `GROUP BY`, `AVG`, `HAVING`, `ORDER BY`, `LIMIT` |
 
-### Queries waiting for labels
-
-The `SUPPORT`, `RUNS`, `WRENCH`, and `SALES` queries do not have published
-reference labels yet. `quail_b.queries()` leaves them out, and `quail_b.run`
-does not run them when `queries` is `None`. To run one, give its ID in
-`queries` and pass a label collection that includes its predicates with
-`collection_id` or `root`. Their reference labels will be the answers of
-Qwen3 32B, the same reference model as for the other queries.
-
 ### Agent trace analytics queries
 
 The `SUPPORT` and `RUNS` queries ask what a team that runs an agent wants to
