@@ -182,6 +182,23 @@ PREDICATES = (
         "quailb.wrench.step.exploits_verifier", "wrench",
         "step_exploits_verifier", "filter", prompts.WRENCH_STEP_EXPLOIT,
         "agent_step", "wrench_steps", "text"),
+    PredicateSpec(
+        "quailb.sales.call.competitor_named", "sales", "competitor_named",
+        "filter", prompts.SALES_COMPETITOR, "sales_call", "sales_calls",
+        "transcript"),
+    PredicateSpec(
+        "quailb.sales.call.rep_follows_up", "sales", "rep_follows_up",
+        "join", prompts.SALES_FOLLOW_UP, "earlier_call", "sales_calls",
+        "transcript", "later_call", "sales_calls", "transcript",
+        pair_columns=("id", "prev_call_id")),
+    PredicateSpec(
+        "quailb.sales.call.rep_offers_discount", "sales",
+        "rep_offers_discount", "filter", prompts.SALES_DISCOUNT,
+        "sales_call", "sales_calls", "transcript"),
+    PredicateSpec(
+        "quailb.sales.call.customer_commits", "sales", "customer_commits",
+        "filter", prompts.SALES_COMMITS, "sales_call", "sales_calls",
+        "transcript"),
 )
 
 # Classification predicates. Their labels are not in the published
@@ -271,6 +288,11 @@ CLASSIFY_PREDICATES = (
         "classify", prompts.WRENCH_EXPLOIT_KIND, "agent_run", "wrench_runs",
         "transcript", labels=prompts.WRENCH_EXPLOIT_KIND_LABELS,
         descriptions=prompts.WRENCH_EXPLOIT_KIND_DESCRIPTIONS),
+    PredicateSpec(
+        "quailb.sales.call.customer_concern", "sales", "customer_concern",
+        "classify", prompts.SALES_CONCERN, "sales_call", "sales_calls",
+        "transcript", labels=prompts.SALES_CONCERN_LABELS,
+        descriptions=prompts.SALES_CONCERN_DESCRIPTIONS),
 )
 
 PREDICATE_BY_KEY = {p.key: p for p in PREDICATES + CLASSIFY_PREDICATES}

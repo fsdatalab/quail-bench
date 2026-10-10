@@ -89,6 +89,18 @@ WRENCH_TASKS = 331
 WRENCH_OUTPUT_CHARS = 2_000
 WRENCH_MAX_TOKENS = 24_000
 
+# CRMArena-Pro's sales calls: synthetic calls between sales reps and
+# customers, saved in the CRM databases of its B2B and B2C companies.
+# Every kept call belongs to a deal (an Opportunity record); calls on
+# leads are left out. A scale factor samples deals in each company.
+CRMARENA_COMMIT = "6d84f3d71305af0fd3d5ed3c1936b7887464455a"
+CRMARENA_URL = (
+    "https://raw.githubusercontent.com/SalesforceAIResearch/CRMArena/"
+    "{commit}/local_data/crmarenapro_{domain}_data.db"
+)
+SALES_DOMAINS = ("b2b", "b2c")
+SALES_DEALS = {"b2b": 1_170, "b2c": 2_290}
+
 # Exact source snapshots for the benchmark corpus.  The row selection below
 # is deterministic only when the upstream revisions are fixed as well as the
 # sampling seed.
@@ -109,6 +121,7 @@ SOURCE_REVISIONS = {
         "35455389ab51bf5e2306bfd436ef72d0f98bf882",
     WRENCH_REPO: "6ab64c43a4c6a4d9aa53c2425f37e715257123a3",
     WRENCH_INDEX_REPO: "622449769ec6ddf33f770794489b8cd21712a0ad",
+    "SalesforceAIResearch/CRMArena": CRMARENA_COMMIT,
 }
 
 # Base document counts at sf=1. LePaRD scales sampled citation pairs
@@ -918,6 +931,83 @@ def _wrench_rows(index, tasks, read_steps, tokenizer):
     return runs, steps
 
 
+def _n_sales_deals(domain, sf):
+    total = SALES_DEALS[domain]
+    return min(total, max(8, round(total * sf)))
+
+
+SALES_CALL_SCHEMA = pa.schema([
+    ("id", pa.string()),
+    ("domain", pa.string()),
+    ("deal_id", pa.string()),
+    ("call_index", pa.int32()),
+    ("prev_call_id", pa.string()),
+    ("deal_stage", pa.string()),
+    ("deal_amount", pa.float64()),
+    ("transcript", pa.string()),
+])
+
+_SALES_CALL_SQL = """
+SELECT v.OpportunityId__c, o.StageName, o.Amount, v.CreatedDate, v.Id,
+       v.Body__c
+FROM VoiceCallTranscript__c v JOIN Opportunity o ON o.Id = v.OpportunityId__c
+"""
+
+
+def _sales_source_calls(domain) -> list[tuple]:
+    """Read one company's deal calls from its CRM database."""
+    import sqlite3
+
+    path = _download(CRMARENA_URL.format(commit=CRMARENA_COMMIT,
+                                         domain=domain))
+    connection = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+    try:
+        return connection.execute(_SALES_CALL_SQL).fetchall()
+    finally:
+        connection.close()
+
+
+def _sales_rows(calls_by_domain: dict, sf) -> list[dict]:
+    """Build the sales call rows of the sampled deals.
+
+    Deals come in seeded order within each company, B2B first; a deal's
+    calls come in time order, and each names the deal's previous call.
+
+    Args:
+        calls_by_domain: Per company, (deal id, stage, amount, created
+            time, call id, transcript) tuples.
+        sf: The scale factor.
+
+    Raises:
+        ValueError: A company has other than SALES_DEALS deals.
+    """
+    rows = []
+    for domain in SALES_DOMAINS:
+        deals = {}
+        for deal, stage, amount, created, call, body in calls_by_domain[domain]:
+            deals.setdefault(deal, []).append(
+                (created, call, stage, float(amount), body))
+        if len(deals) != SALES_DEALS[domain]:
+            raise ValueError(f"{domain} has {len(deals)} deals with calls, "
+                             f"expected {SALES_DEALS[domain]}")
+        keys = sorted(deals)
+        order = np.random.default_rng(DATA_SEED).permutation(len(keys))
+        for index in order[:_n_sales_deals(domain, sf)]:
+            deal_id = f"sd{domain}{index:04d}"
+            prev = None
+            for number, (_, _, stage, amount, body) in enumerate(
+                    sorted(deals[keys[index]]), start=1):
+                call_id = f"sc{len(rows):05d}"
+                rows.append({
+                    "id": call_id, "domain": domain, "deal_id": deal_id,
+                    "call_index": number, "prev_call_id": prev,
+                    "deal_stage": stage, "deal_amount": amount,
+                    "transcript": body,
+                })
+                prev = call_id
+    return rows
+
+
 # ------------------------------------------------------- set builders
 
 def _imdb_pool():
@@ -1273,6 +1363,17 @@ def _build_wrench(d, sf, force=False):
                    step_path, compression="zstd", use_dictionary=False)
 
 
+def _build_sales(d, sf, force=False):
+    """Build the CRMArena-Pro sales calls."""
+    path = d / "sales_calls.parquet"
+    if path.exists() and not force:
+        return
+    rows = _sales_rows({domain: _sales_source_calls(domain)
+                        for domain in SALES_DOMAINS}, sf)
+    pq.write_table(pa.Table.from_pylist(rows, schema=SALES_CALL_SCHEMA),
+                   path, compression="zstd", use_dictionary=False)
+
+
 def _fetch_published_corpus(d, sf, root=None) -> bool:
     """Download the labeled corpus for this scale factor into d.
 
@@ -1352,6 +1453,7 @@ def build_sets(data_dir, sf, lf=1, fetch=True):
             _build_support(d, sf)
             _build_issue_runs(d, sf)
             _build_wrench(d, sf)
+            _build_sales(d, sf)
             return d
         rebuilt_sources = (
             "TIGER-Lab/SWE-Next-SFT-Trajectories",
@@ -1359,6 +1461,7 @@ def build_sets(data_dir, sf, lf=1, fetch=True):
             "nebius/SWE-rebench-openhands-trajectories",
             WRENCH_REPO,
             WRENCH_INDEX_REPO,
+            "SalesforceAIResearch/CRMArena",
         )
         base_sources = {
             name: revision for name, revision in SOURCE_REVISIONS.items()
@@ -1383,6 +1486,7 @@ def build_sets(data_dir, sf, lf=1, fetch=True):
             _build_support(d, sf, force=True)
             _build_issue_runs(d, sf, force=True)
             _build_wrench(d, sf, force=True)
+            _build_sales(d, sf, force=True)
             marker.write_text(json.dumps(expected, indent=2, sort_keys=True))
             return d
     if fetch and _fetch_published_corpus(d, sf):
@@ -1390,6 +1494,7 @@ def build_sets(data_dir, sf, lf=1, fetch=True):
         _build_support(d, sf)
         _build_issue_runs(d, sf)
         _build_wrench(d, sf)
+        _build_sales(d, sf)
         marker.write_text(json.dumps(expected, indent=2, sort_keys=True))
         return d
     d.mkdir(parents=True, exist_ok=True)
@@ -1436,6 +1541,7 @@ def build_sets(data_dir, sf, lf=1, fetch=True):
     _build_support(d, sf, force=True)
     _build_issue_runs(d, sf, force=True)
     _build_wrench(d, sf, force=True)
+    _build_sales(d, sf, force=True)
 
     marker.write_text(json.dumps(expected, indent=2, sort_keys=True))
     return d
@@ -1463,6 +1569,7 @@ CORPUS_COLUMNS = {
     "issue_messages": tuple(MESSAGE_SCHEMA.names),
     "wrench_runs": tuple(WRENCH_RUN_SCHEMA.names),
     "wrench_steps": tuple(WRENCH_STEP_SCHEMA.names),
+    "sales_calls": tuple(SALES_CALL_SCHEMA.names),
 }
 
 

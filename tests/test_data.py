@@ -15,6 +15,7 @@ from quail_b.data import (
     ISSUE_RUNS_PER_ISSUE,
     LEPARD_POSITIVE_PAIRS,
     MESSAGE_MAX_CHARS,
+    SALES_DEALS,
     SCENARIOS,
     SETS,
     SUPPORT_TASKS,
@@ -31,9 +32,11 @@ from quail_b.data import (
     _n_agent_documents,
     _n_issue_run_issues,
     _n_lepard_pairs,
+    _n_sales_deals,
     _n_support_tasks,
     _n_wrench_tasks,
     _request,
+    _sales_rows,
     _sample_lepard_pairs,
     _select_agent_snapshots,
     _support_rows,
@@ -341,3 +344,37 @@ def test_wrench_tasks_are_seeded_and_scale():
     assert len(set(_wrench_tasks(index, 50))) == 50
     assert WRENCH_TASKS == 331
     assert _n_wrench_tasks(0.1) == 33 and _n_wrench_tasks(1.0) == 331
+
+
+def test_sales_rows_order_calls_within_deals(monkeypatch):
+    monkeypatch.setattr("quail_b.data.SALES_DEALS", {"b2b": 2, "b2c": 1})
+    calls = {
+        "b2b": [
+            ("o1", "Closed", 900, "2024-03-05T10:00", "v2", "second call"),
+            ("o1", "Closed", 900, "2024-02-19T10:00", "v1", "first call"),
+            ("o2", "Discovery", 50.5, "2023-01-01T09:00", "v3", "only call"),
+        ],
+        "b2c": [("o9", "Quote", 7, "2023-05-05T08:00", "v9", "car call")],
+    }
+
+    rows = _sales_rows(calls, 1.0)
+
+    assert [row["domain"] for row in rows] == ["b2b"] * 3 + ["b2c"]
+    assert [row["id"] for row in rows] == [f"sc{i:05d}" for i in range(4)]
+    o1 = [row for row in rows if row["deal_stage"] == "Closed"]
+    assert [row["transcript"] for row in o1] == ["first call", "second call"]
+    assert [row["call_index"] for row in o1] == [1, 2]
+    assert o1[0]["prev_call_id"] is None
+    assert o1[1]["prev_call_id"] == o1[0]["id"]
+    assert len({row["deal_id"] for row in rows}) == 3
+    assert isinstance(rows[-1]["deal_amount"], float)
+    assert rows[-1]["prev_call_id"] is None
+    with pytest.raises(ValueError, match="b2c has 2 deals"):
+        _sales_rows({**calls, "b2c": calls["b2c"] + [
+            ("o8", "Quote", 1, "2023-06-01T08:00", "v8", "x")]}, 1.0)
+
+
+def test_sales_deals_scale_per_company():
+    assert SALES_DEALS == {"b2b": 1_170, "b2c": 2_290}
+    assert _n_sales_deals("b2b", 0.1) == 117
+    assert _n_sales_deals("b2c", 1.0) == 2_290

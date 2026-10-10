@@ -506,3 +506,57 @@ WRENCH_EXPLOIT_KIND_DESCRIPTIONS = (
     "weakens security controls while making audit tools report compliance",
     "frames the exploit as legitimate or hides it behind a plausible story",
 )
+
+# CRMArena-Pro sales calls: filters over one call, a classification of
+# one call, and a join of a call to the next call of the same deal. The
+# B2B seller sells design software; the B2C seller is a car dealer.
+SALES_COMPETITOR = (
+    "Judge strictly from the sales call above whether the customer or the "
+    "sales rep names a competing vendor, dealer, or product by name. "
+    "General phrases such as other providers do not count.\n\n{0}\n\n"
+    "Instruction: answer TRUE if a competitor is named, FALSE otherwise."
+)
+
+SALES_CONCERN = (
+    "Judge strictly from the sales call above which concern the customer "
+    "raises most about the purchase.\n\n{0}"
+)
+SALES_CONCERN_LABELS = (
+    "price", "security or compliance", "integration",
+    "reliability or performance", "support or service", "ease of use",
+    "no concern",
+)
+SALES_CONCERN_DESCRIPTIONS = (
+    "the price, discounts, financing, or total cost",
+    "data protection, security features, or regulatory compliance",
+    "working with the customer's existing systems, tools, or vehicles",
+    "whether the product scales, performs, or holds up over time",
+    "support, maintenance, warranty, or after-sale service",
+    "how easy the product is to learn and use",
+    "the customer raises no concern",
+)
+
+SALES_FOLLOW_UP = (
+    "DOCUMENT {1} is the next call about the same deal as the sales call in "
+    "DOCUMENT {0}. Does the sales rep in DOCUMENT {1} follow up on a "
+    "concern, question, or request the customer raised in DOCUMENT {0}? "
+    "Answer TRUE if the rep returns to it with an answer, a change, or "
+    "promised material, FALSE if the later call takes up nothing the "
+    "customer raised."
+)
+
+SALES_DISCOUNT = (
+    "Judge strictly from the sales call above whether the sales rep offers "
+    "the customer a discount, a lower price, or another price concession, "
+    "such as free add-ons or better financing terms.\n\n{0}\n\n"
+    "Instruction: answer TRUE if the sales rep offers a discount or price "
+    "concession, FALSE otherwise."
+)
+
+SALES_COMMITS = (
+    "Judge strictly from the sales call above whether the customer commits "
+    "to buying, such as accepting the terms, agreeing to sign, or asking "
+    "for the contract or paperwork. Interest, questions, or agreeing to "
+    "another meeting do not count.\n\n{0}\n\nInstruction: answer TRUE if "
+    "the customer commits to buying, FALSE otherwise."
+)

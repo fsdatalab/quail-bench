@@ -346,6 +346,36 @@
     "labels_pending": true
   },
   {
+    "id": "SALES-1",
+    "description": "filter: calls that name a competitor",
+    "privacy": false,
+    "labels_pending": true
+  },
+  {
+    "id": "SALES-2",
+    "description": "classify each call: the customer's main concern -> calls per concern, most first",
+    "privacy": false,
+    "labels_pending": true
+  },
+  {
+    "id": "SALES-3",
+    "description": "join over pairs: each call x the next call of the same deal, the rep follows up",
+    "privacy": false,
+    "labels_pending": true
+  },
+  {
+    "id": "SALES-4",
+    "description": "2 filters: the rep offers a discount + the customer commits to buying",
+    "privacy": false,
+    "labels_pending": true
+  },
+  {
+    "id": "SALES-5",
+    "description": "column test: deals in negotiation -> score: the customer commits to buying -> the 25 highest scores",
+    "privacy": false,
+    "labels_pending": true
+  },
+  {
     "id": "PRIV-1",
     "description": "2 filters: P_MSG + P_LOC",
     "privacy": true

@@ -45,6 +45,10 @@ from quail_b.prompts import (
     RUNS_DIFFERENT_APPROACH,
     RUNS_REPRODUCED,
     RUNS_TEST_STEP,
+    SALES_COMMITS,
+    SALES_COMPETITOR,
+    SALES_DISCOUNT,
+    SALES_FOLLOW_UP,
     SCENARIO_MATCH,
     SERIOUS_ADVERSE_EVENT,
     SUPPORT,
@@ -800,6 +804,16 @@ def _wrench_steps():
     return Scan("wrench_steps", "s", "text", ("run_id",))
 
 
+def _sales_calls(alias="c", *columns):
+    return Scan("sales_calls", alias, "transcript", columns)
+
+
+def _follow_up_pairs():
+    """Each sales call joined to the next call of the same deal."""
+    return Join(_sales_calls("c1"), _sales_calls("c2", "prev_call_id"),
+                ("c1", "c2"), SALES_FOLLOW_UP, on=(("id", "prev_call_id"),))
+
+
 def _outcome_pairs():
     """Each successful run joined to each failed run of the same issue."""
     return Join(Where(_issue_runs("s"), "resolved", "=", 1),
@@ -1176,6 +1190,34 @@ QUERIES = (
               ("w.model",), (("flagged", "count", None),)),
                (("flagged", True), ("w.model", False))),
           select=("w.model", "flagged"), labels_pending=True),
+
+    # CRMArena-Pro sales calls. Their reference labels are not published
+    # yet.
+    Query("SALES-1", "filter: calls that name a competitor",
+          _filters(_sales_calls(), SALES_COMPETITOR), labels_pending=True),
+    Query("SALES-2", "classify each call: the customer's main concern -> "
+          "calls per concern, most first",
+          Sort(Aggregate(
+              _classify(_sales_calls(), prompts.SALES_CONCERN,
+                        prompts.SALES_CONCERN_LABELS, "concern",
+                        prompts.SALES_CONCERN_DESCRIPTIONS),
+              ("c.concern",), (("n", "count", None),)),
+               (("n", True), ("c.concern", False))),
+          select=("c.concern", "n"), labels_pending=True),
+    Query("SALES-3", "join over pairs: each call x the next call of the same "
+          "deal, the rep follows up",
+          _follow_up_pairs(), labels_pending=True),
+    Query("SALES-4", "2 filters: the rep offers a discount + the customer "
+          "commits to buying",
+          _filters(_sales_calls(), SALES_DISCOUNT, SALES_COMMITS),
+          labels_pending=True),
+    Query("SALES-5", "column test: deals in negotiation -> score: the "
+          "customer commits to buying -> the 25 highest scores",
+          Fetch(Sort(Score(Where(_sales_calls("c", "deal_stage"),
+                                 "deal_stage", "=", "Negotiation"),
+                           SALES_COMMITS, "commit_score"),
+                     (("c.commit_score", True), ("c.id", False))), 25),
+          select=("c", "c.commit_score"), labels_pending=True),
 
     # PrivacyPolicies: only when that corpus is available.
     Query("PRIV-1", "2 filters: P_MSG + P_LOC",

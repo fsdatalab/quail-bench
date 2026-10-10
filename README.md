@@ -202,6 +202,7 @@ lists the queries that use it.
 | tau-bench | SUPPORT-1 to SUPPORT-6 | `support_traces`, `support_messages` | Customer support agent traces |
 | SWE-rebench | RUNS-1 to RUNS-5 | `issue_runs`, `issue_messages` | Repeated coding agent runs of one issue |
 | Terminal Wrench | WRENCH-1 to WRENCH-5 | `wrench_runs`, `wrench_steps` | Reward hacking in terminal agent runs |
+| CRMArena-Pro | SALES-1 to SALES-5 | `sales_calls` | Sales calls about B2B and B2C deals |
 
 Within each dataset, the first queries have a single filter or join. Later
 queries chain filters, filter both join inputs, scan one table under two
@@ -378,6 +379,36 @@ the pairs the join asks; a query with one is scored per operator like any
 join query. A column test over a single relation still makes the query
 relational, scored from its rows.
 
+### Sales call queries
+
+The `SALES` queries ask what a sales team asks of its recorded calls:
+which calls name a competitor, what customers worry about, whether the
+rep follows up on the next call, and which calls end in a commitment.
+The calls come from the CRM databases of
+[CRMArena-Pro](https://github.com/SalesforceAIResearch/CRMArena)
+(CC BY-NC 4.0), Salesforce AI Research's benchmark of CRM work. They are
+synthetic: an LLM wrote them for two fictional companies, a seller of
+electronic design software (B2B) and a car dealer (B2C), each call tied to
+a deal record. Every call on a deal is kept; calls on leads are left out.
+
+`sales_calls` has one row per call: the transcript as stored, with a
+timestamp and the speaker's name on each line. `deal_id` groups a deal's
+calls, `call_index` orders them in time, and `prev_call_id` names the
+deal's previous call. `deal_stage` and `deal_amount` come from the deal
+record and describe the deal now, not when the call took place. Six B2C
+calls belong to deals whose stage reads `Closed Won`; the others read
+Discovery, Qualification, Quote, Negotiation, or Closed. The deal records
+were generated apart from the calls, so a call's content does not always
+match its deal's stage.
+
+| Query | Question | Operators |
+| --- | --- | --- |
+| SALES-1 | Which calls name a competitor? | `ai_filter` over one call |
+| SALES-2 | What is the customer's main concern, and how many calls raise each? | 7 concerns with descriptions, `GROUP BY`, `COUNT`, `ORDER BY` |
+| SALES-3 | On which next call does the rep follow up on what the customer raised? | `ai_join` of each call to the next call of its deal, on `prev_call_id` |
+| SALES-4 | Which calls have the rep offering a discount and the customer committing to buy? | Two `ai_filter`s over one call |
+| SALES-5 | Among calls on deals in negotiation, which 25 most likely end in a commitment? | Column test on `deal_stage`, `ai_score`, `ORDER BY`, `LIMIT` |
+
 ## Scale factors
 
 Scale factors 0.1, 0.5, and 1.0 sample 10%, 50%, and 100% of each dataset's
@@ -402,6 +433,7 @@ same at every scale factor. Use 0.1 while developing an adapter.
 | SWE-rebench | `issue_messages` | about 20,000 | about 100,000 | about 200,000 |
 | Terminal Wrench | `wrench_runs` | 629 | 2,972 | 5,920 |
 | Terminal Wrench | `wrench_steps` | 3,454 | 16,801 | 32,838 |
+| CRMArena-Pro | `sales_calls` | 985 | 5,088 | 10,088 |
 
 ### Reference answers
 

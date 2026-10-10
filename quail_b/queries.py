@@ -193,6 +193,7 @@ QUERY_FAMILY_WORKLOADS = {
     "SUPPORT": "support",
     "RUNS": "runs",
     "WRENCH": "wrench",
+    "SALES": "sales",
 }
 
 
