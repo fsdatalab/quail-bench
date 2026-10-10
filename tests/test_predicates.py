@@ -97,3 +97,14 @@ def test_raw_join_restores_the_published_predicate_hash():
 
     spec = _spec("quailb.imdb.review.discusses_aspect")
     assert predicate_version(spec)[0] == "pv_7fd88f0450b6e15acbae8810ef0405ae"
+
+
+def test_where_conditions_enter_the_payload_only_when_set():
+    runs_join = next(spec for spec in PREDICATES
+                     if spec.key == "quailb.runs.run.different_approach")
+    payload = predicate_payload(runs_join)
+    assert payload["left_where"] == ["resolved", 1]
+    assert payload["right_where"] == ["resolved", 0]
+    unrestricted = replace(runs_join, left_where=None, right_where=None)
+    assert "left_where" not in predicate_payload(unrestricted)
+    assert predicate_version(runs_join) != predicate_version(unrestricted)

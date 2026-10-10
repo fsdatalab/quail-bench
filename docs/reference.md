@@ -206,8 +206,11 @@ labels answer TRUE.
 
 A join predicate can name `pair_columns`. Its labels then cover only the pairs
 whose two columns are equal. These pairs are the ones that the query's equality
-condition keeps. An answer for any other pair has no label, so the answer fails
-scoring.
+condition keeps. The predicate can also name `left_where` and `right_where`, a
+column and a value that each left or right row must equal. E.g., the RUNS-3
+predicate keeps successful runs on the left and failed runs on the right, as
+the query's `WHERE` conditions do. An answer for any other pair has no label,
+so the answer fails scoring.
 
 ### Rows of a relational query
 

@@ -43,6 +43,10 @@ class PredicateSpec:
     # a join labeled only over the pairs whose (left column, right
     # column) values are equal, as the query's equality condition keeps
     pair_columns: tuple[str, str] | None = None
+    # (column, value) that each left or right row of such a join must
+    # equal, as the query's WHERE conditions keep
+    left_where: tuple[str, object] | None = None
+    right_where: tuple[str, object] | None = None
 
 
 PREDICATES = (
@@ -170,7 +174,8 @@ PREDICATES = (
         "join", prompts.RUNS_DIFFERENT_APPROACH,
         "successful_run", "issue_runs", "transcript",
         "failed_run", "issue_runs", "transcript",
-        pair_columns=("instance_id", "instance_id")),
+        pair_columns=("instance_id", "instance_id"),
+        left_where=("resolved", 1), right_where=("resolved", 0)),
     PredicateSpec(
         "quailb.runs.step.runs_tests", "runs", "step_runs_tests", "filter",
         prompts.RUNS_TEST_STEP, "step", "issue_messages", "content"),
@@ -283,7 +288,8 @@ CLASSIFY_PREDICATES = (
         "successful_run", "issue_runs", "transcript",
         labels=prompts.RUNS_SHORTFALL_LABELS,
         descriptions=prompts.RUNS_SHORTFALL_DESCRIPTIONS,
-        pair_columns=("instance_id", "instance_id")),
+        pair_columns=("instance_id", "instance_id"),
+        left_where=("resolved", 0), right_where=("resolved", 1)),
     PredicateSpec(
         "quailb.wrench.run.exploit_kind", "wrench", "exploit_kind",
         "classify", prompts.WRENCH_EXPLOIT_KIND, "agent_run", "wrench_runs",
@@ -378,6 +384,9 @@ def predicate_payload(spec: PredicateSpec) -> dict:
     # published label sets predate this field, so it is left out when unset
     if spec.pair_columns is not None:
         payload["pair_columns"] = list(spec.pair_columns)
+    for side in ("left_where", "right_where"):
+        if getattr(spec, side) is not None:
+            payload[side] = list(getattr(spec, side))
     return payload
 
 
