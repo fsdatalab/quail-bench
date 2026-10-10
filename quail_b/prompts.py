@@ -536,12 +536,13 @@ SALES_CONCERN_DESCRIPTIONS = (
     "the customer raises no concern",
 )
 
-SALES_REPEATED_CONCERN = (
+SALES_CHANGED_OFFER = (
     "DOCUMENT {1} is the next call about the same deal as the sales call in "
-    "DOCUMENT {0}. Does the customer in DOCUMENT {1} raise again a concern "
-    "or objection that the customer already raised in DOCUMENT {0}? Answer "
-    "TRUE if the customer brings up the same concern again, FALSE if the "
-    "customer raises only new concerns or none."
+    "DOCUMENT {0}. Does the sales rep in DOCUMENT {1} quote a price, "
+    "discount, or payment term that differs from what the rep quoted for the "
+    "same offer in DOCUMENT {0}? Answer TRUE if the two calls give different "
+    "numbers for the same offer, FALSE if they give the same numbers or if "
+    "one of the calls quotes none."
 )
 
 SALES_DISCOUNT = (

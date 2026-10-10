@@ -187,8 +187,8 @@ PREDICATES = (
         "filter", prompts.SALES_COMPETITOR, "sales_call", "sales_calls",
         "transcript"),
     PredicateSpec(
-        "quailb.sales.call.customer_repeats_concern", "sales",
-        "customer_repeats_concern", "join", prompts.SALES_REPEATED_CONCERN,
+        "quailb.sales.call.rep_changes_offer", "sales",
+        "rep_changes_offer", "join", prompts.SALES_CHANGED_OFFER,
         "earlier_call", "sales_calls",
         "transcript", "later_call", "sales_calls", "transcript",
         pair_columns=("id", "prev_call_id")),

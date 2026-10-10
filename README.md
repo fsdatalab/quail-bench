@@ -415,7 +415,7 @@ content can therefore disagree with its deal's stage.
 | --- | --- | --- |
 | SALES-1 | Which calls name a competitor? | `ai_filter` over one call |
 | SALES-2 | What is the customer's main concern, and how many calls raise each? | 7 concerns with descriptions, `GROUP BY`, `COUNT`, `ORDER BY` |
-| SALES-3 | In which pairs of consecutive calls does the customer raise an earlier concern again? | `ai_join` of each call to the next call of its deal, on `prev_call_id` |
+| SALES-3 | In which pairs of consecutive calls does the rep quote a different price or discount? | `ai_join` of each call to the next call of its deal, on `prev_call_id` |
 | SALES-4 | Which calls have the rep offering a discount and the customer committing to buy? | Two `ai_filter`s over one call |
 | SALES-5 | Among calls on deals in negotiation, which 25 most likely end in a commitment? | Column test on `deal_stage`, `ai_score`, `ORDER BY`, `LIMIT` |
 

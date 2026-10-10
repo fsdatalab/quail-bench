@@ -48,7 +48,7 @@ from quail_b.prompts import (
     SALES_COMMITS,
     SALES_COMPETITOR,
     SALES_DISCOUNT,
-    SALES_REPEATED_CONCERN,
+    SALES_CHANGED_OFFER,
     SCENARIO_MATCH,
     SERIOUS_ADVERSE_EVENT,
     SUPPORT,
@@ -811,7 +811,7 @@ def _sales_calls(alias="c", *columns):
 def _next_call_pairs():
     """Each sales call joined to the next call of the same deal."""
     return Join(_sales_calls("c1"), _sales_calls("c2", "prev_call_id"),
-                ("c1", "c2"), SALES_REPEATED_CONCERN,
+                ("c1", "c2"), SALES_CHANGED_OFFER,
                 on=(("id", "prev_call_id"),))
 
 
@@ -1206,7 +1206,7 @@ QUERIES = (
                (("n", True), ("c.concern", False))),
           select=("c.concern", "n"), labels_pending=True),
     Query("SALES-3", "join over pairs: each call x the next call of the same "
-          "deal, the customer raises an earlier concern again",
+          "deal, the rep quotes a different price or discount",
           _next_call_pairs(), labels_pending=True),
     Query("SALES-4", "2 filters: the rep offers a discount + the customer "
           "commits to buying",
