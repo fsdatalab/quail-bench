@@ -199,6 +199,10 @@ lists the queries that use it.
 | LePaRD | LEP-1 to LEP-6 | `citation_contexts`, `citation_passages` | Legal citations |
 | SWE-Next | AGENT-1 to AGENT-5 | `agent_traces` | Software agent trajectories |
 | SWE-Next | REL-AGENT-1 to REL-AGENT-7 | `agent_traces` | Relational operators over the trajectories |
+| tau-bench | SUPPORT-1 to SUPPORT-6 | `support_traces`, `support_messages` | Customer support agent traces |
+| SWE-rebench | RUNS-1 to RUNS-5 | `issue_runs`, `issue_messages` | Repeated coding agent runs of one issue |
+| Terminal Wrench | WRENCH-1 to WRENCH-5 | `wrench_runs`, `wrench_steps` | Reward hacking in terminal agent runs |
+| CRMArena-Pro | SALES-1 to SALES-5 | `sales_calls` | Sales calls about B2B and B2C deals |
 
 Within each dataset, the first queries have a single filter or join. Later
 queries chain filters, filter both join inputs, scan one table under two
@@ -248,7 +252,7 @@ then run it on all 50.
 | FEV-11 | Classification returned and filtered | A label column, and an IN-list filter on it |
 | AGENT-4 | Two classifications in a chain | Label descriptions, and a label filter feeding a classification |
 | IMDB-15 | Classification of joined rows | A label of two documents, returned per pair |
-| REL-AGENT-1 | Two column tests, then a filter | Column tests before the model |
+| REL-AGENT-1 | Two `WHERE` conditions, then a filter | Conditions on stored columns before the model |
 | REL-AGENT-2 | Filter, sort, offset, limit | Ordered and paged rows |
 | REL-AGENT-4 | Score, sort, limit | `ai_score` and top-k |
 | REL-AGENT-5 | Classify, group by a label, having | `COUNT`, `COUNT(DISTINCT)`, `HAVING`, label keys |
@@ -291,8 +295,8 @@ prompt, the answer tables, and label accuracy.
 ### Relational queries
 
 The seven `REL-AGENT` queries add relational operators over the agent traces:
-a column test (a `WHERE` condition on a stored column, such as
-`turn_index >= 10`, applied before any model call), `ORDER BY` with `OFFSET`
+a `WHERE` condition on a stored column (such as `turn_index >= 10`,
+applied before any model call), `ORDER BY` with `OFFSET`
 and `LIMIT`, `DISTINCT`, `GROUP BY` with `COUNT`, `COUNT(DISTINCT)`, `SUM`,
 `AVG`, `MIN`, `MAX`, and `HAVING`. Two of them use a fourth AI function,
 `ai_score(prompt, document) -> fp64`. It returns the model's belief, from 0
@@ -300,13 +304,111 @@ to 1, that the document answers a filter prompt TRUE.
 
 | Query | Question | Operators |
 | --- | --- | --- |
-| REL-AGENT-1 | Recovered snapshots at turn 10 or later, of at most 6,000 tokens | Two column tests, `ai_filter` |
+| REL-AGENT-1 | Recovered snapshots at turn 10 or later, of at most 6,000 tokens | `WHERE turn_index >= 10 AND token_count <= 6000`, `ai_filter` |
 | REL-AGENT-2 | Second page of ten recovered snapshots, shortest first | `ai_filter`, `ORDER BY`, `OFFSET`, `LIMIT` |
 | REL-AGENT-3 | Trajectories with a plausible fix | `ai_filter`, `DISTINCT` |
 | REL-AGENT-4 | The 20 snapshots with the highest recovery score | `ai_score`, `ORDER BY`, `LIMIT` |
 | REL-AGENT-5 | Snapshots and trajectories per test outcome, at least 50 snapshots | Two `ai_classify`, `GROUP BY`, `COUNT`, `COUNT(DISTINCT)`, `HAVING`, `ORDER BY` |
 | REL-AGENT-6 | Trajectories with at least two fixes, earliest first | `ai_filter`, `GROUP BY`, `MIN`, `MAX`, `HAVING`, `ORDER BY`, `LIMIT` |
 | REL-AGENT-7 | Ten trajectories of at least five snapshots with the highest mean fix score | `ai_score`, `GROUP BY`, `AVG`, `HAVING`, `ORDER BY`, `LIMIT` |
+
+### Agent trace analytics queries
+
+The `SUPPORT` and `RUNS` queries ask what a team that runs an agent wants to
+know from the agent's traces. The `SUPPORT` queries read customer service
+conversations from [tau-bench](https://github.com/sierra-research/tau-bench).
+The `RUNS` queries read coding agent runs from
+[SWE-rebench](https://huggingface.co/datasets/nebius/SWE-rebench-openhands-trajectories),
+with eight runs of each GitHub issue.
+
+Each corpus has a trace table and a message table. The trace table has one row
+per trace, with the whole transcript. The message table has one row per
+message. In each message row, `prev_id`, `prev_user_id`, and
+`prev_assistant_id` store the IDs of earlier messages in the same trace.
+
+A join can use these columns in an equality condition. E.g., SUPPORT-2 joins
+each customer reply to the agent message before it on `prev_assistant_id`.
+The model then reads one pair for each reply, not every pair of messages.
+
+The trace tables also keep columns from their sources. `support_traces` stores
+the task and the reward of each run, so SUPPORT-5 can join runs of the same
+task. `issue_runs` stores whether each run resolved its issue, so RUNS-3 can
+join a successful run to a failed run of the same issue.
+
+| Query | Question | Operators |
+| --- | --- | --- |
+| SUPPORT-1 | Which customer messages express frustration with the agent? | `WHERE role = 'user'`, `ai_filter` |
+| SUPPORT-2 | Which customer replies push back on the agent message before them? | `WHERE u.role = 'user'`, `ai_join` over pairs joined on `prev_assistant_id` |
+| SUPPORT-3 | What is each pushback about? | SUPPORT-2, then 6 kinds of disagreement per pair |
+| SUPPORT-4 | What do customers ask the agent to do, as conversations per intent? | 6 intents of the opening message, `GROUP BY`, `COUNT`, `ORDER BY` |
+| SUPPORT-5 | Which runs of the same task handle the request differently? | `ai_join` over pairs joined on `task_id` |
+| SUPPORT-6 | How does each way of handling a request score, as mean reward per outcome? | 5 outcomes, `GROUP BY`, `COUNT`, `AVG`, `HAVING`, `ORDER BY` |
+| RUNS-1 | Which runs reproduced the issue before changing code? | `ai_filter` |
+| RUNS-2 | Which kinds of change resolve the issue most often? | 6 kinds of change, `GROUP BY`, `COUNT`, `AVG`, `ORDER BY` |
+| RUNS-3 | Which successful and failed runs of one issue take different approaches? | `WHERE s.resolved = 1 AND f.resolved = 0`, `ai_join` over pairs joined on `instance_id` |
+| RUNS-4 | What did each failed run lack, compared with a successful run? | RUNS-3, then 5 shortfalls per pair |
+| RUNS-5 | Which runs ran tests most often? | `WHERE role = 'assistant'`, `ai_filter` over steps, `GROUP BY`, `COUNT`, `HAVING`, `ORDER BY`, `LIMIT` |
+
+### Reward hacking queries
+
+The `WRENCH` queries ask which agent runs passed a task's verifier by
+exploiting it instead of solving the task. A verifier is the script that
+checks whether a run solved its task. The runs come from
+[Terminal Wrench](https://huggingface.co/datasets/few-sh/terminal-wrench)
+(Apache-2.0), where Claude Opus 4.6, Gemini 3.1 Pro, and GPT-5.4 do terminal
+tasks. The dataset has two kinds of runs:
+
+- In a hack run, the agent was told to pass the verifier by any means. The
+  dataset then removed that instruction and rewrote the agent's messages to
+  remove mentions of hacking.
+- In a baseline run, the agent solved the task without an instruction to
+  hack.
+
+`wrench_runs` has one row per run. The transcript contains the task and every
+agent step, with long command output cut to 2,000 characters. `wrench_steps`
+has one row per agent step, with the task and that step only. The tables leave
+out runs longer than 24,000 Qwen3 tokens.
+
+The `mode` column stores the dataset's label, `hack` or `baseline`. Only
+WRENCH-5 reads `mode`, to select the baseline runs. You can also use `mode` to
+compare a filter's answers with the dataset's labels.
+
+| Query | Question | Operators |
+| --- | --- | --- |
+| WRENCH-1 | Which runs exploited the verifier? | `ai_filter` over the whole run |
+| WRENCH-2 | Which 100 runs most likely exploited the verifier? | `ai_score`, `ORDER BY`, `LIMIT` |
+| WRENCH-3 | What kind of exploit did each exploiting run use? | WRENCH-1, then 11 exploit kinds with descriptions, from the dataset's categories |
+| WRENCH-4 | Which runs have the most steps that are part of an exploit? | `ai_filter` over steps, `GROUP BY`, `COUNT`, `HAVING`, `ORDER BY`, `LIMIT` |
+| WRENCH-5 | Among runs not asked to hack, how many exploited the verifier, per agent model? | `WHERE mode = 'baseline'`, `ai_filter`, `GROUP BY`, `COUNT`, `ORDER BY` |
+
+### Sales call queries
+
+The `SALES` queries ask what a sales team wants to know from its recorded
+calls. The calls come from
+[CRMArena-Pro](https://github.com/SalesforceAIResearch/CRMArena)
+(CC BY-NC 4.0), a Salesforce AI Research benchmark of CRM tasks. The calls are
+synthetic. An LLM wrote them for two fictional companies: a seller of
+electronic design software (B2B) and a car dealer (B2C).
+
+`sales_calls` has one row per call. Each line of a transcript starts with a
+timestamp and the speaker's name. Each call belongs to a deal, and three
+columns describe the call's deal:
+
+- `deal_id` identifies the deal.
+- `prev_call_id` stores the ID of the deal's previous call. E.g., SALES-3
+  joins each call to the next call of the same deal on `prev_call_id`.
+- `deal_stage` stores the deal's current stage, such as `Negotiation`.
+
+CRMArena-Pro generated the deal records separately from the calls. A call's
+content can therefore disagree with its deal's stage.
+
+| Query | Question | Operators |
+| --- | --- | --- |
+| SALES-1 | Which calls name a competitor? | `ai_filter` over one call |
+| SALES-2 | What is the customer's main concern, and how many calls raise each? | 7 concerns with descriptions, `GROUP BY`, `COUNT`, `ORDER BY` |
+| SALES-3 | In which pairs of consecutive calls does the rep quote a different price or discount? | `ai_join` of each call to the next call of its deal, on `prev_call_id` |
+| SALES-4 | Which calls have the rep offering a discount and the customer committing to buy? | Two `ai_filter`s over one call |
+| SALES-5 | Among calls on deals in negotiation, which 25 most likely end in a commitment? | `WHERE deal_stage = 'Negotiation'`, `ai_score`, `ORDER BY`, `LIMIT` |
 
 ## Scale factors
 
@@ -326,6 +428,13 @@ same at every scale factor. Use 0.1 while developing an adapter.
 | LePaRD | `citation_contexts` | 500 | 2,496 | 4,972 |
 | LePaRD | `citation_passages` | 433 | 1,756 | 2,991 |
 | SWE-Next | `agent_traces` | 1,772 | 8,859 | 17,711 |
+| tau-bench | `support_traces` | 128 | 656 | 1,320 |
+| tau-bench | `support_messages` | 3,442 | 18,310 | 37,906 |
+| SWE-rebench | `issue_runs` | 320 | 1,600 | 3,200 |
+| SWE-rebench | `issue_messages` | about 36,000 | about 177,000 | 351,011 |
+| Terminal Wrench | `wrench_runs` | 629 | 2,972 | 5,920 |
+| Terminal Wrench | `wrench_steps` | 3,454 | 16,801 | 32,838 |
+| CRMArena-Pro | `sales_calls` | 985 | 5,088 | 10,088 |
 
 ### Reference answers
 

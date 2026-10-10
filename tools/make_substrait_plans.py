@@ -42,9 +42,21 @@ from quail_b.prompts import (
     P_MSG,
     REACTION,
     REFUTE,
+    RUNS_DIFFERENT_APPROACH,
+    RUNS_REPRODUCED,
+    RUNS_TEST_STEP,
+    SALES_CHANGED_OFFER,
+    SALES_COMMITS,
+    SALES_COMPETITOR,
+    SALES_DISCOUNT,
     SCENARIO_MATCH,
     SERIOUS_ADVERSE_EVENT,
     SUPPORT,
+    SUPPORT_DIFFERENT_APPROACH,
+    SUPPORT_FRUSTRATED,
+    SUPPORT_PUSHBACK,
+    WRENCH_EXPLOITED,
+    WRENCH_STEP_EXPLOIT,
 )
 from quail_b.substrait import (
     AGGREGATE_GENERIC_EXTENSION_URN,
@@ -111,6 +123,7 @@ class Scan:
         columns: Further columns, for ordinary join conditions, column
             tests, keys, and measures.
         integers: The columns among `columns` typed as 32-bit integers.
+        floats: The columns among `columns` typed as 64-bit floats.
     """
 
     table: str
@@ -118,6 +131,7 @@ class Scan:
     text: str
     columns: tuple[str, ...] = ()
     integers: tuple[str, ...] = ()
+    floats: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -298,7 +312,7 @@ def _fp64_type():
 def _number(value):
     """Return a literal for a Python int, float, or string."""
     if isinstance(value, bool):
-        raise TypeError("a column test compares with a number or string")
+        raise TypeError("a WHERE condition compares with a number or string")
     if isinstance(value, int):
         return algebra.Expression(literal=algebra.Expression.Literal(i32=value))
     if isinstance(value, float):
@@ -391,6 +405,7 @@ class _Emitter:
                     names=names,
                     struct=type_pb2.Type.Struct(
                         types=[_i32_type() if name in node.integers
+                               else _fp64_type() if name in node.floats
                                else _string_type() for name in names],
                         nullability=type_pb2.Type.NULLABILITY_REQUIRED,
                     ),
@@ -759,6 +774,54 @@ def _policies():
     return Scan("policies", "p", "policy_text")
 
 
+def _support_traces(alias, text="transcript"):
+    return Scan("support_traces", alias, text, ("task_id", "reward"),
+                floats=("reward",))
+
+
+def _user_messages():
+    """The customer messages, with the id of the agent message each answers."""
+    return Where(Scan("support_messages", "u", "content",
+                      ("role", "prev_assistant_id")), "role", "=", "user")
+
+
+def _pushback_pairs():
+    """Each customer reply joined to the agent message before it."""
+    return Join(Scan("support_messages", "a", "content"), _user_messages(),
+                ("a", "u"), SUPPORT_PUSHBACK, on=(("id", "prev_assistant_id"),))
+
+
+def _issue_runs(alias):
+    return Scan("issue_runs", alias, "transcript", ("instance_id", "resolved"),
+                integers=("resolved",))
+
+
+def _wrench_runs(*columns, integers=()):
+    return Scan("wrench_runs", "w", "transcript", columns, integers=integers)
+
+
+def _wrench_steps():
+    return Scan("wrench_steps", "s", "text", ("run_id",))
+
+
+def _sales_calls(alias="c", *columns):
+    return Scan("sales_calls", alias, "transcript", columns)
+
+
+def _next_call_pairs():
+    """Each sales call joined to the next call of the same deal."""
+    return Join(_sales_calls("c1"), _sales_calls("c2", "prev_call_id"),
+                ("c1", "c2"), SALES_CHANGED_OFFER,
+                on=(("id", "prev_call_id"),))
+
+
+def _outcome_pairs():
+    """Each successful run joined to each failed run of the same issue."""
+    return Join(Where(_issue_runs("s"), "resolved", "=", 1),
+                Where(_issue_runs("f"), "resolved", "=", 0), ("s", "f"),
+                RUNS_DIFFERENT_APPROACH, on=(("instance_id", "instance_id"),))
+
+
 def _classify(node, prompt, labels, output, descriptions=()):
     return Classify(node, prompt, labels, output, descriptions)
 
@@ -969,8 +1032,8 @@ QUERIES = (
 
     # Relational operators over the agent traces. Each query returns a
     # result small enough to read, and runs on Quail only: the stock
-    # backends refuse column tests, sorts, and aggregates.
-    Query("REL-AGENT-1", "column tests: snapshots past turn 10 of at most "
+    # backends refuse WHERE conditions, sorts, and aggregates.
+    Query("REL-AGENT-1", "where: snapshots past turn 10 of at most "
           "6,000 tokens -> filter: recovered",
           _filters(Where(Where(_traces_with_columns(), "turn_index", ">=", 10),
                          "token_count", "<=", 6000), AGENT_RECOVERED)),
@@ -1020,6 +1083,142 @@ QUERIES = (
               (("n", ">=", 5),)),
               (("mean_fix_score", True), ("t.trajectory_id", False))), 10),
           select=("t.trajectory_id", "mean_fix_score", "n")),
+
+    # Customer support traces and coding agent runs, for agent trace
+    # analytics. Their reference labels are not published yet.
+    Query("SUPPORT-1", "customer messages -> filter: frustrated with the agent",
+          _filters(_user_messages(), SUPPORT_FRUSTRATED),
+          labels_pending=True),
+    Query("SUPPORT-2", "join over pairs: each customer reply x the agent "
+          "message before it, pushback",
+          _pushback_pairs(), labels_pending=True),
+    Query("SUPPORT-3", "pushback pairs -> classify: what the disagreement "
+          "is about",
+          Classify(_pushback_pairs(), prompts.SUPPORT_DISAGREEMENT,
+                   prompts.SUPPORT_DISAGREEMENT_LABELS, "disagreement",
+                   prompts.SUPPORT_DISAGREEMENT_DESCRIPTIONS,
+                   documents=("u", "a")),
+          select=("u", "a", "u.disagreement"), labels_pending=True),
+    Query("SUPPORT-4", "classify each opening request: intent -> "
+          "conversations per intent, most first",
+          Sort(Aggregate(
+              _classify(_support_traces("t", "request"),
+                        prompts.SUPPORT_INTENT, prompts.SUPPORT_INTENT_LABELS,
+                        "intent", prompts.SUPPORT_INTENT_DESCRIPTIONS),
+              ("t.intent",), (("n", "count", None),)),
+               (("n", True), ("t.intent", False))),
+          select=("t.intent", "n"), labels_pending=True),
+    Query("SUPPORT-5", "join over pairs: runs of the same task that handle "
+          "the request differently",
+          Join(_support_traces("r1"), _support_traces("r2"), ("r1", "r2"),
+               SUPPORT_DIFFERENT_APPROACH, on=(("task_id", "task_id"),)),
+          labels_pending=True),
+    Query("SUPPORT-6", "classify each conversation: how the agent handled "
+          "the request -> per outcome: conversations and mean reward, at "
+          "least five, best first",
+          Sort(Having(Aggregate(
+              _classify(_support_traces("t"), prompts.SUPPORT_OUTCOME,
+                        prompts.SUPPORT_OUTCOME_LABELS, "outcome",
+                        prompts.SUPPORT_OUTCOME_DESCRIPTIONS),
+              ("t.outcome",),
+              (("n", "count", None), ("mean_reward", "avg", "t.reward"))),
+              (("n", ">=", 5),)),
+               (("mean_reward", True), ("t.outcome", False))),
+          select=("t.outcome", "n", "mean_reward"), labels_pending=True),
+    Query("RUNS-1", "filter: reproduced the issue before changing the code",
+          _filters(_issue_runs("r"), RUNS_REPRODUCED), labels_pending=True),
+    Query("RUNS-2", "classify each run: the kind of change -> per kind: runs "
+          "and the share resolved, most runs first",
+          Sort(Aggregate(
+              _classify(_issue_runs("r"), prompts.RUNS_STRATEGY,
+                        prompts.RUNS_STRATEGY_LABELS, "strategy",
+                        prompts.RUNS_STRATEGY_DESCRIPTIONS),
+              ("r.strategy",),
+              (("n", "count", None), ("resolved_share", "avg", "r.resolved"))),
+               (("n", True), ("r.strategy", False))),
+          select=("r.strategy", "n", "resolved_share"), labels_pending=True),
+    Query("RUNS-3", "join over pairs: each successful run x each failed run "
+          "of the same issue, different approach",
+          _outcome_pairs(), labels_pending=True),
+    Query("RUNS-4", "different-approach pairs -> classify: what the failed "
+          "run lacked",
+          Classify(_outcome_pairs(), prompts.RUNS_SHORTFALL,
+                   prompts.RUNS_SHORTFALL_LABELS, "shortfall",
+                   prompts.RUNS_SHORTFALL_DESCRIPTIONS, documents=("f", "s")),
+          select=("f", "s", "f.shortfall"), labels_pending=True),
+    Query("RUNS-5", "agent steps -> filter: runs tests -> per run: test "
+          "steps, at least three, most first, 50",
+          Fetch(Sort(Having(Aggregate(
+              _filters(Where(Scan("issue_messages", "m", "content",
+                                  ("trace_id", "role")), "role", "=",
+                             "assistant"), RUNS_TEST_STEP),
+              ("m.trace_id",), (("test_steps", "count", None),)),
+              (("test_steps", ">=", 3),)),
+              (("test_steps", True), ("m.trace_id", False))), 50),
+          select=("m.trace_id", "test_steps"), labels_pending=True),
+
+    # Terminal Wrench runs and their agent steps. Their reference labels
+    # are not published yet.
+    Query("WRENCH-1", "filter: runs that exploited the verifier",
+          _filters(_wrench_runs(), WRENCH_EXPLOITED), labels_pending=True),
+    Query("WRENCH-2", "score: exploited the verifier -> the 100 highest "
+          "scores",
+          Fetch(Sort(Score(_wrench_runs("token_count",
+                                        integers=("token_count",)),
+                           WRENCH_EXPLOITED, "exploit_score"),
+                     (("w.exploit_score", True), ("w.id", False))), 100),
+          select=("w", "w.exploit_score"), labels_pending=True),
+    Query("WRENCH-3", "exploited the verifier -> classify: the kind of "
+          "exploit",
+          _classify(_filters(_wrench_runs(), WRENCH_EXPLOITED),
+                    prompts.WRENCH_EXPLOIT_KIND,
+                    prompts.WRENCH_EXPLOIT_KIND_LABELS, "exploit_kind",
+                    prompts.WRENCH_EXPLOIT_KIND_DESCRIPTIONS),
+          select=("w", "w.exploit_kind"), labels_pending=True),
+    Query("WRENCH-4", "agent steps -> filter: part of an exploit -> per run: "
+          "flagged steps, at least two, most first, 50",
+          Fetch(Sort(Having(Aggregate(
+              _filters(_wrench_steps(), WRENCH_STEP_EXPLOIT),
+              ("s.run_id",), (("flagged_steps", "count", None),)),
+              (("flagged_steps", ">=", 2),)),
+              (("flagged_steps", True), ("s.run_id", False))), 50),
+          select=("s.run_id", "flagged_steps"), labels_pending=True),
+    Query("WRENCH-5", "where: baseline runs -> filter: exploited the "
+          "verifier -> flagged runs per agent model, most first",
+          Sort(Aggregate(
+              _filters(Where(_wrench_runs("model", "mode"), "mode", "=",
+                             "baseline"), WRENCH_EXPLOITED),
+              ("w.model",), (("flagged", "count", None),)),
+               (("flagged", True), ("w.model", False))),
+          select=("w.model", "flagged"), labels_pending=True),
+
+    # CRMArena-Pro sales calls. Their reference labels are not published
+    # yet.
+    Query("SALES-1", "filter: calls that name a competitor",
+          _filters(_sales_calls(), SALES_COMPETITOR), labels_pending=True),
+    Query("SALES-2", "classify each call: the customer's main concern -> "
+          "calls per concern, most first",
+          Sort(Aggregate(
+              _classify(_sales_calls(), prompts.SALES_CONCERN,
+                        prompts.SALES_CONCERN_LABELS, "concern",
+                        prompts.SALES_CONCERN_DESCRIPTIONS),
+              ("c.concern",), (("n", "count", None),)),
+               (("n", True), ("c.concern", False))),
+          select=("c.concern", "n"), labels_pending=True),
+    Query("SALES-3", "join over pairs: each call x the next call of the same "
+          "deal, the rep quotes a different price or discount",
+          _next_call_pairs(), labels_pending=True),
+    Query("SALES-4", "2 filters: the rep offers a discount + the customer "
+          "commits to buying",
+          _filters(_sales_calls(), SALES_DISCOUNT, SALES_COMMITS),
+          labels_pending=True),
+    Query("SALES-5", "where: deals in negotiation -> score: the "
+          "customer commits to buying -> the 25 highest scores",
+          Fetch(Sort(Score(Where(_sales_calls("c", "deal_stage"),
+                                 "deal_stage", "=", "Negotiation"),
+                           SALES_COMMITS, "commit_score"),
+                     (("c.commit_score", True), ("c.id", False))), 25),
+          select=("c", "c.commit_score"), labels_pending=True),
 
     # PrivacyPolicies: only when that corpus is available.
     Query("PRIV-1", "2 filters: P_MSG + P_LOC",

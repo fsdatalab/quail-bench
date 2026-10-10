@@ -32,7 +32,12 @@ CLASSIFY_QUERIES = ("IMDB-11", "IMDB-12", "IMDB-13", "IMDB-14", "IMDB-15",
 
 
 def test_classification_queries_are_published():
-    assert pending_query_ids() == ()
+    assert pending_query_ids() == (
+        *(f"SUPPORT-{i}" for i in range(1, 7)),
+        *(f"RUNS-{i}" for i in range(1, 6)),
+        *(f"WRENCH-{i}" for i in range(1, 6)),
+        *(f"SALES-{i}" for i in range(1, 6)),
+    )
     assert tuple(query_id for query_id, spec in queries().items()
                  if spec.info.classifies) == CLASSIFY_QUERIES
 

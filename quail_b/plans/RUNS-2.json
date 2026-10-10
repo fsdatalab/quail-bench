@@ -1,0 +1,361 @@
+{
+  "extension_urns": [
+    {
+      "extension_urn_anchor": 1,
+      "urn": "extension:org.fsdatalab.quail_b:functions_ai"
+    },
+    {
+      "extension_urn_anchor": 4,
+      "urn": "extension:io.substrait:functions_aggregate_generic"
+    },
+    {
+      "extension_urn_anchor": 5,
+      "urn": "extension:io.substrait:functions_arithmetic"
+    }
+  ],
+  "extensions": [
+    {
+      "extension_function": {
+        "extension_urn_reference": 1,
+        "function_anchor": 5,
+        "name": "ai_classify:str_str_list_list"
+      }
+    },
+    {
+      "extension_function": {
+        "extension_urn_reference": 4,
+        "function_anchor": 13,
+        "name": "count:any"
+      }
+    },
+    {
+      "extension_function": {
+        "extension_urn_reference": 5,
+        "function_anchor": 15,
+        "name": "avg:i32"
+      }
+    }
+  ],
+  "relations": [
+    {
+      "root": {
+        "input": {
+          "project": {
+            "common": {
+              "emit": {
+                "output_mapping": [
+                  3,
+                  4,
+                  5
+                ]
+              }
+            },
+            "expressions": [
+              {
+                "selection": {
+                  "direct_reference": {
+                    "struct_field": {}
+                  },
+                  "root_reference": {}
+                }
+              },
+              {
+                "selection": {
+                  "direct_reference": {
+                    "struct_field": {
+                      "field": 1
+                    }
+                  },
+                  "root_reference": {}
+                }
+              },
+              {
+                "selection": {
+                  "direct_reference": {
+                    "struct_field": {
+                      "field": 2
+                    }
+                  },
+                  "root_reference": {}
+                }
+              }
+            ],
+            "input": {
+              "sort": {
+                "common": {
+                  "direct": {},
+                  "hint": {
+                    "alias": "sort-1"
+                  }
+                },
+                "input": {
+                  "aggregate": {
+                    "common": {
+                      "direct": {},
+                      "hint": {
+                        "alias": "aggregate-1",
+                        "output_names": [
+                          "r.strategy",
+                          "n",
+                          "resolved_share"
+                        ]
+                      }
+                    },
+                    "grouping_expressions": [
+                      {
+                        "selection": {
+                          "direct_reference": {
+                            "struct_field": {
+                              "field": 4
+                            }
+                          },
+                          "root_reference": {}
+                        }
+                      }
+                    ],
+                    "groupings": [
+                      {
+                        "expression_references": [
+                          0
+                        ]
+                      }
+                    ],
+                    "input": {
+                      "project": {
+                        "common": {
+                          "direct": {},
+                          "hint": {
+                            "alias": "classify-1",
+                            "output_names": [
+                              "r.id",
+                              "r.transcript",
+                              "r.instance_id",
+                              "r.resolved",
+                              "r.strategy"
+                            ]
+                          }
+                        },
+                        "expressions": [
+                          {
+                            "scalar_function": {
+                              "arguments": [
+                                {
+                                  "value": {
+                                    "literal": {
+                                      "string": "Judge strictly from the agent run above what kind of change the agent made to fix the issue.\n\n{0}"
+                                    }
+                                  }
+                                },
+                                {
+                                  "value": {
+                                    "selection": {
+                                      "direct_reference": {
+                                        "struct_field": {
+                                          "field": 1
+                                        }
+                                      },
+                                      "root_reference": {}
+                                    }
+                                  }
+                                },
+                                {
+                                  "value": {
+                                    "literal": {
+                                      "list": {
+                                        "values": [
+                                          {
+                                            "string": "targeted fix"
+                                          },
+                                          {
+                                            "string": "broad rewrite"
+                                          },
+                                          {
+                                            "string": "special case"
+                                          },
+                                          {
+                                            "string": "new feature"
+                                          },
+                                          {
+                                            "string": "tests or config only"
+                                          },
+                                          {
+                                            "string": "no change"
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  }
+                                },
+                                {
+                                  "value": {
+                                    "literal": {
+                                      "list": {
+                                        "values": [
+                                          {
+                                            "string": "changed the lines that cause the issue and little else"
+                                          },
+                                          {
+                                            "string": "restructured or rewrote a function, class, or module"
+                                          },
+                                          {
+                                            "string": "added a check or branch for the reported input only"
+                                          },
+                                          {
+                                            "string": "added a function, option, or class the issue asked for"
+                                          },
+                                          {
+                                            "string": "changed tests, documentation, or configuration, not the code"
+                                          },
+                                          {
+                                            "string": "made no change to the project's code"
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  }
+                                }
+                              ],
+                              "function_reference": 5,
+                              "output_type": {
+                                "string": {
+                                  "nullability": "NULLABILITY_REQUIRED"
+                                }
+                              }
+                            }
+                          }
+                        ],
+                        "input": {
+                          "read": {
+                            "base_schema": {
+                              "names": [
+                                "id",
+                                "transcript",
+                                "instance_id",
+                                "resolved"
+                              ],
+                              "struct": {
+                                "nullability": "NULLABILITY_REQUIRED",
+                                "types": [
+                                  {
+                                    "string": {
+                                      "nullability": "NULLABILITY_REQUIRED"
+                                    }
+                                  },
+                                  {
+                                    "string": {
+                                      "nullability": "NULLABILITY_REQUIRED"
+                                    }
+                                  },
+                                  {
+                                    "string": {
+                                      "nullability": "NULLABILITY_REQUIRED"
+                                    }
+                                  },
+                                  {
+                                    "i32": {
+                                      "nullability": "NULLABILITY_REQUIRED"
+                                    }
+                                  }
+                                ]
+                              }
+                            },
+                            "common": {
+                              "direct": {},
+                              "hint": {
+                                "alias": "r"
+                              }
+                            },
+                            "named_table": {
+                              "names": [
+                                "issue_runs"
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "measures": [
+                      {
+                        "measure": {
+                          "function_reference": 13,
+                          "invocation": "AGGREGATION_INVOCATION_ALL",
+                          "output_type": {
+                            "i64": {
+                              "nullability": "NULLABILITY_REQUIRED"
+                            }
+                          },
+                          "phase": "AGGREGATION_PHASE_INITIAL_TO_RESULT"
+                        }
+                      },
+                      {
+                        "measure": {
+                          "arguments": [
+                            {
+                              "value": {
+                                "selection": {
+                                  "direct_reference": {
+                                    "struct_field": {
+                                      "field": 3
+                                    }
+                                  },
+                                  "root_reference": {}
+                                }
+                              }
+                            }
+                          ],
+                          "function_reference": 15,
+                          "invocation": "AGGREGATION_INVOCATION_ALL",
+                          "output_type": {
+                            "i64": {
+                              "nullability": "NULLABILITY_REQUIRED"
+                            }
+                          },
+                          "phase": "AGGREGATION_PHASE_INITIAL_TO_RESULT"
+                        }
+                      }
+                    ]
+                  }
+                },
+                "sorts": [
+                  {
+                    "direction": "SORT_DIRECTION_DESC_NULLS_LAST",
+                    "expr": {
+                      "selection": {
+                        "direct_reference": {
+                          "struct_field": {
+                            "field": 1
+                          }
+                        },
+                        "root_reference": {}
+                      }
+                    }
+                  },
+                  {
+                    "direction": "SORT_DIRECTION_ASC_NULLS_LAST",
+                    "expr": {
+                      "selection": {
+                        "direct_reference": {
+                          "struct_field": {}
+                        },
+                        "root_reference": {}
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "names": [
+          "strategy",
+          "n",
+          "resolved_share"
+        ]
+      }
+    }
+  ],
+  "version": {
+    "minor_number": 103,
+    "producer": "quail-b"
+  }
+}

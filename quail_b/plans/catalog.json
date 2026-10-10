@@ -216,7 +216,7 @@
   },
   {
     "id": "REL-AGENT-1",
-    "description": "column tests: snapshots past turn 10 of at most 6,000 tokens -> filter: recovered",
+    "description": "where: snapshots past turn 10 of at most 6,000 tokens -> filter: recovered",
     "privacy": false
   },
   {
@@ -248,6 +248,132 @@
     "id": "REL-AGENT-7",
     "description": "score: implemented a fix -> per trajectory of at least five snapshots: the mean score; the ten highest",
     "privacy": false
+  },
+  {
+    "id": "SUPPORT-1",
+    "description": "customer messages -> filter: frustrated with the agent",
+    "privacy": false,
+    "labels_pending": true
+  },
+  {
+    "id": "SUPPORT-2",
+    "description": "join over pairs: each customer reply x the agent message before it, pushback",
+    "privacy": false,
+    "labels_pending": true
+  },
+  {
+    "id": "SUPPORT-3",
+    "description": "pushback pairs -> classify: what the disagreement is about",
+    "privacy": false,
+    "labels_pending": true
+  },
+  {
+    "id": "SUPPORT-4",
+    "description": "classify each opening request: intent -> conversations per intent, most first",
+    "privacy": false,
+    "labels_pending": true
+  },
+  {
+    "id": "SUPPORT-5",
+    "description": "join over pairs: runs of the same task that handle the request differently",
+    "privacy": false,
+    "labels_pending": true
+  },
+  {
+    "id": "SUPPORT-6",
+    "description": "classify each conversation: how the agent handled the request -> per outcome: conversations and mean reward, at least five, best first",
+    "privacy": false,
+    "labels_pending": true
+  },
+  {
+    "id": "RUNS-1",
+    "description": "filter: reproduced the issue before changing the code",
+    "privacy": false,
+    "labels_pending": true
+  },
+  {
+    "id": "RUNS-2",
+    "description": "classify each run: the kind of change -> per kind: runs and the share resolved, most runs first",
+    "privacy": false,
+    "labels_pending": true
+  },
+  {
+    "id": "RUNS-3",
+    "description": "join over pairs: each successful run x each failed run of the same issue, different approach",
+    "privacy": false,
+    "labels_pending": true
+  },
+  {
+    "id": "RUNS-4",
+    "description": "different-approach pairs -> classify: what the failed run lacked",
+    "privacy": false,
+    "labels_pending": true
+  },
+  {
+    "id": "RUNS-5",
+    "description": "agent steps -> filter: runs tests -> per run: test steps, at least three, most first, 50",
+    "privacy": false,
+    "labels_pending": true
+  },
+  {
+    "id": "WRENCH-1",
+    "description": "filter: runs that exploited the verifier",
+    "privacy": false,
+    "labels_pending": true
+  },
+  {
+    "id": "WRENCH-2",
+    "description": "score: exploited the verifier -> the 100 highest scores",
+    "privacy": false,
+    "labels_pending": true
+  },
+  {
+    "id": "WRENCH-3",
+    "description": "exploited the verifier -> classify: the kind of exploit",
+    "privacy": false,
+    "labels_pending": true
+  },
+  {
+    "id": "WRENCH-4",
+    "description": "agent steps -> filter: part of an exploit -> per run: flagged steps, at least two, most first, 50",
+    "privacy": false,
+    "labels_pending": true
+  },
+  {
+    "id": "WRENCH-5",
+    "description": "where: baseline runs -> filter: exploited the verifier -> flagged runs per agent model, most first",
+    "privacy": false,
+    "labels_pending": true
+  },
+  {
+    "id": "SALES-1",
+    "description": "filter: calls that name a competitor",
+    "privacy": false,
+    "labels_pending": true
+  },
+  {
+    "id": "SALES-2",
+    "description": "classify each call: the customer's main concern -> calls per concern, most first",
+    "privacy": false,
+    "labels_pending": true
+  },
+  {
+    "id": "SALES-3",
+    "description": "join over pairs: each call x the next call of the same deal, the rep quotes a different price or discount",
+    "privacy": false,
+    "labels_pending": true
+  },
+  {
+    "id": "SALES-4",
+    "description": "2 filters: the rep offers a discount + the customer commits to buying",
+    "privacy": false,
+    "labels_pending": true
+  },
+  {
+    "id": "SALES-5",
+    "description": "where: deals in negotiation -> score: the customer commits to buying -> the 25 highest scores",
+    "privacy": false,
+    "labels_pending": true
   },
   {
     "id": "PRIV-1",

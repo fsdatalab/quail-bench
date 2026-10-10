@@ -21,7 +21,7 @@ AND_NAME = "and:bool"
 AGGREGATE_GENERIC_EXTENSION_URN = (
     "extension:io.substrait:functions_aggregate_generic")
 ARITHMETIC_EXTENSION_URN = "extension:io.substrait:functions_arithmetic"
-# column tests against a literal, by Substrait function name
+# WHERE conditions against a literal, by Substrait function name
 COMPARISON_NAMES = {
     "equal:any_any": "=", "not_equal:any_any": "<>",
     "lt:any_any": "<", "lte:any_any": "<=",
@@ -241,8 +241,14 @@ class PlanInfo:
 
     @property
     def relational(self) -> bool:
-        """Whether the query has a column test, a score, or a tail step."""
-        return bool(self.scores or self.column_tests or self.tail)
+        """Whether the query is scored from its rows rather than per operator.
+
+        A score or a tail step makes a query relational, and so does a
+        WHERE condition over the one relation it reads. A WHERE condition on
+        one relation of a join only limits the pairs the join asks.
+        """
+        return bool(self.scores or self.tail
+                    or (self.column_tests and len(self.relations) == 1))
 
     @property
     def aggregate(self) -> Aggregate | None:
@@ -493,16 +499,16 @@ def _decode(
             comparison = _comparison_name(condition, functions)
             if comparison is None:
                 raise ValueError(
-                    "a column test FilterRel combines comparisons only")
+                    "a WHERE condition FilterRel combines comparisons only")
             tests.append(_column_test(
                 rel.filter.common.hint.alias, child.fields, condition,
                 comparison))
         if len({test.relation for test in tests}) != 1:
-            raise ValueError("a column test FilterRel tests one relation")
+            raise ValueError("a WHERE condition FilterRel tests one relation")
         if any(not isinstance(operator, ColumnTest)
                for operator in child.operators):
             raise ValueError(
-                "a column test sits directly over its relation's scan")
+                "a WHERE condition sits directly over its relation's scan")
         return _Decoded(child.fields, child.tables, child.text_columns,
                         (*child.operators, *tests))
 
@@ -605,22 +611,22 @@ def _comparison_name(expression, functions) -> str | None:
 def _literal_value(expression: algebra_pb2.Expression):
     """Return the Python value of a number or string literal."""
     if not expression.HasField("literal"):
-        raise ValueError("a column test compares with a literal")
+        raise ValueError("a WHERE condition compares with a literal")
     literal = expression.literal
     kind = literal.WhichOneof("literal_type")
     if kind in ("i8", "i16", "i32", "i64", "fp32", "fp64", "string"):
         return getattr(literal, kind)
-    raise ValueError(f"unsupported column test literal {kind!r}")
+    raise ValueError(f"unsupported WHERE condition literal {kind!r}")
 
 
 def _column_test(operator_id: str, fields, condition, comparison: str
                  ) -> ColumnTest:
     arguments = _arguments(condition)
     if len(arguments) != 2:
-        raise ValueError("a column test compares a column with a literal")
+        raise ValueError("a WHERE condition compares a column with a literal")
     alias, column = _selected(fields, arguments[0])
     if column == "id":
-        raise ValueError("a column test does not test the id column")
+        raise ValueError("a WHERE condition does not test the id column")
     return ColumnTest(operator_id, alias, column, comparison,
                        _literal_value(arguments[1]))
 
@@ -814,7 +820,7 @@ def _decode_tail(rel: algebra_pb2.Rel, functions: dict[int, str]
 
 
 def _validate_relational(info: PlanInfo) -> None:
-    """Check the column tests, scores, tail, and projection of a relational plan."""
+    """Check the WHERE conditions, scores, tail, and projection of a relational plan."""
     if len(info.relations) != 1:
         raise ValueError("a relational QUAIL-B query reads one relation")
     kinds = [type(step) for step in info.tail]
@@ -892,7 +898,7 @@ def _validate_info(info: PlanInfo) -> None:
                     f"classification {operator.id!r} of joined rows must follow the "
                     "join of its two relations")
         elif (
-            isinstance(operator, (Filter, Classify, InList))
+            isinstance(operator, (Filter, Classify, InList, ColumnTest))
             and index > first_join[operator.relation]
         ):
             raise ValueError(
