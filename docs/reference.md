@@ -500,6 +500,24 @@ uv run python tools/make_cuad_labels.py <root> --scale-factor 0.1
 
 Then pass `root=<root>` to `quail_b.run`.
 
+To publish the CUAD labels, the same tool adds the 18 label sets to the
+published collections of the scale factor's corpus. It writes one new
+collection for each active collection of that corpus, holding the old
+label sets and the CUAD ones, and the pointers that name the new
+collections. The corpus files stay as published, because the benchmark
+builds the CUAD tables from their sources. With `--upload`, the files go
+to the public bucket with the AWS credentials of the machine running the
+command. For example:
+
+```sh
+uv run python tools/make_cuad_labels.py <root> --extend-published
+uv run python tools/make_cuad_labels.py <root> --extend-published --upload
+```
+
+The first command writes the files under `<root>` for inspection; the
+second writes them again and uploads them. After the upload, remove
+`labels_pending` from the CUAD entries of the workload catalog.
+
 ## Extraction
 
 `ai_extract(question, document)` returns the words of the document that
