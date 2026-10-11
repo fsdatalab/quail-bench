@@ -37,8 +37,8 @@ from quail_b.substrait import (
 from tools.make_substrait_plans import write_plans
 
 
-def test_catalog_has_the_65_default_queries_and_two_privacy_queries():
-    assert len(QUERIES) == 65
+def test_catalog_has_the_85_default_queries_and_two_privacy_queries():
+    assert len(QUERIES) == 85
     assert QUERY_ORDER == (
         *(f"IMDB-{i}" for i in range(1, 16)),
         *(f"BIO-{i}" for i in range(1, 7)),
@@ -46,6 +46,10 @@ def test_catalog_has_the_65_default_queries_and_two_privacy_queries():
         *(f"LEP-{i}" for i in range(1, 7)),
         *(f"AGENT-{i}" for i in range(1, 6)),
         *(f"REL-AGENT-{i}" for i in range(1, 8)),
+        *(f"SUPPORT-{i}" for i in range(1, 7)),
+        *(f"RUNS-{i}" for i in range(1, 5)),
+        *(f"WRENCH-{i}" for i in range(1, 6)),
+        *(f"SALES-{i}" for i in range(1, 6)),
         *(f"CUAD-{i}" for i in range(1, 16)),
     )
     assert [spec.id for spec in PRIVACY_QUERIES] == ["PRIV-1", "PRIV-2"]
@@ -250,12 +254,6 @@ def test_substrait_plans_are_packaged():
     entries = json.loads(catalog.read_text())
 
     assert len(entries) == 87
-    assert [entry["id"] for entry in entries if entry.get("labels_pending")] == [
-        *(f"SUPPORT-{i}" for i in range(1, 7)),
-        *(f"RUNS-{i}" for i in range(1, 5)),
-        *(f"WRENCH-{i}" for i in range(1, 6)),
-        *(f"SALES-{i}" for i in range(1, 6)),
-    ]
     assert all(
         package.joinpath("plans", f"{entry['id']}.json").is_file()
         for entry in entries
@@ -276,10 +274,10 @@ def test_checked_in_plans_equal_the_generator_output(tmp_path):
 
 def test_parallel_query_split_matches_stock_vllm():
     assert split_query_ids(QUERY_ORDER, 4) == (
-        QUERY_ORDER[0:17],
-        QUERY_ORDER[17:33],
-        QUERY_ORDER[33:49],
-        QUERY_ORDER[49:65],
+        QUERY_ORDER[0:22],
+        QUERY_ORDER[22:43],
+        QUERY_ORDER[43:64],
+        QUERY_ORDER[64:85],
     )
 
 
@@ -304,7 +302,11 @@ def test_query_family_split_matches_benchmark_catalog():
         QUERY_ORDER[32:38],
         QUERY_ORDER[38:43],
         QUERY_ORDER[43:50],
-        QUERY_ORDER[50:65],
+        QUERY_ORDER[50:56],
+        QUERY_ORDER[56:60],
+        QUERY_ORDER[60:65],
+        QUERY_ORDER[65:70],
+        QUERY_ORDER[70:85],
     )
     assert query_family_name(QUERY_ORDER[0:15]) == "imdb"
     assert query_family_name(QUERY_ORDER[43:50]) == "relational"

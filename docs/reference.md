@@ -480,32 +480,6 @@ filter stores its boolean `answer`. The manifest's predicate lists the
   partner's, as in a join's label set. The label set has a row only for the
   rows the reference join keeps.
 
-### Queries waiting for labels
-
-A query marked `labels_pending` in the catalog has no published labels yet.
-`quail_b.queries()` leaves it out; `queries(include_pending=True)` and
-`get_query` return it. Running one needs a label collection that includes its
-predicates, passed with `root` or `collection_id`. The `SUPPORT-`, `RUNS-`,
-`WRENCH-`, and `SALES-` queries are pending.
-
-The CUAD labels come from the dataset's own annotations, not from a model.
-`tools/make_cuad_labels.py` writes them for every published scale factor and
-uploads them:
-
-```sh
-uv run python tools/make_cuad_labels.py <root>
-uv run python tools/make_cuad_labels.py <root> --upload
-```
-
-The first command writes the files under `<root>` for inspection. For each
-scale factor, they are one label set per CUAD predicate, one new collection
-for each active collection of the published corpus, holding the old label
-sets and the CUAD ones, and the pointers naming the new collections. The
-corpus files are not written, because the benchmark builds the CUAD tables
-from their sources. The second command writes the same files and copies them
-to the public bucket with the AWS credentials of the machine running it,
-then reads the pointers back to confirm the upload.
-
 ## Extraction
 
 `ai_extract(question, document)` returns the words of the document that

@@ -25,7 +25,7 @@ def select_queries(only=None, *, scale_factor=0.1) -> tuple[QuerySpec, ...]:
     """Validate a scale factor and return the requested query definitions."""
     if scale_factor not in PUBLISHED_CORPORA:
         raise ValueError("scale factor must be 0.1, 0.5, or 1.0")
-    available = queries(include_pending=only is not None)
+    available = queries()
     ids = list(queries()) if only is None else (
         [only] if isinstance(only, str) else list(only))
     unknown = set(ids) - available.keys()

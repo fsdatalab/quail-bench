@@ -297,7 +297,6 @@ class Query:
         privacy: Whether the query reads the privacy policy corpus.
         select: Returned columns: an alias for its id, `alias.column`
             for a label column; None returns every relation's id.
-        labels_pending: Whether its reference labels are unpublished.
     """
 
     id: str
@@ -305,7 +304,6 @@ class Query:
     tree: "Scan | Filter | Join | Classify | InList | Extract"
     privacy: bool = False
     select: tuple[str, ...] | None = None
-    labels_pending: bool = False
 
 
 def _string_type():
@@ -1168,18 +1166,17 @@ QUERIES = (
     # Customer support traces and coding agent runs, for agent trace
     # analytics. Their reference labels are not published yet.
     Query("SUPPORT-1", "customer messages -> filter: frustrated with the agent",
-          _filters(_user_messages(), SUPPORT_FRUSTRATED),
-          labels_pending=True),
+          _filters(_user_messages(), SUPPORT_FRUSTRATED)),
     Query("SUPPORT-2", "join over pairs: each customer reply x the agent "
           "message before it, pushback",
-          _pushback_pairs(), labels_pending=True),
+          _pushback_pairs()),
     Query("SUPPORT-3", "pushback pairs -> classify: what the disagreement "
           "is about",
           Classify(_pushback_pairs(), prompts.SUPPORT_DISAGREEMENT,
                    prompts.SUPPORT_DISAGREEMENT_LABELS, "disagreement",
                    prompts.SUPPORT_DISAGREEMENT_DESCRIPTIONS,
                    documents=("u", "a")),
-          select=("u", "a", "u.disagreement"), labels_pending=True),
+          select=("u", "a", "u.disagreement")),
     Query("SUPPORT-4", "classify each opening request: intent -> "
           "conversations per intent, most first",
           Sort(Aggregate(
@@ -1188,12 +1185,11 @@ QUERIES = (
                         "intent", prompts.SUPPORT_INTENT_DESCRIPTIONS),
               ("t.intent",), (("n", "count", None),)),
                (("n", True), ("t.intent", False))),
-          select=("t.intent", "n"), labels_pending=True),
+          select=("t.intent", "n")),
     Query("SUPPORT-5", "join over pairs: runs of the same task that handle "
           "the request differently",
           Join(_support_traces("r1"), _support_traces("r2"), ("r1", "r2"),
-               SUPPORT_DIFFERENT_APPROACH, on=(("task_id", "task_id"),)),
-          labels_pending=True),
+               SUPPORT_DIFFERENT_APPROACH, on=(("task_id", "task_id"),))),
     Query("SUPPORT-6", "classify each conversation: how the agent handled "
           "the request -> per outcome: conversations and mean reward, at "
           "least five, best first",
@@ -1205,9 +1201,9 @@ QUERIES = (
               (("n", "count", None), ("mean_reward", "avg", "t.reward"))),
               (("n", ">=", 5),)),
                (("mean_reward", True), ("t.outcome", False))),
-          select=("t.outcome", "n", "mean_reward"), labels_pending=True),
+          select=("t.outcome", "n", "mean_reward")),
     Query("RUNS-1", "filter: reproduced the issue before changing the code",
-          _filters(_issue_runs("r"), RUNS_REPRODUCED), labels_pending=True),
+          _filters(_issue_runs("r"), RUNS_REPRODUCED)),
     Query("RUNS-2", "classify each run: the kind of change -> per kind: runs "
           "and the share resolved, most runs first",
           Sort(Aggregate(
@@ -1217,10 +1213,10 @@ QUERIES = (
               ("r.strategy",),
               (("n", "count", None), ("resolved_share", "avg", "r.resolved"))),
                (("n", True), ("r.strategy", False))),
-          select=("r.strategy", "n", "resolved_share"), labels_pending=True),
+          select=("r.strategy", "n", "resolved_share")),
     Query("RUNS-3", "join over pairs: each successful run's patch x each "
           "failed run's patch for the same issue, different approach",
-          _outcome_pairs(), labels_pending=True),
+          _outcome_pairs()),
     Query("RUNS-4", "agent steps -> filter: runs tests -> per run: test "
           "steps, at least three, most first, 50",
           Fetch(Sort(Having(Aggregate(
@@ -1230,26 +1226,26 @@ QUERIES = (
               ("m.trace_id",), (("test_steps", "count", None),)),
               (("test_steps", ">=", 3),)),
               (("test_steps", True), ("m.trace_id", False))), 50),
-          select=("m.trace_id", "test_steps"), labels_pending=True),
+          select=("m.trace_id", "test_steps")),
 
     # Terminal Wrench runs and their agent steps. Their reference labels
     # are not published yet.
     Query("WRENCH-1", "filter: runs that exploited the verifier",
-          _filters(_wrench_runs(), WRENCH_EXPLOITED), labels_pending=True),
+          _filters(_wrench_runs(), WRENCH_EXPLOITED)),
     Query("WRENCH-2", "score: exploited the verifier -> the 100 highest "
           "scores",
           Fetch(Sort(Score(_wrench_runs("token_count",
                                         integers=("token_count",)),
                            WRENCH_EXPLOITED, "exploit_score"),
                      (("w.exploit_score", True), ("w.id", False))), 100),
-          select=("w", "w.exploit_score"), labels_pending=True),
+          select=("w", "w.exploit_score")),
     Query("WRENCH-3", "exploited the verifier -> classify: the kind of "
           "exploit",
           _classify(_filters(_wrench_runs(), WRENCH_EXPLOITED),
                     prompts.WRENCH_EXPLOIT_KIND,
                     prompts.WRENCH_EXPLOIT_KIND_LABELS, "exploit_kind",
                     prompts.WRENCH_EXPLOIT_KIND_DESCRIPTIONS),
-          select=("w", "w.exploit_kind"), labels_pending=True),
+          select=("w", "w.exploit_kind")),
     Query("WRENCH-4", "agent steps -> filter: part of an exploit -> per run: "
           "flagged steps, at least two, most first, 50",
           Fetch(Sort(Having(Aggregate(
@@ -1257,7 +1253,7 @@ QUERIES = (
               ("s.run_id",), (("flagged_steps", "count", None),)),
               (("flagged_steps", ">=", 2),)),
               (("flagged_steps", True), ("s.run_id", False))), 50),
-          select=("s.run_id", "flagged_steps"), labels_pending=True),
+          select=("s.run_id", "flagged_steps")),
     Query("WRENCH-5", "where: baseline runs -> filter: exploited the "
           "verifier -> flagged runs per agent model, most first",
           Sort(Aggregate(
@@ -1265,12 +1261,12 @@ QUERIES = (
                              "baseline"), WRENCH_EXPLOITED),
               ("w.model",), (("flagged", "count", None),)),
                (("flagged", True), ("w.model", False))),
-          select=("w.model", "flagged"), labels_pending=True),
+          select=("w.model", "flagged")),
 
     # CRMArena-Pro sales calls. Their reference labels are not published
     # yet.
     Query("SALES-1", "filter: calls that name a competitor",
-          _filters(_sales_calls(), SALES_COMPETITOR), labels_pending=True),
+          _filters(_sales_calls(), SALES_COMPETITOR)),
     Query("SALES-2", "classify each call: the customer's main concern -> "
           "calls per concern, most first",
           Sort(Aggregate(
@@ -1279,21 +1275,20 @@ QUERIES = (
                         prompts.SALES_CONCERN_DESCRIPTIONS),
               ("c.concern",), (("n", "count", None),)),
                (("n", True), ("c.concern", False))),
-          select=("c.concern", "n"), labels_pending=True),
+          select=("c.concern", "n")),
     Query("SALES-3", "join over pairs: each call x the next call of the same "
           "deal, the rep quotes a different price or discount",
-          _next_call_pairs(), labels_pending=True),
+          _next_call_pairs()),
     Query("SALES-4", "2 filters: the rep offers a discount + the customer "
           "commits to buying",
-          _filters(_sales_calls(), SALES_DISCOUNT, SALES_COMMITS),
-          labels_pending=True),
+          _filters(_sales_calls(), SALES_DISCOUNT, SALES_COMMITS)),
     Query("SALES-5", "where: deals in negotiation -> score: the "
           "customer commits to buying -> the 25 highest scores",
           Fetch(Sort(Score(Where(_sales_calls("c", "deal_stage"),
                                  "deal_stage", "=", "Negotiation"),
                            SALES_COMMITS, "commit_score"),
                      (("c.commit_score", True), ("c.id", False))), 25),
-          select=("c", "c.commit_score"), labels_pending=True),
+          select=("c", "c.commit_score")),
 
     # CUAD contracts, with the lawyers' labels. Their reference labels
     # are not published yet.
@@ -1391,8 +1386,6 @@ def write_plans(directory: Path) -> None:
             "description": query.description,
             "privacy": query.privacy,
         }
-        if query.labels_pending:
-            entry["labels_pending"] = True
         catalog.append(entry)
     (directory / "catalog.json").write_text(
         json.dumps(catalog, indent=2) + "\n"

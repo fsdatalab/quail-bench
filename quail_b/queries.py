@@ -40,8 +40,20 @@ from quail_b.prompts import (
     NEUROLOGICAL_REACTION,
     REACTION,
     REFUTE,
+    RUNS_DIFFERENT_APPROACH,
+    RUNS_REPRODUCED,
+    RUNS_TEST_STEP,
+    SALES_CHANGED_OFFER,
+    SALES_COMMITS,
+    SALES_COMPETITOR,
+    SALES_DISCOUNT,
     SERIOUS_ADVERSE_EVENT,
     SUPPORT,
+    SUPPORT_DIFFERENT_APPROACH,
+    SUPPORT_FRUSTRATED,
+    SUPPORT_PUSHBACK,
+    WRENCH_EXPLOITED,
+    WRENCH_STEP_EXPLOIT,
     cuad_filter,
 )
 from quail_b.substrait import PlanInfo, inspect_plan
@@ -82,6 +94,15 @@ FILTER_SELECTIVITY_ESTIMATES = {
     cuad_filter("License Grant"): 209 / 449,
     cuad_filter("Non-Transferable License"): 108 / 449,
     cuad_filter("Change Of Control"): 88 / 449,
+    # agent traces and sales calls: gt_92964efd9d1b9c8e0cc64ebd30d73e0b
+    SUPPORT_FRUSTRATED: 76 / 3442,
+    RUNS_REPRODUCED: 312 / 320,
+    RUNS_TEST_STEP: 10708 / 36341,
+    WRENCH_EXPLOITED: 324 / 629,
+    WRENCH_STEP_EXPLOIT: 1339 / 3454,
+    SALES_COMPETITOR: 344 / 985,
+    SALES_DISCOUNT: 104 / 985,
+    SALES_COMMITS: 33 / 985,
 }
 JOIN_SELECTIVITY_ESTIMATES = {
     DISCUSS_ASPECT: 17683 / 60000,
@@ -91,6 +112,11 @@ JOIN_SELECTIVITY_ESTIMATES = {
     REFUTE: 477 / 143500,
     LEPJOIN: 500 / 216500,
     CUAD_HAS_CLAUSE: 2857 / 14817,
+    # gt_92964efd9d1b9c8e0cc64ebd30d73e0b, over the candidate pairs
+    SUPPORT_PUSHBACK: 161 / 3058,
+    SUPPORT_DIFFERENT_APPROACH: 358 / 1024,
+    RUNS_DIFFERENT_APPROACH: 8 / 117,
+    SALES_CHANGED_OFFER: 56 / 639,
 }
 # IN-list filters, keyed by (classification prompt, accepted labels), from
 # the sf=0.1 reference labels in gt_6d7ca88a74a30b665bfb67dcde76daff.
@@ -155,12 +181,11 @@ class QuerySpec:
 
 @cache
 def _load_queries() -> tuple[tuple[QuerySpec, ...], ...]:
-    """Return (regular, privacy, labels pending) query definitions."""
+    """Return (regular, privacy) query definitions."""
     root = files("quail_b").joinpath("plans")
     catalog = json.loads(root.joinpath("catalog.json").read_text())
     regular = []
     privacy = []
-    pending = []
     seen = set()
     for item in catalog:
         query_id = item["id"]
@@ -172,13 +197,11 @@ def _load_queries() -> tuple[tuple[QuerySpec, ...], ...]:
             plan_pb2.Plan(),
         )
         query = QuerySpec.from_plan(query_id, item["description"], plan)
-        if item.get("labels_pending"):
-            pending.append(query)
-        elif item["privacy"]:
+        if item["privacy"]:
             privacy.append(query)
         else:
             regular.append(query)
-    return tuple(regular), tuple(privacy), tuple(pending)
+    return tuple(regular), tuple(privacy)
 
 
 def __getattr__(name: str):
@@ -186,7 +209,7 @@ def __getattr__(name: str):
     # files on first use, so importing the package does not parse them.
     if name not in ("QUERIES", "PRIVACY_QUERIES", "QUERY_ORDER"):
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    regular, privacy, _pending = _load_queries()
+    regular, privacy = _load_queries()
     globals().update(
         QUERIES=regular,
         PRIVACY_QUERIES=privacy,
@@ -212,25 +235,15 @@ QUERY_FAMILY_WORKLOADS = {
 }
 
 
-def queries(include_privacy: bool = False,
-            include_pending: bool = False) -> dict[str, QuerySpec]:
+def queries(include_privacy: bool = False) -> dict[str, QuerySpec]:
     """Return the benchmark queries by id, in benchmark order.
 
     Args:
         include_privacy: Also return the privacy policy queries.
-        include_pending: Also return queries whose reference labels are
-            not published yet. They run only against a label collection
-            that includes their predicates.
     """
-    regular, privacy, pending = _load_queries()
-    specs = (regular + (privacy if include_privacy else ())
-             + (pending if include_pending else ()))
+    regular, privacy = _load_queries()
+    specs = regular + (privacy if include_privacy else ())
     return {spec.id: spec for spec in specs}
-
-
-def pending_query_ids() -> tuple[str, ...]:
-    """Return the IDs of queries whose reference labels are unpublished."""
-    return tuple(spec.id for spec in _load_queries()[2])
 
 
 def split_query_ids(ids, containers):
@@ -277,5 +290,5 @@ def query_family_name(ids):
 
 
 def get_query(query_id: str) -> QuerySpec:
-    """Return one benchmark query definition by id, labels pending or not."""
-    return queries(include_pending=True)[query_id]
+    """Return one benchmark query definition by id."""
+    return queries()[query_id]

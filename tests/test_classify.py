@@ -15,7 +15,7 @@ from quail_b.data import (
     SOURCE_REVISIONS,
     corpus_identity,
 )
-from quail_b.queries import QuerySpec, pending_query_ids, queries
+from quail_b.queries import QuerySpec, queries
 from quail_b.run import _write_json
 from quail_b.substrait import AI_CLASSIFY_JOINED_NAME, AI_CLASSIFY_NAME
 from tools.make_substrait_plans import (
@@ -28,16 +28,12 @@ from tools.make_substrait_plans import (
 
 CLASSIFY_QUERIES = ("IMDB-11", "IMDB-12", "IMDB-13", "IMDB-14", "IMDB-15",
                     "BIO-5", "BIO-6", "FEV-11", "LEP-6", "AGENT-3", "AGENT-4",
-                    "AGENT-5", "REL-AGENT-5", "CUAD-11", "CUAD-12")
+                    "AGENT-5", "REL-AGENT-5", "SUPPORT-3", "SUPPORT-4",
+                    "SUPPORT-6", "RUNS-2", "WRENCH-3", "SALES-2", "CUAD-11",
+                    "CUAD-12")
 
 
 def test_classification_queries_are_published():
-    assert pending_query_ids() == (
-        *(f"SUPPORT-{i}" for i in range(1, 7)),
-        *(f"RUNS-{i}" for i in range(1, 5)),
-        *(f"WRENCH-{i}" for i in range(1, 6)),
-        *(f"SALES-{i}" for i in range(1, 6)),
-    )
     assert tuple(query_id for query_id, spec in queries().items()
                  if spec.info.classifies) == CLASSIFY_QUERIES
 
@@ -56,7 +52,7 @@ def test_every_classification_has_one_predicate():
         spec.template: spec for spec in predicates.CLASSIFY_PREDICATES}
     assert len(by_template) == len(predicates.CLASSIFY_PREDICATES)
     used = set()
-    for query_id in CLASSIFY_QUERIES + pending_query_ids():
+    for query_id in CLASSIFY_QUERIES:
         for operator in quail_b.get_query(query_id).info.classifies:
             spec = by_template[operator.prompt]
             assert spec.labels == operator.labels

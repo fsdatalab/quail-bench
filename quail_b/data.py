@@ -32,9 +32,9 @@ CACHE_SCHEMA_VERSION = 11
 # the public bucket. build_sets downloads it instead of rebuilding from
 # the sources; the corpus id is checked after download.
 PUBLISHED_CORPORA = {
-    0.1: "c_1aa2c4f0d0b6c816fd37aa5748c33341",
-    0.5: "c_6773c85b3754908434661c1dadfad0fa",
-    1.0: "c_81a95887a650aaa1a343e0d688b81bef",
+    0.1: "c_e380e53469a6a62de83a452fbc51a73e",
+    0.5: "c_38414b12549ab6243397fd41522e67ad",
+    1.0: "c_3a8712778b5fe0938abe729770c4d23d",
 }
 LEPARD_POSITIVE_PAIRS = 5_000
 # The base count for scaling. SWE-Next at the pinned revision yields
@@ -1745,6 +1745,21 @@ def corpus_identity(rows: dict[str, pa.Table | list[dict]],
             "rows": len(row_hashes),
             "ordered_rows_full_hash": _full_hash(row_hashes),
         }
+    return corpus_identity_of_tables(tables, scale_factor, data_seed,
+                                     source_revisions)
+
+
+def corpus_identity_of_tables(tables: dict[str, dict], scale_factor: float,
+                              data_seed: int, source_revisions: dict) -> dict:
+    """Return the corpus identity of tables already hashed.
+
+    Args:
+        tables: Each table's `rows` and `ordered_rows_full_hash`, by name.
+        scale_factor: The corpus scale factor.
+        data_seed: The seed the tables were sampled with.
+        source_revisions: The pinned source revision of each dataset.
+    """
+    tables = dict(sorted(tables.items()))
     payload = {
         "schema_version": 1,
         "benchmark": "quailb",
