@@ -37,6 +37,7 @@ def test_classification_queries_are_published():
         *(f"RUNS-{i}" for i in range(1, 5)),
         *(f"WRENCH-{i}" for i in range(1, 6)),
         *(f"SALES-{i}" for i in range(1, 6)),
+        *(f"CUAD-{i}" for i in range(1, 16)),
     )
     assert tuple(query_id for query_id, spec in queries().items()
                  if spec.info.classifies) == CLASSIFY_QUERIES
@@ -240,7 +241,8 @@ def _collection(root, tables, label_sets):
         label_sets: (predicate, rows) pairs. A classify predicate's rows
             are (left_id, label), or (left_id, right_id, label) for a
             classification of joined rows; a filter's (left_id, answer); a join's
-            (left_id, right_id, answer).
+            (left_id, right_id, answer); an extraction's (left_id, answers),
+            the reference spans as a list.
     """
     corpus_id = PUBLISHED_CORPORA[0.1]
     corpus = root / GROUND_TRUTH_ROOT / "corpora" / corpus_id
@@ -275,6 +277,10 @@ def _collection(root, tables, label_sets):
         elif predicate["kind"] == "join":
             columns["right_id"] = [row[1] for row in rows]
             columns["answer"] = [row[2] for row in rows]
+        elif predicate["kind"] == "extract":
+            columns["right_id"] = pa.array([None] * len(rows), pa.string())
+            columns["answers"] = pa.array([list(row[1]) for row in rows],
+                                          pa.list_(pa.string()))
         else:
             columns["right_id"] = pa.array([None] * len(rows), pa.string())
             columns["answer"] = [row[1] for row in rows]

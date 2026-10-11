@@ -58,6 +58,7 @@ def test_set_table_matches_design():
         "claims": 5_000,
         "agent_traces": AGENT_TRACE_DOCUMENTS,
         "policies": 1_000_000,
+        "contracts": 449,
     }
     assert LEPARD_POSITIVE_PAIRS == 5_000
     assert _n_lepard_pairs(0.1) == 500

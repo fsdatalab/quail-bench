@@ -172,7 +172,7 @@ print(reviews.num_rows)   # 5000
 
 ## Queries
 
-The queries use three AI functions, declared as Substrait extensions in
+The queries use five AI functions, declared as Substrait extensions in
 [`quail_b/substrait_extensions.yaml`](quail_b/substrait_extensions.yaml):
 
 ```text
@@ -180,6 +180,8 @@ ai_filter(prompt, document) -> boolean
 ai_join(prompt, left_document, right_document) -> boolean
 ai_classify(prompt, document, labels, descriptions) -> string
 ai_classify(prompt, anchor, partner, labels, descriptions) -> string
+ai_score(prompt, document) -> fp64
+ai_extract(question, document) -> string or null
 ```
 
 The plans combine them with scans, equality conditions, conjunction,
@@ -203,6 +205,7 @@ lists the queries that use it.
 | SWE-rebench | RUNS-1 to RUNS-4 | `issue_runs`, `issue_messages` | Repeated coding agent runs of one issue |
 | Terminal Wrench | WRENCH-1 to WRENCH-5 | `wrench_runs`, `wrench_steps` | Reward hacking in terminal agent runs |
 | CRMArena-Pro | SALES-1 to SALES-5 | `sales_calls` | Sales calls about B2B and B2C deals |
+| CUAD | CUAD-1 to CUAD-15 | `contracts`, `clause_types` | Clauses of commercial contracts, labeled by lawyers |
 
 Within each dataset, the first queries have a single filter or join. Later
 queries chain filters, filter both join inputs, scan one table under two
@@ -257,6 +260,9 @@ then run it on all 50.
 | REL-AGENT-4 | Score, sort, limit | `ai_score` and top-k |
 | REL-AGENT-5 | Classify, group by a label, having | `COUNT`, `COUNT(DISTINCT)`, `HAVING`, label keys |
 | REL-AGENT-6 | Filter, group by a column, having, limit | `MIN`, `MAX`, and a limit after an aggregate |
+| CUAD-7 | Filter, then an extraction | An answer column copied from the document, null where the document has no answer |
+| CUAD-10 | Three extractions of one document | Three questions that can reuse one document's KV |
+| CUAD-15 | Filter, extraction, sort, limit | An answer column in a relational query |
 
 ### Classification queries
 
@@ -291,6 +297,65 @@ positive, negative, neutral, or mixed.
 A classification answer is the label with the largest sum of label-token log
 probabilities; the [reference](docs/reference.md#classification) defines the
 prompt, the answer tables, and label accuracy.
+
+### Extraction queries
+
+Nine queries copy the answer to a question out of each document, with
+`ai_extract(question, document)`. The answer is a span: a run of words copied
+from the document. When the document does not answer the question, the answer
+is null.
+
+- The reference answers are the spans lawyers marked in CUAD. A contract that
+  states one thing in several places has several spans.
+- An answer is scored by token F1 against its best-matching span. Token F1
+  measures the overlap between the answer's words and the span's words.
+- A null answer is right exactly where the document has no span.
+
+For example, CUAD-3 asks what caps liability in each contract. The lawyers
+marked a span in 49% of the contracts. For the other 51%, the right answer is
+null. The [reference](docs/reference.md#extraction) defines the prompt, the
+answer tables, and span accuracy.
+
+CUAD ([Hendrycks et al., 2021](https://arxiv.org/abs/2103.06268), CC BY 4.0)
+holds 510 commercial contracts from SEC filings. Lawyers marked 41 clause
+categories in them: 8 fields answered with text and 33 clause types answered
+Yes or No.
+
+- The text fields include the parties, the agreement date, and the governing
+  law.
+- The Yes or No clause types include a non-compete and a cap on liability.
+
+QUAIL-B builds two tables from CUAD:
+
+- `contracts` holds the 449 contracts within 24,000 Qwen3 tokens. Each row
+  holds one whole contract.
+- `clause_types` holds the 33 Yes or No categories, each with the question the
+  lawyers answered.
+
+The queries use the lawyers' questions as written. The lawyers' answers are
+the reference labels:
+
+- The Yes or No answers label the filters and the join.
+- The governing law answers label the classification.
+- The marked spans label the extractions.
+
+| Query | Question | Operators |
+| --- | --- | --- |
+| CUAD-1 | Which law governs each contract? | `ai_extract` of a short field; 84% have a span |
+| CUAD-2 | What is the agreement date of each contract? | `ai_extract` of a date; 92% have a span |
+| CUAD-3 | What caps liability in each contract? | `ai_extract` of a clause; 49% have a span, and the rest are null |
+| CUAD-4 | Who are the parties to each contract? | `ai_extract` with several spans per contract |
+| CUAD-5 | Which contracts can be terminated for convenience? | `ai_filter`; 33% pass |
+| CUAD-6 | Which contracts have both a non-compete and an exclusivity commitment? | Two `ai_filter`s |
+| CUAD-7 | What are the audit rights, where a contract grants any? | `ai_filter`, then `ai_extract` |
+| CUAD-8 | What caps liability, in contracts that also require insurance? | Two `ai_filter`s, then `ai_extract` |
+| CUAD-9 | What does each non-transferable license grant? | Two `ai_filter`s, then `ai_extract` |
+| CUAD-10 | What are the agreement date, the expiration date, and the governing law of each contract? | Three `ai_extract`s of one document |
+| CUAD-11 | How many contracts does each governing law cover? | 7 labels, `GROUP BY`, `COUNT`, `ORDER BY` |
+| CUAD-12 | Among contracts requiring insurance, how many does each governing law cover? | `ai_filter`, then the classification and `GROUP BY` |
+| CUAD-13 | Which clause types does each contract contain? | `ai_join` of contracts to the 33 clause types; 19% of pairs match |
+| CUAD-14 | Which clause types do contracts with a change of control clause contain? | `ai_filter`, then the `ai_join` |
+| CUAD-15 | When do the first 20 contracts terminable for convenience expire? | `ai_filter`, `ai_extract`, `ORDER BY`, `LIMIT` |
 
 ### Relational queries
 
@@ -437,6 +502,8 @@ same at every scale factor. Use 0.1 while developing an adapter.
 | Terminal Wrench | `wrench_runs` | 629 | 2,972 | 5,920 |
 | Terminal Wrench | `wrench_steps` | 3,454 | 16,801 | 32,838 |
 | CRMArena-Pro | `sales_calls` | 985 | 5,088 | 10,088 |
+| CUAD | `contracts` | 45 | 225 | 449 |
+| CUAD | `clause_types` | 33 | 33 | 33 |
 
 ### Reference answers
 
@@ -516,6 +583,7 @@ reports it as zero.
 | Output precision and recall | Returned rows compared with the reference result |
 | Predicate-level accuracy | Share of filter and join answers that match the labels |
 | Label accuracy | Share of classification answers that match the labels |
+| Span accuracy | Mean token F1 of extraction answers against the reference spans |
 | Document throughput | Input documents per second, for queries with zero joins |
 | Join throughput | Evaluated document pairs per second |
 | GPU cost | `runtime_s / 3600 * gpu_count * gpu_hourly_rate_usd` |

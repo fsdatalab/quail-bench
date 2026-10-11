@@ -1,8 +1,9 @@
 """The QUAIL-B predicates and the identity of their reference labels.
 
 A predicate is one TRUE or FALSE question over one table column
-(filter) or two (join), or one choice among fixed labels over one
-column or two (classify). Its version hashes everything that can change
+(filter) or two (join), one choice among fixed labels over one column
+or two (classify), or one question whose answer is copied from one
+column (extract). Its version hashes everything that can change
 the model's answer; the label-set id hashes the version, the corpus,
 and the judge, so a label file's path says exactly what produced it.
 The pass that writes the labels lives in Quail's repository.
@@ -205,6 +206,26 @@ PREDICATES = (
         "quailb.sales.call.customer_commits", "sales", "customer_commits",
         "filter", prompts.SALES_COMMITS, "sales_call", "sales_calls",
         "transcript"),
+    # CUAD: the lawyers' Yes or No answers, by clause category
+    *(PredicateSpec(
+        f"quailb.cuad.contract.{slug}", "cuad", slug, "filter",
+        prompts.cuad_filter(category), "contract", "contracts", "text",
+        source_policy="cuad_annotation")
+      for slug, category in (
+          ("terminates_for_convenience", "Termination For Convenience"),
+          ("non_compete", "Non-Compete"),
+          ("exclusivity", "Exclusivity"),
+          ("audit_rights", "Audit Rights"),
+          ("caps_liability", "Cap On Liability"),
+          ("insurance", "Insurance"),
+          ("license_grant", "License Grant"),
+          ("non_transferable_license", "Non-Transferable License"),
+          ("change_of_control", "Change Of Control"))),
+    PredicateSpec(
+        "quailb.cuad.contract.has_clause_type", "cuad", "has_clause_type",
+        "join", prompts.CUAD_HAS_CLAUSE, "contract", "contracts", "text",
+        "clause_type", "clause_types", "question",
+        source_policy="cuad_annotation"),
 )
 
 # Classification predicates. Their labels are not in the published
@@ -292,9 +313,33 @@ CLASSIFY_PREDICATES = (
         "classify", prompts.SALES_CONCERN, "sales_call", "sales_calls",
         "transcript", labels=prompts.SALES_CONCERN_LABELS,
         descriptions=prompts.SALES_CONCERN_DESCRIPTIONS),
+    PredicateSpec(
+        "quailb.cuad.contract.governing_law_state", "cuad",
+        "governing_law_state", "classify", prompts.CUAD_GOVERNING_LAW,
+        "contract", "contracts", "text",
+        source_policy="cuad_annotation",
+        labels=prompts.CUAD_GOVERNING_LAW_LABELS,
+        descriptions=prompts.CUAD_GOVERNING_LAW_DESCRIPTIONS),
 )
 
-PREDICATE_BY_KEY = {p.key: p for p in PREDICATES + CLASSIFY_PREDICATES}
+# Extraction predicates: the lawyers' marked spans, by clause category.
+# The template is the question as the dataset writes it.
+EXTRACT_PREDICATES = tuple(
+    PredicateSpec(
+        f"quailb.cuad.contract.{slug}_span", "cuad", f"{slug}_span",
+        "extract", prompts.CUAD_QUESTIONS[category], "contract",
+        "contracts", "text", source_policy="cuad_annotation")
+    for slug, category in (
+        ("governing_law", "Governing Law"),
+        ("agreement_date", "Agreement Date"),
+        ("expiration_date", "Expiration Date"),
+        ("parties", "Parties"),
+        ("liability_cap", "Cap On Liability"),
+        ("audit_rights", "Audit Rights"),
+        ("license_grant", "License Grant")))
+
+PREDICATE_BY_KEY = {p.key: p for p in (PREDICATES + CLASSIFY_PREDICATES
+                                       + EXTRACT_PREDICATES)}
 
 WORKLOADS = tuple(dict.fromkeys(spec.workload for spec in PREDICATES))
 
@@ -334,6 +379,7 @@ def predicate_payload(spec: PredicateSpec) -> dict:
         "filter": "filter_document_then_question_v1",
         "join": "join_arg0_anchor_then_arg1_v1",
         "classify": "classify_document_then_categories_v1",
+        "extract": "extract_document_then_question_v1",
     }[spec.kind]
     if is_joined_classify(spec):
         # stored in the published label sets' identities; keep as is
@@ -369,6 +415,16 @@ def predicate_payload(spec: PredicateSpec) -> dict:
             answer_cue=rendering.ANSWER_CUE,
             labels=list(spec.labels),
             descriptions=list(_descriptions(spec)),
+        )
+    if spec.kind == "extract":
+        payload.pop("task_instruction", None)
+        payload.update(
+            question_label=rendering.EXTRACT_QUESTION_LABEL,
+            extract_instruction=rendering.EXTRACT_INSTRUCTION,
+            answer_format=(rendering.EXTRACT_FORMAT + "\n"
+                           + rendering.EXTRACT_PHRASE_FORMAT),
+            answer_cue=rendering.EXTRACT_CUE,
+            none_answer=rendering.EXTRACT_NONE,
         )
     if is_joined_classify(spec):
         payload.update(anchor_note=JOIN_ANCHOR_NOTE,
@@ -450,6 +506,13 @@ SOURCE_SPECS = {
         "rule": ("anchor cited_passage_ids intersects candidate "
                  "passage_ids"),
     },
+    "cuad_annotation": {
+        "dataset": data.CUAD_REPO,
+        "revision": data.SOURCE_REVISIONS[data.CUAD_REPO],
+        "rule": ("master_clauses.csv answers label the filters, the join, "
+                 "and the governing law; CUAD_v1.json spans are the "
+                 "extraction's answers"),
+    },
 }
 
 
@@ -467,11 +530,12 @@ def label_sources(spec: PredicateSpec, judge: dict = JUDGE_SPEC) -> list[dict]:
         full = _full_hash(payload)
         sources.append({"id": _named_id("s", full), "full_hash": full,
                         "spec": payload})
-    if spec.source_policy == "lepard_citation_edge":
-        payload = SOURCE_SPECS["lepard_citation_edge"]
-        full = _full_hash(payload)
-        sources.append({"id": _named_id("s", full), "full_hash": full,
-                        "spec": payload})
+    for name in ("lepard_citation_edge", "cuad_annotation"):
+        if spec.source_policy == name:
+            payload = SOURCE_SPECS[name]
+            full = _full_hash(payload)
+            sources.append({"id": _named_id("s", full), "full_hash": full,
+                            "spec": payload})
     return sources
 
 
@@ -529,3 +593,9 @@ def render_classify_prompt(spec: PredicateSpec, document: str,
 
 def render_join_prompt(spec: PredicateSpec, left: str, right: str) -> str:
     return rendering.render_join_prompt(spec.template, (left, right), anchor=0)
+
+
+def render_extract_prompt(spec: PredicateSpec, document: str) -> str:
+    if spec.kind != "extract":
+        raise ValueError(f"{spec.key} is not an extraction")
+    return rendering.render_extract_prompt(spec.template, document)

@@ -19,6 +19,7 @@ from quail_b.prompts import (
     ASPECT_SENTIMENT,
     BIO_ORGAN_CLASS,
     CARDIOVASCULAR_REACTION,
+    CUAD_HAS_CLAUSE,
     DISCUSS_ASPECT,
     F1,
     F4,
@@ -41,6 +42,7 @@ from quail_b.prompts import (
     REFUTE,
     SERIOUS_ADVERSE_EVENT,
     SUPPORT,
+    cuad_filter,
 )
 from quail_b.substrait import PlanInfo, inspect_plan
 
@@ -69,6 +71,17 @@ FILTER_SELECTIVITY_ESTIMATES = {
     LEP4: 31 / 500,
     LEP5: 14 / 500,
     LEPS1: 351 / 433,
+    # CUAD: the lawyers' Yes answers over the 449 contracts within the
+    # token cap (quail_b.data.CUAD_CONTRACTS), the same at every scale
+    cuad_filter("Termination For Convenience"): 147 / 449,
+    cuad_filter("Non-Compete"): 90 / 449,
+    cuad_filter("Exclusivity"): 144 / 449,
+    cuad_filter("Audit Rights"): 164 / 449,
+    cuad_filter("Cap On Liability"): 220 / 449,
+    cuad_filter("Insurance"): 118 / 449,
+    cuad_filter("License Grant"): 209 / 449,
+    cuad_filter("Non-Transferable License"): 108 / 449,
+    cuad_filter("Change Of Control"): 88 / 449,
 }
 JOIN_SELECTIVITY_ESTIMATES = {
     DISCUSS_ASPECT: 17683 / 60000,
@@ -77,6 +90,7 @@ JOIN_SELECTIVITY_ESTIMATES = {
     SUPPORT: 311 / 143500,
     REFUTE: 477 / 143500,
     LEPJOIN: 500 / 216500,
+    CUAD_HAS_CLAUSE: 2857 / 14817,
 }
 # IN-list filters, keyed by (classification prompt, accepted labels), from
 # the sf=0.1 reference labels in gt_6d7ca88a74a30b665bfb67dcde76daff.
@@ -194,6 +208,7 @@ QUERY_FAMILY_WORKLOADS = {
     "RUNS": "runs",
     "WRENCH": "wrench",
     "SALES": "sales",
+    "CUAD": "cuad",
 }
 
 

@@ -235,9 +235,10 @@ def test_ai_extension_definition_is_packaged():
     assert "name: ai_join" in extension
     assert "name: ai_classify" in extension
     assert "name: ai_score" in extension
-    # a filter, a score, a one-document classification, and a pair:
-    # prompt, two documents, labels, descriptions
-    assert extension.count("- name: document") == 5
+    assert "name: ai_extract" in extension
+    # a filter, a score, an extraction, a one-document classification,
+    # and a pair: prompt, two documents, labels, descriptions
+    assert extension.count("- name: document") == 6
 
 
 def test_substrait_plans_are_packaged():
@@ -245,12 +246,13 @@ def test_substrait_plans_are_packaged():
     catalog = package.joinpath("plans", "catalog.json")
     entries = json.loads(catalog.read_text())
 
-    assert len(entries) == 72
+    assert len(entries) == 87
     assert [entry["id"] for entry in entries if entry.get("labels_pending")] == [
         *(f"SUPPORT-{i}" for i in range(1, 7)),
         *(f"RUNS-{i}" for i in range(1, 5)),
         *(f"WRENCH-{i}" for i in range(1, 6)),
         *(f"SALES-{i}" for i in range(1, 6)),
+        *(f"CUAD-{i}" for i in range(1, 16)),
     ]
     assert all(
         package.joinpath("plans", f"{entry['id']}.json").is_file()
@@ -291,6 +293,7 @@ def test_query_family_split_matches_benchmark_catalog():
         "RUNS": "runs",
         "WRENCH": "wrench",
         "SALES": "sales",
+        "CUAD": "cuad",
     }
     assert split_query_families(QUERY_ORDER) == (
         QUERY_ORDER[0:15],

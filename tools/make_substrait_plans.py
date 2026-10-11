@@ -26,6 +26,11 @@ from quail_b.prompts import (
     AGENT_RECOVERED,
     ASPECT_SENTIMENT,
     CARDIOVASCULAR_REACTION,
+    CUAD_GOVERNING_LAW,
+    CUAD_GOVERNING_LAW_DESCRIPTIONS,
+    CUAD_GOVERNING_LAW_LABELS,
+    CUAD_HAS_CLAUSE,
+    CUAD_QUESTIONS,
     DISCUSS_ASPECT,
     F1,
     F4,
@@ -57,12 +62,14 @@ from quail_b.prompts import (
     SUPPORT_PUSHBACK,
     WRENCH_EXPLOITED,
     WRENCH_STEP_EXPLOIT,
+    cuad_filter,
 )
 from quail_b.substrait import (
     AGGREGATE_GENERIC_EXTENSION_URN,
     AI_CLASSIFY_JOINED_NAME,
     AI_CLASSIFY_NAME,
     AI_EXTENSION_URN,
+    AI_EXTRACT_NAME,
     AI_FILTER_NAME,
     AI_JOIN_NAME,
     AI_SCORE_NAME,
@@ -105,6 +112,7 @@ _FUNCTIONS = {
     "avg:fp64": (16, ARITHMETIC_EXTENSION_URN),
     "min:i32": (17, ARITHMETIC_EXTENSION_URN),
     "max:i32": (18, ARITHMETIC_EXTENSION_URN),
+    AI_EXTRACT_NAME: (19, AI_EXTENSION_URN),
 }
 _COMPARISONS = {
     "=": EQUAL_NAME, "<>": "not_equal:any_any", "<": "lt:any_any",
@@ -158,6 +166,23 @@ class Score:
 
 
 @dataclass(frozen=True)
+class Extract:
+    """Add one answer column to one relation: the words that answer a question.
+
+    Attributes:
+        input: The relation's scan, filters, classifications, or
+            extractions.
+        question: The question the answer is copied for.
+        output: The name of the answer column, null where the document
+            does not answer the question.
+    """
+
+    input: "Scan | Where | Filter | Classify | InList | Extract"
+    question: str
+    output: str
+
+
+@dataclass(frozen=True)
 class Aggregate:
     """Group the rows by key fields and compute measures per group.
 
@@ -202,7 +227,7 @@ class Fetch:
 class Filter:
     """Keep the documents of one relation that answer a prompt TRUE."""
 
-    input: "Scan | Where | Filter | Classify | InList | Score"
+    input: "Scan | Where | Filter | Classify | InList | Score | Extract"
     prompt: str
 
 
@@ -225,7 +250,7 @@ class Classify:
             alias; None takes the join's aliases in order.
     """
 
-    input: Scan | Filter | Classify | InList | Join
+    input: "Scan | Filter | Classify | InList | Join | Extract"
     prompt: str
     labels: tuple[str, ...]
     output: str
@@ -277,7 +302,7 @@ class Query:
 
     id: str
     description: str
-    tree: Scan | Filter | Join | Classify | InList
+    tree: "Scan | Filter | Join | Classify | InList | Extract"
     privacy: bool = False
     select: tuple[str, ...] | None = None
     labels_pending: bool = False
@@ -287,6 +312,14 @@ def _string_type():
     return type_pb2.Type(
         string=type_pb2.Type.String(
             nullability=type_pb2.Type.NULLABILITY_REQUIRED
+        )
+    )
+
+
+def _nullable_string_type():
+    return type_pb2.Type(
+        string=type_pb2.Type.String(
+            nullability=type_pb2.Type.NULLABILITY_NULLABLE
         )
     )
 
@@ -387,7 +420,7 @@ class _Emitter:
 
     def __init__(self):
         self.counts = {"filter": 0, "join": 0, "classify": 0,
-                       "in-list": 0, "where": 0, "score": 0,
+                       "in-list": 0, "where": 0, "score": 0, "extract": 0,
                        "aggregate": 0, "having": 0, "sort": 0, "fetch": 0}
         self.functions = set()
 
@@ -445,6 +478,24 @@ class _Emitter:
                     _literal(node.prompt),
                     _field(fields.index((alias, text[alias]))),
                 ], _fp64_type())],
+            )
+            return algebra.Rel(project=relation), output_fields, text
+
+        if isinstance(node, Extract):
+            rel, fields, text = self.emit(node.input)
+            (alias,) = text
+            self.functions.add(AI_EXTRACT_NAME)
+            output_fields = (*fields, (alias, node.output))
+            common = _common(self._operator_id("extract"))
+            common.hint.output_names.extend(
+                ".".join(field) for field in output_fields)
+            relation = algebra.ProjectRel(
+                common=common,
+                input=rel,
+                expressions=[_call(AI_EXTRACT_NAME, [
+                    _literal(node.question),
+                    _field(fields.index((alias, text[alias]))),
+                ], _nullable_string_type())],
             )
             return algebra.Rel(project=relation), output_fields, text
 
@@ -806,6 +857,36 @@ def _wrench_steps():
 
 def _sales_calls(alias="c", *columns):
     return Scan("sales_calls", alias, "transcript", columns)
+
+
+def _contracts(alias="c"):
+    return Scan("contracts", alias, "text")
+
+
+def _clause_types():
+    return Scan("clause_types", "k", "question")
+
+
+def _cuad_filters(node, *categories):
+    for category in categories:
+        node = Filter(node, cuad_filter(category))
+    return node
+
+
+def _cuad_extract(node, category, output):
+    return Extract(node, CUAD_QUESTIONS[category], output)
+
+
+def _governing_law(node):
+    return _classify(node, CUAD_GOVERNING_LAW, CUAD_GOVERNING_LAW_LABELS,
+                     "governing_law_state", CUAD_GOVERNING_LAW_DESCRIPTIONS)
+
+
+def _law_counts(node):
+    """Contracts per governing law label, most first."""
+    return Sort(Aggregate(_governing_law(node), ("c.governing_law_state",),
+                          (("contracts", "count", None),)),
+                (("contracts", True), ("c.governing_law_state", False)))
 
 
 def _next_call_pairs():
@@ -1213,6 +1294,74 @@ QUERIES = (
                            SALES_COMMITS, "commit_score"),
                      (("c.commit_score", True), ("c.id", False))), 25),
           select=("c", "c.commit_score"), labels_pending=True),
+
+    # CUAD contracts, with the lawyers' labels. Their reference labels
+    # are not published yet.
+    Query("CUAD-1", "extract: the governing law of each contract",
+          _cuad_extract(_contracts(), "Governing Law", "governing_law"),
+          select=("c", "c.governing_law"), labels_pending=True),
+    Query("CUAD-2", "extract: the agreement date of each contract",
+          _cuad_extract(_contracts(), "Agreement Date", "agreement_date"),
+          select=("c", "c.agreement_date"), labels_pending=True),
+    Query("CUAD-3", "extract: the cap on liability clause, null without one",
+          _cuad_extract(_contracts(), "Cap On Liability", "liability_cap"),
+          select=("c", "c.liability_cap"), labels_pending=True),
+    Query("CUAD-4", "extract: the parties, several spans per contract",
+          _cuad_extract(_contracts(), "Parties", "parties"),
+          select=("c", "c.parties"), labels_pending=True),
+    Query("CUAD-5", "filter: termination for convenience",
+          _cuad_filters(_contracts(), "Termination For Convenience"),
+          labels_pending=True),
+    Query("CUAD-6", "2 filters: non-compete + exclusivity",
+          _cuad_filters(_contracts(), "Non-Compete", "Exclusivity"),
+          labels_pending=True),
+    Query("CUAD-7", "filter: audit rights -> extract: the audit rights clause",
+          _cuad_extract(_cuad_filters(_contracts(), "Audit Rights"),
+                        "Audit Rights", "audit_rights"),
+          select=("c", "c.audit_rights"), labels_pending=True),
+    Query("CUAD-8", "2 filters: cap on liability + insurance -> extract: "
+          "the cap on liability clause",
+          _cuad_extract(_cuad_filters(_contracts(), "Cap On Liability",
+                                      "Insurance"),
+                        "Cap On Liability", "liability_cap"),
+          select=("c", "c.liability_cap"), labels_pending=True),
+    Query("CUAD-9", "2 filters: license grant + non-transferable license -> "
+          "extract: the license grant",
+          _cuad_extract(_cuad_filters(_contracts(), "License Grant",
+                                      "Non-Transferable License"),
+                        "License Grant", "license_grant"),
+          select=("c", "c.license_grant"), labels_pending=True),
+    Query("CUAD-10", "3 extracts: the agreement date, the expiration date, "
+          "and the governing law of each contract",
+          _cuad_extract(_cuad_extract(_cuad_extract(
+              _contracts(), "Agreement Date", "agreement_date"),
+              "Expiration Date", "expiration_date"),
+              "Governing Law", "governing_law"),
+          select=("c", "c.agreement_date", "c.expiration_date",
+                  "c.governing_law"),
+          labels_pending=True),
+    Query("CUAD-11", "classify each contract: its governing law -> contracts "
+          "per law, most first",
+          _law_counts(_contracts()),
+          select=("c.governing_law_state", "contracts"), labels_pending=True),
+    Query("CUAD-12", "filter: insurance -> classify: the governing law -> "
+          "contracts per law, most first",
+          _law_counts(_cuad_filters(_contracts(), "Insurance")),
+          select=("c.governing_law_state", "contracts"), labels_pending=True),
+    Query("CUAD-13", "join: contracts x clause types (33 types)",
+          Join(_contracts(), _clause_types(), ("c", "k"), CUAD_HAS_CLAUSE),
+          labels_pending=True),
+    Query("CUAD-14", "filter: change of control -> join: clause types",
+          Join(_cuad_filters(_contracts(), "Change Of Control"),
+               _clause_types(), ("c", "k"), CUAD_HAS_CLAUSE),
+          labels_pending=True),
+    Query("CUAD-15", "filter: termination for convenience -> extract: the "
+          "expiration date -> by id, 20",
+          Fetch(Sort(_cuad_extract(
+              _cuad_filters(_contracts(), "Termination For Convenience"),
+              "Expiration Date", "expiration_date"),
+              (("c.id", False),)), 20),
+          select=("c", "c.expiration_date"), labels_pending=True),
 
     # PrivacyPolicies: only when that corpus is available.
     Query("PRIV-1", "2 filters: P_MSG + P_LOC",

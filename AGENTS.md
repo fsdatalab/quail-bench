@@ -24,11 +24,12 @@ Read `README.md` for the public benchmark contract and metric definitions.
   and input tables, then returns a `RunOutput`.
 - Do not add engine runtime code, GPU infrastructure, or experiment reports
   here.
-- The AI operators are `ai_filter`, `ai_join`, `ai_classify`, and `ai_score`.
-  Relational operators appear in the `REL-` queries, the agent trace
-  queries (`SUPPORT-`, `RUNS-`, `WRENCH-`), and the sales call queries
-  (`SALES-`). Do not add maps, speculation, or forking unless the task
-  changes the benchmark scope.
+- The AI operators are `ai_filter`, `ai_join`, `ai_classify`, `ai_score`,
+  and `ai_extract`. Relational operators appear in the `REL-` queries,
+  the agent trace queries (`SUPPORT-`, `RUNS-`, `WRENCH-`), the sales
+  call queries (`SALES-`), and the contract queries (`CUAD-`). Do not
+  add maps, speculation, or forking unless the task changes the
+  benchmark scope.
 - Preserve query IDs, operator IDs, prompt text, corpus identities, scale
   factors, and label identities unless the task explicitly changes that
   public contract.

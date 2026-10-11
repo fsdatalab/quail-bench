@@ -542,3 +542,174 @@ SALES_COMMITS = (
     "another meeting do not count.\n\n{0}\n\nInstruction: answer TRUE if "
     "the customer commits to buying, FALSE otherwise."
 )
+
+
+# CUAD: the 41 clause categories lawyers marked in the contracts, each
+# with the question its labelers answered, as the dataset writes it
+# (quail_b.data.cuad_categories), non-breaking spaces included. The 8
+# field categories are answered with text and are extraction
+# questions; the other 33 are answered Yes or No and are filter
+# questions and the join's clause types.
+CUAD_QUESTIONS = {
+    "Document Name":
+        "The name of the contract",
+    "Parties":
+        "The two or more parties who signed the contract",
+    "Agreement Date":
+        "The date of the contract",
+    "Effective Date":
+        "The date when the contract is effective",
+    "Expiration Date":
+        "On what date will the contract's initial term expire?",
+    "Renewal Term":
+        "What is the renewal term after the initial term expires? This includes "
+        "automatic extensions and unilateral extensions with prior notice.",
+    "Notice Period To Terminate Renewal":
+        "What is the notice period required to terminate renewal?",
+    "Governing Law":
+        "Which state/country's law governs the interpretation of the contract?",
+    "Most Favored Nation":
+        "Is there a clause that if a third party gets better terms on the licensing "
+        "or sale of technology/goods/services described in the contract, the buyer "
+        "of such technology/goods/services under the contract shall be entitled to "
+        "those better terms?",
+    "Non-Compete":
+        "Is there a restriction on the ability of a party to compete with the "
+        "counterparty or operate in a certain geography or business or technology "
+        "sector?",
+    "Exclusivity":
+        "Is there an exclusive dealing\u00a0 commitment with the counterparty? This "
+        "includes a commitment to procure all “requirements” from one party of "
+        "certain technology, goods, or services or a prohibition on licensing or "
+        "selling technology, goods or services to third parties, or a prohibition "
+        "on\u00a0 collaborating or working with other parties), whether during the "
+        "contract or\u00a0 after the contract ends (or both).",
+    "No-Solicit Of Customers":
+        "Is a party restricted from contracting or soliciting customers or partners "
+        "of the counterparty, whether during the contract or after the contract ends "
+        "(or both)?",
+    "Competitive Restriction Exception":
+        "This category includes the exceptions or carveouts to Non-Compete, "
+        "Exclusivity and No-Solicit of Customers above.",
+    "No-Solicit Of Employees":
+        "Is there a restriction on a party’s soliciting or hiring employees and/or "
+        "contractors from the\u00a0 counterparty, whether during the contract or "
+        "after the contract ends (or both)?",
+    "Non-Disparagement":
+        "Is there a requirement on a party not to disparage the counterparty?",
+    "Termination For Convenience":
+        "Can a party terminate this\u00a0 contract without cause (solely by giving a "
+        "notice and allowing a waiting\u00a0 period to expire)?",
+    "Rofr/Rofo/Rofn":
+        "Is there a clause granting one party a right of first refusal, right of "
+        "first offer or right of first negotiation to purchase, license, market, or "
+        "distribute equity interest, technology, assets, products or services?",
+    "Change Of Control":
+        "Does one party have the right to terminate or is consent or notice required "
+        "of the counterparty if such party undergoes a change of control, such as a "
+        "merger, stock sale, transfer of all or substantially all of its assets or "
+        "business, or assignment by operation of law?",
+    "Anti-Assignment":
+        "Is consent or notice required of a party if the contract is assigned to a "
+        "third party?",
+    "Revenue/Profit Sharing":
+        "Is one party required to share revenue or profit with the counterparty for "
+        "any technology, goods, or\u00a0services?",
+    "Price Restrictions":
+        "Is there a restriction on the\u00a0 ability of a party to raise or reduce "
+        "prices of technology, goods, or\u00a0 services provided?",
+    "Minimum Commitment":
+        "Is there a minimum order size or minimum amount or units per-time period "
+        "that one party must buy from the counterparty under the contract?",
+    "Volume Restriction":
+        "Is there a fee increase or consent requirement, etc. if one party’s use of "
+        "the product/services exceeds certain threshold?",
+    "Ip Ownership Assignment":
+        "Does intellectual property created\u00a0 by one party become the property "
+        "of the counterparty, either per the terms of the contract or upon the "
+        "occurrence of certain events?",
+    "Joint Ip Ownership":
+        "Is there any clause providing for joint or shared ownership of intellectual "
+        "property between the parties to the contract?",
+    "License Grant":
+        "Does the contract contain a license granted by one party to its "
+        "counterparty?",
+    "Non-Transferable License":
+        "Does the contract limit the ability of a party to transfer the license "
+        "being granted to a third party?",
+    "Affiliate License-Licensor":
+        "Does the contract contain a license grant by affiliates of the licensor or "
+        "that includes intellectual property of affiliates of the licensor?",
+    "Affiliate License-Licensee":
+        "Does the contract contain a license grant to a licensee (incl. sublicensor) "
+        "and the affiliates of such licensee/sublicensor?",
+    "Unlimited/All-You-Can-Eat-License":
+        "Is there a clause granting one party an “enterprise,” “all you can eat” or "
+        "unlimited usage license?",
+    "Irrevocable Or Perpetual License":
+        "Does the contract contain a\u00a0 license grant that is irrevocable or "
+        "perpetual?",
+    "Source Code Escrow":
+        "Is one party required to deposit its source code into escrow with a third "
+        "party, which can be released to the counterparty upon the occurrence of "
+        "certain events (bankruptcy,\u00a0 insolvency, etc.)?",
+    "Post-Termination Services":
+        "Is a party subject to obligations after the termination or expiration of a "
+        "contract, including any post-termination transition, payment, transfer of "
+        "IP, wind-down, last-buy, or similar commitments?",
+    "Audit Rights":
+        "Does a party have the right to\u00a0 audit the books, records, or physical "
+        "locations of the counterparty to ensure compliance with the contract?",
+    "Uncapped Liability":
+        "Is a party’s liability uncapped upon the breach of its obligation in the "
+        "contract? This also includes uncap liability for a particular type of "
+        "breach such as IP infringement or breach of confidentiality obligation.",
+    "Cap On Liability":
+        "Does the contract include a cap on liability upon the breach of a party’s "
+        "obligation? This includes time limitation for the counterparty to bring "
+        "claims or maximum amount for recovery.",
+    "Liquidated Damages":
+        "Does the contract contain a clause that would award either party liquidated "
+        "damages for breach or a fee upon the termination of a contract (termination "
+        "fee)?",
+    "Warranty Duration":
+        "What is the duration of any\u00a0 warranty against defects or errors in "
+        "technology, products, or services\u00a0 provided under the contract?",
+    "Insurance":
+        "Is there a requirement for insurance that must be maintained by one party "
+        "for the benefit of the counterparty?",
+    "Covenant Not To Sue":
+        "Is a party restricted from contesting the validity of the counterparty’s "
+        "ownership of intellectual property or otherwise bringing a claim against "
+        "the counterparty for matters unrelated to the contract?",
+    "Third Party Beneficiary":
+        "Is there a non-contracting party who is a beneficiary to some or all of the "
+        "clauses in the contract and therefore can enforce its rights against a "
+        "contracting party?",
+}
+
+
+def cuad_filter(category: str) -> str:
+    """Return the filter template of one Yes-or-No CUAD category."""
+    return "{0}\n\n" + CUAD_QUESTIONS[category]
+
+
+CUAD_HAS_CLAUSE = (
+    "DOCUMENT {1} names a clause type and the question its labelers answered. "
+    "Judge strictly from the contract in DOCUMENT {0} whether the answer to "
+    "that question for this contract is yes."
+)
+
+CUAD_GOVERNING_LAW = (
+    "Judge strictly from the contract above which state's or country's law "
+    "governs its interpretation.\n\n{0}"
+)
+CUAD_GOVERNING_LAW_LABELS = (
+    "New York", "California", "Delaware", "Texas", "Florida",
+    "another state or country", "not stated",
+)
+CUAD_GOVERNING_LAW_DESCRIPTIONS = (
+    "", "", "", "", "",
+    "a governing law other than those five",
+    "the contract names no governing law",
+)

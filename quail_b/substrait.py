@@ -16,6 +16,7 @@ AI_JOIN_NAME = "ai_join:str_str_str"
 AI_CLASSIFY_NAME = "ai_classify:str_str_list_list"
 AI_CLASSIFY_JOINED_NAME = "ai_classify:str_str_str_list_list"
 AI_SCORE_NAME = "ai_score:str_str"
+AI_EXTRACT_NAME = "ai_extract:str_str"
 EQUAL_NAME = "equal:any_any"
 AND_NAME = "and:bool"
 AGGREGATE_GENERIC_EXTENSION_URN = (
@@ -39,6 +40,7 @@ _FUNCTION_URNS = {
     AI_CLASSIFY_NAME: AI_EXTENSION_URN,
     AI_CLASSIFY_JOINED_NAME: AI_EXTENSION_URN,
     AI_SCORE_NAME: AI_EXTENSION_URN,
+    AI_EXTRACT_NAME: AI_EXTENSION_URN,
     EQUAL_NAME: COMPARISON_EXTENSION_URN,
     AND_NAME: BOOLEAN_EXTENSION_URN,
     **{name: COMPARISON_EXTENSION_URN for name in COMPARISON_NAMES},
@@ -131,6 +133,21 @@ class Score:
 
 
 @dataclass(frozen=True)
+class Extract:
+    """One ai_extract call that adds a nullable string column to one relation.
+
+    The prompt is the question; the answer is the words of the document
+    that answer it, copied from the document, or null when the document
+    does not answer it.
+    """
+
+    id: str
+    relation: str
+    prompt: str
+    output: str
+
+
+@dataclass(frozen=True)
 class ColumnTest:
     """A test of one source column against a literal, before the model."""
 
@@ -182,7 +199,8 @@ class Fetch:
     count: int
 
 
-type Operator = Filter | Join | Classify | InList | Score | ColumnTest
+type Operator = (Filter | Join | Classify | InList | Score | ColumnTest
+                 | Extract)
 type Step = Aggregate | Having | Sort | Fetch
 
 
@@ -221,7 +239,8 @@ class PlanInfo:
         )
 
     @property
-    def ai_operators(self) -> tuple[Filter | Join | Classify | Score, ...]:
+    def ai_operators(
+            self) -> tuple[Filter | Join | Classify | Score | Extract, ...]:
         """The operators that ask the model, each with its prompt."""
         return tuple(
             operator
@@ -233,6 +252,11 @@ class PlanInfo:
     def scores(self) -> tuple[Score, ...]:
         return tuple(operator for operator in self.operators
                      if isinstance(operator, Score))
+
+    @property
+    def extracts(self) -> tuple[Extract, ...]:
+        return tuple(operator for operator in self.operators
+                     if isinstance(operator, Extract))
 
     @property
     def column_tests(self) -> tuple[ColumnTest, ...]:
@@ -289,6 +313,12 @@ class PlanInfo:
     def classify_output(self, output: str) -> Classify:
         return next(
             operator for operator in self.classifies
+            if operator.output == output
+        )
+
+    def extract_output(self, output: str) -> Extract:
+        return next(
+            operator for operator in self.extracts
             if operator.output == output
         )
 
@@ -633,13 +663,44 @@ def _column_test(operator_id: str, fields, condition, comparison: str
 
 def _decode_project(project: algebra_pb2.ProjectRel,
                     functions: dict[int, str]) -> _Decoded:
-    """Decode an inner ProjectRel: an ai_classify label or an ai_score number."""
+    """Decode an inner ProjectRel: a classify label, a score, or an extract."""
     if len(project.expressions) == 1 and project.expressions[0].HasField(
             "scalar_function"):
         reference = project.expressions[0].scalar_function.function_reference
         if functions.get(reference) == AI_SCORE_NAME:
             return _decode_score(project, functions)
+        if functions.get(reference) == AI_EXTRACT_NAME:
+            return _decode_extract(project, functions)
     return _decode_classify(project, functions)
+
+
+def _decode_extract(project: algebra_pb2.ProjectRel,
+                    functions: dict[int, str]) -> _Decoded:
+    """Decode a ProjectRel that adds one ai_extract answer column."""
+    child = _decode(project.input, functions)
+    if project.common.HasField("emit"):
+        raise ValueError("an extract ProjectRel adds exactly one column")
+    arguments = _arguments(project.expressions[0])
+    if len(arguments) != 2:
+        raise ValueError("ai_extract needs a question and a document field")
+    prompt = _literal_string(arguments[0])
+    field = _selected(child.fields, arguments[1])
+    names = tuple(project.common.hint.output_names)
+    expected = tuple(".".join(name) for name in child.fields)
+    if len(names) != len(expected) + 1 or names[:-1] != expected:
+        raise ValueError("an extract ProjectRel must name every output field")
+    alias, _, output = names[-1].partition(".")
+    if alias != field[0] or not output or "." in output:
+        raise ValueError("an answer column must belong to the read relation")
+    if output == "id" or (alias, output) in child.fields:
+        raise ValueError(f"answer column {output!r} is already a field")
+    operator = Extract(project.common.hint.alias, alias, prompt, output)
+    return _Decoded(
+        (*child.fields, (alias, output)),
+        child.tables,
+        _with_text_column(child.text_columns, field),
+        (*child.operators, operator),
+    )
 
 
 def _decode_score(project: algebra_pb2.ProjectRel,
@@ -860,6 +921,10 @@ def _validate_relational(info: PlanInfo) -> None:
         if info.fetch is None and info.aggregate is None and (
                 f"{score.relation}.{score.output}" not in info.select):
             raise ValueError(f"score column {score.output!r} is never used")
+    for extract in info.extracts:
+        if f"{extract.relation}.{extract.output}" not in info.select:
+            raise ValueError(
+                f"answer column {extract.output!r} is never used")
 
 
 def _validate_info(info: PlanInfo) -> None:
@@ -898,16 +963,18 @@ def _validate_info(info: PlanInfo) -> None:
                     f"classification {operator.id!r} of joined rows must follow the "
                     "join of its two relations")
         elif (
-            isinstance(operator, (Filter, Classify, InList, ColumnTest))
+            isinstance(operator, (Filter, Classify, InList, ColumnTest,
+                                  Extract))
             and index > first_join[operator.relation]
         ):
             raise ValueError(
                 f"filter {operator.id!r} must precede joins on its relation"
             )
-    outputs = [operator.output for operator in info.classifies]
+    outputs = [operator.output for operator in (*info.classifies,
+                                                *info.extracts)]
     if len(set(outputs)) != len(outputs) or set(outputs) & set(aliases):
-        raise ValueError("label column names must be distinct from each "
-                         "other and from relation aliases")
+        raise ValueError("label and answer column names must be distinct "
+                         "from each other and from relation aliases")
     selected = {_field_alias(name) for name in info.select}
     if not selected or not selected <= set(aliases):
         raise ValueError("QUAIL-B projection uses an unknown relation")
@@ -921,13 +988,15 @@ def _validate_info(info: PlanInfo) -> None:
         if column == "id":
             continue
         operator = next(
-            (operator for operator in info.classifies
+            (operator for operator in (*info.classifies, *info.extracts)
              if (operator.relation, operator.output) == (alias, column)),
             None)
         if operator is None:
-            raise ValueError(f"QUAIL-B projection selects {name!r}; only ids "
-                             "and label columns can be selected")
-        if not set(operator.relations) <= selected_ids:
+            raise ValueError(f"QUAIL-B projection selects {name!r}; only ids, "
+                             "label columns, and answer columns can be "
+                             "selected")
+        if isinstance(operator, Classify) and not (
+                set(operator.relations) <= selected_ids):
             raise ValueError(f"a query selecting the joined-row label {name!r} must "
                              "select both relations' ids")
     used = {operator.output for operator in info.in_lists}
@@ -936,6 +1005,10 @@ def _validate_info(info: PlanInfo) -> None:
         if operator.output not in used:
             raise ValueError(
                 f"label column {operator.output!r} is never used")
+    for operator in info.extracts:
+        if operator.output not in used:
+            raise ValueError(
+                f"answer column {operator.output!r} is never used")
 
 
 def inspect_plan(plan: plan_pb2.Plan) -> PlanInfo:
