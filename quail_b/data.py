@@ -77,7 +77,7 @@ ISSUE_RUNS_PER_ISSUE = 8
 ISSUE_RUN_SOURCE_RUNS = 12
 ISSUE_RUN_MAX_TOKENS = 24_000
 TRANSCRIPT_TOOL_CHARS = 400
-# RUNS-3 and RUNS-4 read two patches in one prompt, which must fit one
+# RUNS-3 reads two patches in one prompt, which must fit one
 # forward pass of the reference judge (41,943 tokens for Qwen3 32B on
 # one H100), so a longer patch keeps its start and end.
 ISSUE_PATCH_MAX_CHARS = 40_000

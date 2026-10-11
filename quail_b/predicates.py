@@ -283,14 +283,6 @@ CLASSIFY_PREDICATES = (
         labels=prompts.RUNS_STRATEGY_LABELS,
         descriptions=prompts.RUNS_STRATEGY_DESCRIPTIONS),
     PredicateSpec(
-        "quailb.runs.run.shortfall", "runs", "shortfall", "classify",
-        prompts.RUNS_SHORTFALL, "failed_run", "issue_runs", "patch",
-        "successful_run", "issue_runs", "patch",
-        labels=prompts.RUNS_SHORTFALL_LABELS,
-        descriptions=prompts.RUNS_SHORTFALL_DESCRIPTIONS,
-        pair_columns=("instance_id", "instance_id"),
-        left_where=("resolved", 0), right_where=("resolved", 1)),
-    PredicateSpec(
         "quailb.wrench.run.exploit_kind", "wrench", "exploit_kind",
         "classify", prompts.WRENCH_EXPLOIT_KIND, "agent_run", "wrench_runs",
         "transcript", labels=prompts.WRENCH_EXPLOIT_KIND_LABELS,

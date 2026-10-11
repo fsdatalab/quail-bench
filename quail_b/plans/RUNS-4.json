@@ -9,16 +9,16 @@
       "urn": "extension:io.substrait:functions_comparison"
     },
     {
-      "extension_urn_anchor": 3,
-      "urn": "extension:io.substrait:functions_boolean"
+      "extension_urn_anchor": 4,
+      "urn": "extension:io.substrait:functions_aggregate_generic"
     }
   ],
   "extensions": [
     {
       "extension_function": {
         "extension_urn_reference": 1,
-        "function_anchor": 2,
-        "name": "ai_join:str_str_str"
+        "function_anchor": 1,
+        "name": "ai_filter:str_str"
       }
     },
     {
@@ -30,16 +30,16 @@
     },
     {
       "extension_function": {
-        "extension_urn_reference": 3,
-        "function_anchor": 4,
-        "name": "and:bool"
+        "extension_urn_reference": 2,
+        "function_anchor": 12,
+        "name": "gte:any_any"
       }
     },
     {
       "extension_function": {
-        "extension_urn_reference": 1,
-        "function_anchor": 6,
-        "name": "ai_classify:str_str_str_list_list"
+        "extension_urn_reference": 4,
+        "function_anchor": 13,
+        "name": "count:any"
       }
     }
   ],
@@ -51,23 +51,12 @@
             "common": {
               "emit": {
                 "output_mapping": [
-                  9,
-                  10,
-                  11
+                  2,
+                  3
                 ]
               }
             },
             "expressions": [
-              {
-                "selection": {
-                  "direct_reference": {
-                    "struct_field": {
-                      "field": 4
-                    }
-                  },
-                  "root_reference": {}
-                }
-              },
               {
                 "selection": {
                   "direct_reference": {
@@ -80,7 +69,7 @@
                 "selection": {
                   "direct_reference": {
                     "struct_field": {
-                      "field": 8
+                      "field": 1
                     }
                   },
                   "root_reference": {}
@@ -88,228 +77,32 @@
               }
             ],
             "input": {
-              "project": {
+              "fetch": {
                 "common": {
                   "direct": {},
                   "hint": {
-                    "alias": "classify-1",
-                    "output_names": [
-                      "s.id",
-                      "s.patch",
-                      "s.instance_id",
-                      "s.resolved",
-                      "f.id",
-                      "f.patch",
-                      "f.instance_id",
-                      "f.resolved",
-                      "f.shortfall"
-                    ]
+                    "alias": "fetch-1"
                   }
                 },
-                "expressions": [
-                  {
-                    "scalar_function": {
-                      "arguments": [
-                        {
-                          "value": {
-                            "literal": {
-                              "string": "Judge strictly from the failed run's patch in DOCUMENT {0}, compared with the patch of a successful run of the same issue in DOCUMENT {1}, what the failed patch lacks."
-                            }
-                          }
-                        },
-                        {
-                          "value": {
-                            "selection": {
-                              "direct_reference": {
-                                "struct_field": {
-                                  "field": 5
-                                }
-                              },
-                              "root_reference": {}
-                            }
-                          }
-                        },
-                        {
-                          "value": {
-                            "selection": {
-                              "direct_reference": {
-                                "struct_field": {
-                                  "field": 1
-                                }
-                              },
-                              "root_reference": {}
-                            }
-                          }
-                        },
-                        {
-                          "value": {
-                            "literal": {
-                              "list": {
-                                "values": [
-                                  {
-                                    "string": "wrong location"
-                                  },
-                                  {
-                                    "string": "incomplete fix"
-                                  },
-                                  {
-                                    "string": "special case"
-                                  },
-                                  {
-                                    "string": "no change"
-                                  },
-                                  {
-                                    "string": "other"
-                                  }
-                                ]
-                              }
-                            }
-                          }
-                        },
-                        {
-                          "value": {
-                            "literal": {
-                              "list": {
-                                "values": [
-                                  {
-                                    "string": "changes code that does not cause the issue"
-                                  },
-                                  {
-                                    "string": "changes the right code but misses cases the successful patch covers"
-                                  },
-                                  {
-                                    "string": "handles only the reported input instead of the general case"
-                                  },
-                                  {
-                                    "string": "changes none of the project's code"
-                                  },
-                                  {
-                                    "string": "none of the above"
-                                  }
-                                ]
-                              }
-                            }
-                          }
-                        }
-                      ],
-                      "function_reference": 6,
-                      "output_type": {
-                        "string": {
-                          "nullability": "NULLABILITY_REQUIRED"
-                        }
-                      }
-                    }
+                "count_expr": {
+                  "literal": {
+                    "i64": "50"
                   }
-                ],
+                },
                 "input": {
-                  "join": {
+                  "sort": {
                     "common": {
                       "direct": {},
                       "hint": {
-                        "alias": "join-1"
+                        "alias": "sort-1"
                       }
                     },
-                    "expression": {
-                      "scalar_function": {
-                        "arguments": [
-                          {
-                            "value": {
-                              "scalar_function": {
-                                "arguments": [
-                                  {
-                                    "value": {
-                                      "literal": {
-                                        "string": "DOCUMENT {0} and DOCUMENT {1} are the patches of two agent runs on the same issue. Does the patch in DOCUMENT {1} take a different approach from the patch in DOCUMENT {0}? Answer TRUE if the two patches change different code or fix the issue in different ways, FALSE if they make essentially the same change."
-                                      }
-                                    }
-                                  },
-                                  {
-                                    "value": {
-                                      "selection": {
-                                        "direct_reference": {
-                                          "struct_field": {
-                                            "field": 1
-                                          }
-                                        },
-                                        "root_reference": {}
-                                      }
-                                    }
-                                  },
-                                  {
-                                    "value": {
-                                      "selection": {
-                                        "direct_reference": {
-                                          "struct_field": {
-                                            "field": 5
-                                          }
-                                        },
-                                        "root_reference": {}
-                                      }
-                                    }
-                                  }
-                                ],
-                                "function_reference": 2,
-                                "output_type": {
-                                  "bool": {
-                                    "nullability": "NULLABILITY_REQUIRED"
-                                  }
-                                }
-                              }
-                            }
-                          },
-                          {
-                            "value": {
-                              "scalar_function": {
-                                "arguments": [
-                                  {
-                                    "value": {
-                                      "selection": {
-                                        "direct_reference": {
-                                          "struct_field": {
-                                            "field": 2
-                                          }
-                                        },
-                                        "root_reference": {}
-                                      }
-                                    }
-                                  },
-                                  {
-                                    "value": {
-                                      "selection": {
-                                        "direct_reference": {
-                                          "struct_field": {
-                                            "field": 6
-                                          }
-                                        },
-                                        "root_reference": {}
-                                      }
-                                    }
-                                  }
-                                ],
-                                "function_reference": 3,
-                                "output_type": {
-                                  "bool": {
-                                    "nullability": "NULLABILITY_REQUIRED"
-                                  }
-                                }
-                              }
-                            }
-                          }
-                        ],
-                        "function_reference": 4,
-                        "output_type": {
-                          "bool": {
-                            "nullability": "NULLABILITY_REQUIRED"
-                          }
-                        }
-                      }
-                    },
-                    "left": {
+                    "input": {
                       "filter": {
                         "common": {
                           "direct": {},
                           "hint": {
-                            "alias": "where-1"
+                            "alias": "having-1"
                           }
                         },
                         "condition": {
@@ -320,7 +113,7 @@
                                   "selection": {
                                     "direct_reference": {
                                       "struct_field": {
-                                        "field": 3
+                                        "field": 1
                                       }
                                     },
                                     "root_reference": {}
@@ -330,12 +123,12 @@
                               {
                                 "value": {
                                   "literal": {
-                                    "i32": 1
+                                    "i32": 3
                                   }
                                 }
                               }
                             ],
-                            "function_reference": 3,
+                            "function_reference": 12,
                             "output_type": {
                               "bool": {
                                 "nullability": "NULLABILITY_REQUIRED"
@@ -344,145 +137,215 @@
                           }
                         },
                         "input": {
-                          "read": {
-                            "base_schema": {
-                              "names": [
-                                "id",
-                                "patch",
-                                "instance_id",
-                                "resolved"
-                              ],
-                              "struct": {
-                                "nullability": "NULLABILITY_REQUIRED",
-                                "types": [
-                                  {
-                                    "string": {
-                                      "nullability": "NULLABILITY_REQUIRED"
-                                    }
-                                  },
-                                  {
-                                    "string": {
-                                      "nullability": "NULLABILITY_REQUIRED"
-                                    }
-                                  },
-                                  {
-                                    "string": {
-                                      "nullability": "NULLABILITY_REQUIRED"
-                                    }
-                                  },
-                                  {
-                                    "i32": {
-                                      "nullability": "NULLABILITY_REQUIRED"
-                                    }
-                                  }
-                                ]
-                              }
-                            },
+                          "aggregate": {
                             "common": {
                               "direct": {},
                               "hint": {
-                                "alias": "s"
+                                "alias": "aggregate-1",
+                                "output_names": [
+                                  "m.trace_id",
+                                  "test_steps"
+                                ]
                               }
                             },
-                            "named_table": {
-                              "names": [
-                                "issue_runs"
-                              ]
-                            }
-                          }
-                        }
-                      }
-                    },
-                    "right": {
-                      "filter": {
-                        "common": {
-                          "direct": {},
-                          "hint": {
-                            "alias": "where-2"
-                          }
-                        },
-                        "condition": {
-                          "scalar_function": {
-                            "arguments": [
+                            "grouping_expressions": [
                               {
-                                "value": {
-                                  "selection": {
-                                    "direct_reference": {
-                                      "struct_field": {
-                                        "field": 3
+                                "selection": {
+                                  "direct_reference": {
+                                    "struct_field": {
+                                      "field": 2
+                                    }
+                                  },
+                                  "root_reference": {}
+                                }
+                              }
+                            ],
+                            "groupings": [
+                              {
+                                "expression_references": [
+                                  0
+                                ]
+                              }
+                            ],
+                            "input": {
+                              "filter": {
+                                "common": {
+                                  "direct": {},
+                                  "hint": {
+                                    "alias": "filter-1"
+                                  }
+                                },
+                                "condition": {
+                                  "scalar_function": {
+                                    "arguments": [
+                                      {
+                                        "value": {
+                                          "literal": {
+                                            "string": "Judge strictly from the agent step above whether it runs the project's tests or a reproduction script.\n\n{0}\n\nInstruction: answer TRUE if the step runs tests or a reproduction script, FALSE otherwise."
+                                          }
+                                        }
+                                      },
+                                      {
+                                        "value": {
+                                          "selection": {
+                                            "direct_reference": {
+                                              "struct_field": {
+                                                "field": 1
+                                              }
+                                            },
+                                            "root_reference": {}
+                                          }
+                                        }
+                                      }
+                                    ],
+                                    "function_reference": 1,
+                                    "output_type": {
+                                      "bool": {
+                                        "nullability": "NULLABILITY_REQUIRED"
+                                      }
+                                    }
+                                  }
+                                },
+                                "input": {
+                                  "filter": {
+                                    "common": {
+                                      "direct": {},
+                                      "hint": {
+                                        "alias": "where-1"
                                       }
                                     },
-                                    "root_reference": {}
+                                    "condition": {
+                                      "scalar_function": {
+                                        "arguments": [
+                                          {
+                                            "value": {
+                                              "selection": {
+                                                "direct_reference": {
+                                                  "struct_field": {
+                                                    "field": 3
+                                                  }
+                                                },
+                                                "root_reference": {}
+                                              }
+                                            }
+                                          },
+                                          {
+                                            "value": {
+                                              "literal": {
+                                                "string": "assistant"
+                                              }
+                                            }
+                                          }
+                                        ],
+                                        "function_reference": 3,
+                                        "output_type": {
+                                          "bool": {
+                                            "nullability": "NULLABILITY_REQUIRED"
+                                          }
+                                        }
+                                      }
+                                    },
+                                    "input": {
+                                      "read": {
+                                        "base_schema": {
+                                          "names": [
+                                            "id",
+                                            "content",
+                                            "trace_id",
+                                            "role"
+                                          ],
+                                          "struct": {
+                                            "nullability": "NULLABILITY_REQUIRED",
+                                            "types": [
+                                              {
+                                                "string": {
+                                                  "nullability": "NULLABILITY_REQUIRED"
+                                                }
+                                              },
+                                              {
+                                                "string": {
+                                                  "nullability": "NULLABILITY_REQUIRED"
+                                                }
+                                              },
+                                              {
+                                                "string": {
+                                                  "nullability": "NULLABILITY_REQUIRED"
+                                                }
+                                              },
+                                              {
+                                                "string": {
+                                                  "nullability": "NULLABILITY_REQUIRED"
+                                                }
+                                              }
+                                            ]
+                                          }
+                                        },
+                                        "common": {
+                                          "direct": {},
+                                          "hint": {
+                                            "alias": "m"
+                                          }
+                                        },
+                                        "named_table": {
+                                          "names": [
+                                            "issue_messages"
+                                          ]
+                                        }
+                                      }
+                                    }
                                   }
                                 }
-                              },
+                              }
+                            },
+                            "measures": [
                               {
-                                "value": {
-                                  "literal": {
-                                    "i32": 0
-                                  }
+                                "measure": {
+                                  "function_reference": 13,
+                                  "invocation": "AGGREGATION_INVOCATION_ALL",
+                                  "output_type": {
+                                    "i64": {
+                                      "nullability": "NULLABILITY_REQUIRED"
+                                    }
+                                  },
+                                  "phase": "AGGREGATION_PHASE_INITIAL_TO_RESULT"
                                 }
                               }
-                            ],
-                            "function_reference": 3,
-                            "output_type": {
-                              "bool": {
-                                "nullability": "NULLABILITY_REQUIRED"
-                              }
-                            }
-                          }
-                        },
-                        "input": {
-                          "read": {
-                            "base_schema": {
-                              "names": [
-                                "id",
-                                "patch",
-                                "instance_id",
-                                "resolved"
-                              ],
-                              "struct": {
-                                "nullability": "NULLABILITY_REQUIRED",
-                                "types": [
-                                  {
-                                    "string": {
-                                      "nullability": "NULLABILITY_REQUIRED"
-                                    }
-                                  },
-                                  {
-                                    "string": {
-                                      "nullability": "NULLABILITY_REQUIRED"
-                                    }
-                                  },
-                                  {
-                                    "string": {
-                                      "nullability": "NULLABILITY_REQUIRED"
-                                    }
-                                  },
-                                  {
-                                    "i32": {
-                                      "nullability": "NULLABILITY_REQUIRED"
-                                    }
-                                  }
-                                ]
-                              }
-                            },
-                            "common": {
-                              "direct": {},
-                              "hint": {
-                                "alias": "f"
-                              }
-                            },
-                            "named_table": {
-                              "names": [
-                                "issue_runs"
-                              ]
-                            }
+                            ]
                           }
                         }
                       }
                     },
-                    "type": "JOIN_TYPE_INNER"
+                    "sorts": [
+                      {
+                        "direction": "SORT_DIRECTION_DESC_NULLS_LAST",
+                        "expr": {
+                          "selection": {
+                            "direct_reference": {
+                              "struct_field": {
+                                "field": 1
+                              }
+                            },
+                            "root_reference": {}
+                          }
+                        }
+                      },
+                      {
+                        "direction": "SORT_DIRECTION_ASC_NULLS_LAST",
+                        "expr": {
+                          "selection": {
+                            "direct_reference": {
+                              "struct_field": {}
+                            },
+                            "root_reference": {}
+                          }
+                        }
+                      }
+                    ]
+                  }
+                },
+                "offset_expr": {
+                  "literal": {
+                    "i64": "0"
                   }
                 }
               }
@@ -490,9 +353,8 @@
           }
         },
         "names": [
-          "f",
-          "s",
-          "shortfall"
+          "trace_id",
+          "test_steps"
         ]
       }
     }
