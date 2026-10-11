@@ -202,7 +202,7 @@ lists the queries that use it.
 | SWE-Next | AGENT-1 to AGENT-5 | `agent_traces` | Software agent trajectories |
 | SWE-Next | REL-AGENT-1 to REL-AGENT-7 | `agent_traces` | Relational operators over the trajectories |
 | tau-bench | SUPPORT-1 to SUPPORT-6 | `support_traces`, `support_messages` | Customer support agent traces |
-| SWE-rebench | RUNS-1 to RUNS-5 | `issue_runs`, `issue_messages` | Repeated coding agent runs of one issue |
+| SWE-rebench | RUNS-1 to RUNS-4 | `issue_runs`, `issue_messages` | Repeated coding agent runs of one issue |
 | Terminal Wrench | WRENCH-1 to WRENCH-5 | `wrench_runs`, `wrench_steps` | Reward hacking in terminal agent runs |
 | CRMArena-Pro | SALES-1 to SALES-5 | `sales_calls` | Sales calls about B2B and B2C deals |
 | CUAD | CUAD-1 to CUAD-15 | `contracts`, `clause_types` | Clauses of commercial contracts, with lawyers' labels |
@@ -380,9 +380,9 @@ The trace tables also keep columns from their sources. `support_traces` stores
 the task and the reward of each run, so SUPPORT-5 can join runs of the same
 task. `issue_runs` stores whether each run resolved its issue, so RUNS-3 can
 join a successful run to a failed run of the same issue. `issue_runs` also
-stores each run's final patch, and RUNS-3 and RUNS-4 compare the two runs'
-patches. Two whole transcripts can exceed what Qwen3 32B reads in one forward
-pass on one H100, but two patches fit.
+stores each run's final patch, and RUNS-3 compares the two runs' patches.
+Two whole transcripts can exceed what Qwen3 32B reads in one forward pass on
+one H100, but two patches fit.
 
 | Query | Question | Operators |
 | --- | --- | --- |
@@ -395,8 +395,7 @@ pass on one H100, but two patches fit.
 | RUNS-1 | Which runs reproduced the issue before changing code? | `ai_filter` |
 | RUNS-2 | Which kinds of change resolve the issue most often? | 6 kinds of change, `GROUP BY`, `COUNT`, `AVG`, `ORDER BY` |
 | RUNS-3 | Which patches of successful and failed runs of one issue take different approaches? | `WHERE s.resolved = 1 AND f.resolved = 0`, `ai_join` over pairs joined on `instance_id` |
-| RUNS-4 | What does each failed run's patch lack, compared with a successful run's patch? | RUNS-3, then 5 shortfalls per pair |
-| RUNS-5 | Which runs ran tests most often? | `WHERE role = 'assistant'`, `ai_filter` over steps, `GROUP BY`, `COUNT`, `HAVING`, `ORDER BY`, `LIMIT` |
+| RUNS-4 | Which runs ran tests most often? | `WHERE role = 'assistant'`, `ai_filter` over steps, `GROUP BY`, `COUNT`, `HAVING`, `ORDER BY`, `LIMIT` |
 
 ### Reward hacking queries
 

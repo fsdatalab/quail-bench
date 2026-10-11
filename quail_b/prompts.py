@@ -436,24 +436,6 @@ RUNS_DIFFERENT_APPROACH = (
     "essentially the same change."
 )
 
-# A classification of joined rows: the failed run's patch is DOCUMENT
-# {0} and the patch of a successful run of the same issue is DOCUMENT {1}.
-RUNS_SHORTFALL = (
-    "Judge strictly from the failed run's patch in DOCUMENT {0}, compared "
-    "with the patch of a successful run of the same issue in DOCUMENT {1}, "
-    "what the failed patch lacks."
-)
-RUNS_SHORTFALL_LABELS = (
-    "wrong location", "incomplete fix", "special case", "no change", "other",
-)
-RUNS_SHORTFALL_DESCRIPTIONS = (
-    "changes code that does not cause the issue",
-    "changes the right code but misses cases the successful patch covers",
-    "handles only the reported input instead of the general case",
-    "changes none of the project's code",
-    "none of the above",
-)
-
 RUNS_TEST_STEP = (
     "Judge strictly from the agent step above whether it runs the "
     "project's tests or a reproduction script.\n\n{0}\n\nInstruction: "

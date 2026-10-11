@@ -305,12 +305,6 @@
   },
   {
     "id": "RUNS-4",
-    "description": "different-approach pairs -> classify: what the failed patch lacks",
-    "privacy": false,
-    "labels_pending": true
-  },
-  {
-    "id": "RUNS-5",
     "description": "agent steps -> filter: runs tests -> per run: test steps, at least three, most first, 50",
     "privacy": false,
     "labels_pending": true

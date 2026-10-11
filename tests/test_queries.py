@@ -246,10 +246,10 @@ def test_substrait_plans_are_packaged():
     catalog = package.joinpath("plans", "catalog.json")
     entries = json.loads(catalog.read_text())
 
-    assert len(entries) == 88
+    assert len(entries) == 87
     assert [entry["id"] for entry in entries if entry.get("labels_pending")] == [
         *(f"SUPPORT-{i}" for i in range(1, 7)),
-        *(f"RUNS-{i}" for i in range(1, 6)),
+        *(f"RUNS-{i}" for i in range(1, 5)),
         *(f"WRENCH-{i}" for i in range(1, 6)),
         *(f"SALES-{i}" for i in range(1, 6)),
         *(f"CUAD-{i}" for i in range(1, 16)),

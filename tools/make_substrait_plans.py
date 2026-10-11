@@ -1221,13 +1221,7 @@ QUERIES = (
     Query("RUNS-3", "join over pairs: each successful run's patch x each "
           "failed run's patch for the same issue, different approach",
           _outcome_pairs(), labels_pending=True),
-    Query("RUNS-4", "different-approach pairs -> classify: what the failed "
-          "patch lacks",
-          Classify(_outcome_pairs(), prompts.RUNS_SHORTFALL,
-                   prompts.RUNS_SHORTFALL_LABELS, "shortfall",
-                   prompts.RUNS_SHORTFALL_DESCRIPTIONS, documents=("f", "s")),
-          select=("f", "s", "f.shortfall"), labels_pending=True),
-    Query("RUNS-5", "agent steps -> filter: runs tests -> per run: test "
+    Query("RUNS-4", "agent steps -> filter: runs tests -> per run: test "
           "steps, at least three, most first, 50",
           Fetch(Sort(Having(Aggregate(
               _filters(Where(Scan("issue_messages", "m", "content",
