@@ -486,37 +486,25 @@ A query marked `labels_pending` in the catalog has no published labels yet.
 `quail_b.queries()` leaves it out; `queries(include_pending=True)` and
 `get_query` return it. Running one needs a label collection that includes its
 predicates, passed with `root` or `collection_id`. The `SUPPORT-`, `RUNS-`,
-`WRENCH-`, `SALES-`, and `CUAD-` queries are pending.
+`WRENCH-`, and `SALES-` queries are pending.
 
 The CUAD labels come from the dataset's own annotations, not from a model.
-`tools/make_cuad_labels.py` builds the CUAD tables for one scale factor and
-writes their labels as a local collection, with one label set for each of the
-18 CUAD predicates. For example, to write the labels for scale factor 0.1
-under `<root>`:
+`tools/make_cuad_labels.py` writes them for every published scale factor and
+uploads them:
 
 ```sh
-uv run python tools/make_cuad_labels.py <root> --scale-factor 0.1
+uv run python tools/make_cuad_labels.py <root>
+uv run python tools/make_cuad_labels.py <root> --upload
 ```
 
-Then pass `root=<root>` to `quail_b.run`.
-
-To publish the CUAD labels, the same tool adds the 18 label sets to the
-published collections of the scale factor's corpus. It writes one new
-collection for each active collection of that corpus, holding the old
-label sets and the CUAD ones, and the pointers that name the new
-collections. The corpus files stay as published, because the benchmark
-builds the CUAD tables from their sources. With `--upload`, the files go
-to the public bucket with the AWS credentials of the machine running the
-command. For example:
-
-```sh
-uv run python tools/make_cuad_labels.py <root> --extend-published
-uv run python tools/make_cuad_labels.py <root> --extend-published --upload
-```
-
-The first command writes the files under `<root>` for inspection; the
-second writes them again and uploads them. After the upload, remove
-`labels_pending` from the CUAD entries of the workload catalog.
+The first command writes the files under `<root>` for inspection. For each
+scale factor, they are one label set per CUAD predicate, one new collection
+for each active collection of the published corpus, holding the old label
+sets and the CUAD ones, and the pointers naming the new collections. The
+corpus files are not written, because the benchmark builds the CUAD tables
+from their sources. The second command writes the same files and copies them
+to the public bucket with the AWS credentials of the machine running it,
+then reads the pointers back to confirm the upload.
 
 ## Extraction
 

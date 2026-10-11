@@ -372,92 +372,77 @@
   {
     "id": "CUAD-1",
     "description": "extract: the governing law of each contract",
-    "privacy": false,
-    "labels_pending": true
+    "privacy": false
   },
   {
     "id": "CUAD-2",
     "description": "extract: the agreement date of each contract",
-    "privacy": false,
-    "labels_pending": true
+    "privacy": false
   },
   {
     "id": "CUAD-3",
     "description": "extract: the cap on liability clause, null without one",
-    "privacy": false,
-    "labels_pending": true
+    "privacy": false
   },
   {
     "id": "CUAD-4",
     "description": "extract: the parties, several spans per contract",
-    "privacy": false,
-    "labels_pending": true
+    "privacy": false
   },
   {
     "id": "CUAD-5",
     "description": "filter: termination for convenience",
-    "privacy": false,
-    "labels_pending": true
+    "privacy": false
   },
   {
     "id": "CUAD-6",
     "description": "2 filters: non-compete + exclusivity",
-    "privacy": false,
-    "labels_pending": true
+    "privacy": false
   },
   {
     "id": "CUAD-7",
     "description": "filter: audit rights -> extract: the audit rights clause",
-    "privacy": false,
-    "labels_pending": true
+    "privacy": false
   },
   {
     "id": "CUAD-8",
     "description": "2 filters: cap on liability + insurance -> extract: the cap on liability clause",
-    "privacy": false,
-    "labels_pending": true
+    "privacy": false
   },
   {
     "id": "CUAD-9",
     "description": "2 filters: license grant + non-transferable license -> extract: the license grant",
-    "privacy": false,
-    "labels_pending": true
+    "privacy": false
   },
   {
     "id": "CUAD-10",
     "description": "3 extracts: the agreement date, the expiration date, and the governing law of each contract",
-    "privacy": false,
-    "labels_pending": true
+    "privacy": false
   },
   {
     "id": "CUAD-11",
     "description": "classify each contract: its governing law -> contracts per law, most first",
-    "privacy": false,
-    "labels_pending": true
+    "privacy": false
   },
   {
     "id": "CUAD-12",
     "description": "filter: insurance -> classify: the governing law -> contracts per law, most first",
-    "privacy": false,
-    "labels_pending": true
+    "privacy": false
   },
   {
     "id": "CUAD-13",
     "description": "join: contracts x clause types (33 types)",
-    "privacy": false,
-    "labels_pending": true
+    "privacy": false
   },
   {
     "id": "CUAD-14",
     "description": "filter: change of control -> join: clause types",
-    "privacy": false,
-    "labels_pending": true
+    "privacy": false
   },
   {
     "id": "CUAD-15",
     "description": "filter: termination for convenience -> extract: the expiration date -> by id, 20",
-    "privacy": false,
-    "labels_pending": true
+    "privacy": false
   },
   {
     "id": "PRIV-1",

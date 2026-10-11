@@ -37,8 +37,8 @@ from quail_b.substrait import (
 from tools.make_substrait_plans import write_plans
 
 
-def test_catalog_has_the_50_default_queries_and_two_privacy_queries():
-    assert len(QUERIES) == 50
+def test_catalog_has_the_65_default_queries_and_two_privacy_queries():
+    assert len(QUERIES) == 65
     assert QUERY_ORDER == (
         *(f"IMDB-{i}" for i in range(1, 16)),
         *(f"BIO-{i}" for i in range(1, 7)),
@@ -46,6 +46,7 @@ def test_catalog_has_the_50_default_queries_and_two_privacy_queries():
         *(f"LEP-{i}" for i in range(1, 7)),
         *(f"AGENT-{i}" for i in range(1, 6)),
         *(f"REL-AGENT-{i}" for i in range(1, 8)),
+        *(f"CUAD-{i}" for i in range(1, 16)),
     )
     assert [spec.id for spec in PRIVACY_QUERIES] == ["PRIV-1", "PRIV-2"]
     assert list(queries(include_privacy=True)) == [*QUERY_ORDER, "PRIV-1", "PRIV-2"]
@@ -65,7 +66,9 @@ def test_catalog_has_the_50_default_queries_and_two_privacy_queries():
             for in_list in info.in_lists
         ), spec.id
         if not info.classifies and not info.relational:
-            assert all(name.endswith(".id") for name in info.select), spec.id
+            answers = {extract.output for extract in info.extracts}
+            assert all(name.endswith(".id") or name.split(".")[-1] in answers
+                       for name in info.select), spec.id
     for spec in PRIVACY_QUERIES:
         info = inspect_plan(spec.plan)
         assert any(
@@ -252,7 +255,6 @@ def test_substrait_plans_are_packaged():
         *(f"RUNS-{i}" for i in range(1, 5)),
         *(f"WRENCH-{i}" for i in range(1, 6)),
         *(f"SALES-{i}" for i in range(1, 6)),
-        *(f"CUAD-{i}" for i in range(1, 16)),
     ]
     assert all(
         package.joinpath("plans", f"{entry['id']}.json").is_file()
@@ -274,10 +276,10 @@ def test_checked_in_plans_equal_the_generator_output(tmp_path):
 
 def test_parallel_query_split_matches_stock_vllm():
     assert split_query_ids(QUERY_ORDER, 4) == (
-        QUERY_ORDER[0:13],
-        QUERY_ORDER[13:26],
-        QUERY_ORDER[26:38],
-        QUERY_ORDER[38:50],
+        QUERY_ORDER[0:17],
+        QUERY_ORDER[17:33],
+        QUERY_ORDER[33:49],
+        QUERY_ORDER[49:65],
     )
 
 
@@ -302,6 +304,7 @@ def test_query_family_split_matches_benchmark_catalog():
         QUERY_ORDER[32:38],
         QUERY_ORDER[38:43],
         QUERY_ORDER[43:50],
+        QUERY_ORDER[50:65],
     )
     assert query_family_name(QUERY_ORDER[0:15]) == "imdb"
     assert query_family_name(QUERY_ORDER[43:50]) == "relational"

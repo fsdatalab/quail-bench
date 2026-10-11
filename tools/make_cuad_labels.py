@@ -1,7 +1,6 @@
-"""Write the CUAD reference labels as a label collection.
+"""Publish the CUAD reference labels.
 
-    uv run python tools/make_cuad_labels.py <root> [--scale-factor 0.1]
-    uv run python tools/make_cuad_labels.py <root> --extend-published [--upload]
+    uv run python tools/make_cuad_labels.py <root> [--upload]
 
 The CUAD labels come from the dataset's own annotations, not from a
 judge model: a category's Yes or No answer in master_clauses.csv
@@ -9,20 +8,16 @@ labels its filter and the join's clause type, the normalized
 governing law names the classification's label, and the spans marked
 in CUAD_v1.json are an extraction's answers.
 
-The first form writes a local mirror: the contracts and clause_types
-tables under the published corpus id, so the benchmark accepts the
-root, one label set per CUAD predicate, and a collection naming only
-them. Run the CUAD queries against it with `quail_b.run(..., root=<root>)`.
-
-The second form writes the files that add the CUAD label sets to the
-published ground truth: label sets whose ids come from the published
-corpus, one new collection per active collection of that corpus with
-the CUAD label sets added, and the pointers naming the new
-collections. The corpus files are not written; the benchmark builds
-the CUAD tables from their sources. With `--upload`, the files are
-copied to the public bucket with the AWS credentials of the machine
-running the command. Afterwards, remove `labels_pending` from the
-CUAD entries of the workload catalog.
+For each published scale factor, the tool writes under root the files
+that add the CUAD label sets to the published ground truth: one label
+set per CUAD predicate, with ids from the published corpus; one new
+collection per active collection of that corpus, holding the old
+label sets and the CUAD ones; and the pointers naming the new
+collections. The corpus files are not written, because the benchmark
+builds the CUAD tables from their sources. With `--upload`, the files
+are copied to the public bucket with the AWS credentials of the
+machine running the command, and the pointers are read back from the
+bucket to confirm the upload.
 """
 
 from __future__ import annotations
@@ -36,18 +31,10 @@ from pathlib import Path
 import pyarrow as pa
 import pyarrow.parquet as pq
 from huggingface_hub import hf_hub_download
-from pyarrow import fs
 
 from quail_b import data, prompts
 from quail_b._files import PUBLIC_BUCKET, _list_files
-from quail_b.data import (
-    CORPUS_COLUMNS,
-    DATA_SEED,
-    GROUND_TRUTH_ROOT,
-    PUBLISHED_CORPORA,
-    SOURCE_REVISIONS,
-    corpus_identity,
-)
+from quail_b.data import GROUND_TRUTH_ROOT, PUBLISHED_CORPORA, SOURCE_REVISIONS
 from quail_b.labels import _read_json, label_columns
 from quail_b.predicates import (
     CLASSIFY_PREDICATES,
@@ -171,39 +158,6 @@ def write_label_sets(root: Path, corpus_id: str, corpus_full_hash: str,
     return label_sets
 
 
-def write_collection(root: Path, scale_factor: float, tables: dict,
-                     csv_rows: dict, source: dict) -> str:
-    """Write the corpus mirror, the label sets, and the collection.
-
-    Returns:
-        The collection id.
-    """
-    corpus_id = PUBLISHED_CORPORA[scale_factor]
-    identity = corpus_identity(tables, scale_factor, DATA_SEED,
-                               SOURCE_REVISIONS)
-    corpus = root / GROUND_TRUTH_ROOT / "corpora" / corpus_id
-    corpus.mkdir(parents=True, exist_ok=True)
-    for name, table in tables.items():
-        pq.write_table(table, corpus / f"{name}.parquet")
-    manifest = {**identity, "corpus_id": corpus_id,
-                "columns": {name: list(CORPUS_COLUMNS[name]) for name in tables}}
-    _write_json(corpus / "manifest.json", manifest)
-    label_sets = write_label_sets(root, corpus_id, identity["corpus_full_hash"],
-                                  tables, csv_rows, source)
-    payload = {"schema_version": 1, "benchmark": "quailb",
-               "scale_factor": scale_factor, "corpus_id": corpus_id,
-               "workload": "cuad", "label_sets": label_sets}
-    collection_id = f"gtw_{data._full_hash(payload)[:32]}"
-    collection = root / GROUND_TRUTH_ROOT / "collections" / collection_id
-    collection.mkdir(parents=True, exist_ok=True)
-    _write_json(collection / "manifest.json", {
-        **payload, "status": "complete", "collection_id": collection_id,
-        "summary": {"model": None, "source": "cuad_annotation"}})
-    _write_json(corpus / "active_collection.json",
-                {"collection_id": collection_id})
-    return collection_id
-
-
 def extend_collections(root: Path, scale_factor: float, label_sets: dict,
                        published_root=None) -> dict:
     """Write one collection per active collection, with these label sets added.
@@ -220,7 +174,7 @@ def extend_collections(root: Path, scale_factor: float, label_sets: dict,
             for the public bucket.
 
     Returns:
-        The new collection id by pointer file name.
+        The new collection id by pointer path in the bucket.
     """
     corpus_id = PUBLISHED_CORPORA[scale_factor]
     corpus_prefix = f"{GROUND_TRUTH_ROOT}/corpora/{corpus_id}"
@@ -260,64 +214,74 @@ def extend_collections(root: Path, scale_factor: float, label_sets: dict,
         pointer_path = root / pointer
         pointer_path.parent.mkdir(parents=True, exist_ok=True)
         _write_json(pointer_path, {"collection_id": collection_id})
-        written[Path(pointer).name] = collection_id
+        written[pointer] = collection_id
     return written
 
 
-def upload(root: Path, destination: str = PUBLIC_BUCKET,
-           filesystem=None) -> None:
-    """Copy the ground truth files under root to the bucket.
+def upload(root: Path, bucket: str = PUBLIC_BUCKET, client=None) -> list[str]:
+    """Copy every file under root to the bucket; returns the keys written.
 
     Args:
         root: Directory in the bucket's layout.
-        destination: Bucket name, or a directory on `filesystem`.
-        filesystem: The destination filesystem; None for S3 with the
-            machine's AWS credentials.
+        bucket: The destination bucket.
+        client: A boto3 S3 client; None for one with the machine's
+            AWS credentials.
     """
-    if filesystem is None:
-        filesystem = fs.S3FileSystem()
-    fs.copy_files(str(root / GROUND_TRUTH_ROOT), f"{destination}/{GROUND_TRUTH_ROOT}",
-                  source_filesystem=fs.LocalFileSystem(),
-                  destination_filesystem=filesystem)
+    if client is None:
+        import boto3
+
+        client = boto3.client("s3")
+    keys = []
+    for path in sorted(root.rglob("*")):
+        if path.is_file():
+            key = path.relative_to(root).as_posix()
+            client.upload_file(str(path), bucket, key)
+            keys.append(key)
+    return keys
+
+
+def check_published(expected: dict) -> None:
+    """Raise unless the bucket's pointers name these collections.
+
+    Args:
+        expected: The collection id by pointer path, as
+            `extend_collections` returns them.
+    """
+    for pointer, collection_id in expected.items():
+        published = _read_json(None, pointer)["collection_id"]
+        if published != collection_id:
+            raise RuntimeError(
+                f"{pointer} names {published}, expected {collection_id}")
 
 
 def main(argv=None) -> None:
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("root", type=Path)
-    parser.add_argument("--scale-factor", type=float, default=0.1)
-    parser.add_argument("--extend-published", action="store_true",
-                        help="add the label sets to the published collections")
     parser.add_argument("--upload", action="store_true",
                         help="copy the written files to the public bucket")
     arguments = parser.parse_args(argv)
-    if arguments.upload and not arguments.extend_published:
-        parser.error("--upload needs --extend-published")
-    with tempfile.TemporaryDirectory() as built:
-        data._build_cuad(Path(built), arguments.scale_factor, force=True)
-        tables = {name: pq.read_table(Path(built) / f"{name}.parquet")
-                  for name in ("contracts", "clause_types")}
     source = {data.cuad_title_key(contract["title"]): contract
               for contract in data.cuad_source()}
-    result = {"root": str(arguments.root),
-              "scale_factor": arguments.scale_factor,
-              "contracts": tables["contracts"].num_rows}
-    if arguments.extend_published:
-        corpus_id = PUBLISHED_CORPORA[arguments.scale_factor]
+    csv_rows = _csv_rows()
+    collections = {}
+    for scale_factor, corpus_id in sorted(PUBLISHED_CORPORA.items()):
+        with tempfile.TemporaryDirectory() as built:
+            data._build_cuad(Path(built), scale_factor, force=True)
+            tables = {name: pq.read_table(Path(built) / f"{name}.parquet")
+                      for name in ("contracts", "clause_types")}
         corpus = _read_json(
             None, f"{GROUND_TRUTH_ROOT}/corpora/{corpus_id}/manifest.json")
         label_sets = write_label_sets(
             arguments.root, corpus_id, corpus["corpus_full_hash"], tables,
-            _csv_rows(), source)
-        result["collections"] = extend_collections(
-            arguments.root, arguments.scale_factor, label_sets)
-        if arguments.upload:
-            upload(arguments.root)
-            result["uploaded_to"] = PUBLIC_BUCKET
-    else:
-        result["collection_id"] = write_collection(
-            arguments.root, arguments.scale_factor, tables, _csv_rows(),
-            source)
-    print(json.dumps(result))
+            csv_rows, source)
+        collections.update(extend_collections(
+            arguments.root, scale_factor, label_sets))
+    result = {"root": str(arguments.root), "collections": collections}
+    if arguments.upload:
+        result["uploaded"] = len(upload(arguments.root))
+        check_published(collections)
+        result["bucket"] = PUBLIC_BUCKET
+    print(json.dumps(result, indent=2))
 
 
 if __name__ == "__main__":

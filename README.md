@@ -22,11 +22,11 @@ The query is written with BigQuery's
 function, and its prompts are shortened. QUAIL-B publishes each query as a
 Substrait plan with the exact prompt text.
 
-The benchmark contains 50 such queries over five document collections: movie
+The benchmark contains 65 such queries over six document collections: movie
 reviews, adverse drug reaction reports, claims and evidence for fact
-verification, legal citations, and software agent trajectories. Each collection
-comes at three scale factors, with reference answers for every filter, join,
-and classification.
+verification, legal citations, software agent trajectories, and commercial
+contracts. Each collection comes at three scale factors, with reference
+answers for every filter, join, classification, and extraction.
 
 To benchmark your engine, you write an adapter: a Python function that receives
 one query and its input tables, runs the query on your engine, and returns the
@@ -113,7 +113,7 @@ A full call to `quail_b.run` looks like:
 ```python
 quail_b.run(
     run_query,
-    queries=None,                        # None runs all 50 queries
+    queries=None,                        # None runs all 65 queries
     scale_factor=0.1,                    # 0.1, 0.5, or 1.0
     output_dir="results/vllm_qwen3_4b",  # must be a new directory
     metadata={"engine": "vllm", "model": "Qwen/Qwen3-4B-FP8"},
@@ -129,7 +129,7 @@ it saves the output, scores it, and updates `run.json`. At the end it writes
 | Parameter | Default | Meaning |
 | --- | --- | --- |
 | `run_query` | required | Your adapter |
-| `queries` | `None` | Query IDs to run; `None` runs all 50 |
+| `queries` | `None` | Query IDs to run; `None` runs all 65 |
 | `scale_factor` | `0.1` | Published scale factor: `0.1`, `0.5`, or `1.0` |
 | `output_dir` | required | New directory for this run's results |
 | `metadata` | `None` | JSON object saved with the run: engine, model, settings |
@@ -236,11 +236,11 @@ following question:", so an engine can reuse a document's KV across questions.
 
 ### Developing an adapter
 
-The 50 queries have several different shapes: how many filters, joins,
-classifications, and relational operators they have, and how those operators
+The 65 queries have several different shapes: how many filters, joins,
+classifications, extractions, and relational operators they have, and how those operators
 are arranged in the plan. The table below lists one query for each distinct
 shape, from simplest to most complex. Test your adapter on these queries first,
-then run it on all 50.
+then run it on all 65.
 
 | Query | Shape | What it tests |
 | --- | --- | --- |

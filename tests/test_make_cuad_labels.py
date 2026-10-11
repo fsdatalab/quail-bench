@@ -3,8 +3,6 @@
 import json
 from pathlib import Path
 
-from pyarrow import fs
-
 from quail_b.data import GROUND_TRUTH_ROOT, PUBLISHED_CORPORA
 from tools.make_cuad_labels import extend_collections, upload
 
@@ -36,7 +34,7 @@ def _published(root: Path) -> dict[str, str]:
                    "label_sets": sets,
                    "reused_label_sets": {"a": {"source_corpus_id": "c_x"}}})
         _write(corpus / pointer, {"collection_id": collection_id})
-        old[pointer] = collection_id
+        old[f"{GROUND_TRUTH_ROOT}/corpora/{CORPUS_ID}/{pointer}"] = collection_id
     return old
 
 
@@ -63,13 +61,12 @@ def test_extend_collections_adds_label_sets_to_each_active_collection(tmp_path):
         assert manifest["corpus_id"] == CORPUS_ID
         assert manifest["reused_label_sets"] == old_manifest["reused_label_sets"]
         assert manifest["summary"]["extends_collection"] == old[pointer]
-        assert json.loads(
-            (out / GROUND_TRUTH_ROOT / "corpora" / CORPUS_ID / pointer)
-            .read_text()) == {"collection_id": collection_id}
+        assert json.loads((out / pointer).read_text()) == {
+            "collection_id": collection_id}
     # The corpus files stay as published: only pointers are written there.
     corpus_files = {path.name for path in
                     (out / GROUND_TRUTH_ROOT / "corpora" / CORPUS_ID).iterdir()}
-    assert corpus_files == set(old)
+    assert corpus_files == {Path(pointer).name for pointer in old}
 
 
 def test_extend_collections_is_deterministic(tmp_path):
@@ -83,17 +80,27 @@ def test_extend_collections_is_deterministic(tmp_path):
     assert first == second
 
 
-def test_upload_copies_the_ground_truth_tree(tmp_path):
+class FakeClient:
+    def __init__(self):
+        self.uploads = []
+
+    def upload_file(self, path, bucket, key):
+        self.uploads.append((Path(path).read_bytes(), bucket, key))
+
+
+def test_upload_sends_every_file_under_root_with_its_bucket_key(tmp_path):
     published = tmp_path / "published"
     _published(published)
     out = tmp_path / "out"
     extend_collections(out, SF, {"k": "ls_k"}, published_root=published)
-    bucket = tmp_path / "bucket"
+    client = FakeClient()
 
-    upload(out, str(bucket), filesystem=fs.LocalFileSystem())
+    keys = upload(out, "bucket", client=client)
 
-    expected = sorted(path.relative_to(out) for path in out.rglob("*")
+    expected = sorted(path.relative_to(out).as_posix() for path in out.rglob("*")
                       if path.is_file())
-    copied = sorted(path.relative_to(bucket) for path in bucket.rglob("*")
-                    if path.is_file())
-    assert copied == expected
+    assert keys == expected
+    assert [key for _, _, key in client.uploads] == expected
+    assert {bucket for _, bucket, _ in client.uploads} == {"bucket"}
+    assert all(content == (out / key).read_bytes()
+               for content, _, key in client.uploads)

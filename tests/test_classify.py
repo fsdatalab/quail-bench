@@ -28,7 +28,7 @@ from tools.make_substrait_plans import (
 
 CLASSIFY_QUERIES = ("IMDB-11", "IMDB-12", "IMDB-13", "IMDB-14", "IMDB-15",
                     "BIO-5", "BIO-6", "FEV-11", "LEP-6", "AGENT-3", "AGENT-4",
-                    "AGENT-5", "REL-AGENT-5")
+                    "AGENT-5", "REL-AGENT-5", "CUAD-11", "CUAD-12")
 
 
 def test_classification_queries_are_published():
@@ -37,7 +37,6 @@ def test_classification_queries_are_published():
         *(f"RUNS-{i}" for i in range(1, 5)),
         *(f"WRENCH-{i}" for i in range(1, 6)),
         *(f"SALES-{i}" for i in range(1, 6)),
-        *(f"CUAD-{i}" for i in range(1, 16)),
     )
     assert tuple(query_id for query_id, spec in queries().items()
                  if spec.info.classifies) == CLASSIFY_QUERIES
