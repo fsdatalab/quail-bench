@@ -8,7 +8,7 @@ from test_classify import _collection
 
 import quail_b
 from quail_b import predicates, prompts, rendering
-from quail_b.queries import pending_query_ids
+from quail_b.queries import queries
 from quail_b.scoring import normalize_answer, span_scores
 from quail_b.substrait import AI_EXTRACT_NAME, Extract
 from tools.make_substrait_plans import Extract as ExtractNode
@@ -24,8 +24,8 @@ GOVERNING_LAW = prompts.CUAD_QUESTIONS["Governing Law"]
 AUDIT_RIGHTS = prompts.CUAD_QUESTIONS["Audit Rights"]
 
 
-def test_cuad_queries_are_pending_and_use_every_operator_kind():
-    assert pending_query_ids()[-15:] == CUAD_QUERIES
+def test_cuad_queries_are_published_and_use_every_operator_kind():
+    assert all(query_id in queries() for query_id in CUAD_QUERIES)
     infos = {query_id: quail_b.get_query(query_id).info
              for query_id in CUAD_QUERIES}
     assert [query_id for query_id, info in infos.items() if info.extracts] == [

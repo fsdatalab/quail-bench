@@ -23,6 +23,8 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    # uploads the CUAD labels in tools/make_cuad_labels.py
+    "boto3>=1.35",
     "pytest>=8.0",
     "ruff==0.12.9",
     "vulture>=2.16,<3",

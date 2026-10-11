@@ -252,212 +252,177 @@
   {
     "id": "SUPPORT-1",
     "description": "customer messages -> filter: frustrated with the agent",
-    "privacy": false,
-    "labels_pending": true
+    "privacy": false
   },
   {
     "id": "SUPPORT-2",
     "description": "join over pairs: each customer reply x the agent message before it, pushback",
-    "privacy": false,
-    "labels_pending": true
+    "privacy": false
   },
   {
     "id": "SUPPORT-3",
     "description": "pushback pairs -> classify: what the disagreement is about",
-    "privacy": false,
-    "labels_pending": true
+    "privacy": false
   },
   {
     "id": "SUPPORT-4",
     "description": "classify each opening request: intent -> conversations per intent, most first",
-    "privacy": false,
-    "labels_pending": true
+    "privacy": false
   },
   {
     "id": "SUPPORT-5",
     "description": "join over pairs: runs of the same task that handle the request differently",
-    "privacy": false,
-    "labels_pending": true
+    "privacy": false
   },
   {
     "id": "SUPPORT-6",
     "description": "classify each conversation: how the agent handled the request -> per outcome: conversations and mean reward, at least five, best first",
-    "privacy": false,
-    "labels_pending": true
+    "privacy": false
   },
   {
     "id": "RUNS-1",
     "description": "filter: reproduced the issue before changing the code",
-    "privacy": false,
-    "labels_pending": true
+    "privacy": false
   },
   {
     "id": "RUNS-2",
     "description": "classify each run: the kind of change -> per kind: runs and the share resolved, most runs first",
-    "privacy": false,
-    "labels_pending": true
+    "privacy": false
   },
   {
     "id": "RUNS-3",
     "description": "join over pairs: each successful run's patch x each failed run's patch for the same issue, different approach",
-    "privacy": false,
-    "labels_pending": true
+    "privacy": false
   },
   {
     "id": "RUNS-4",
     "description": "agent steps -> filter: runs tests -> per run: test steps, at least three, most first, 50",
-    "privacy": false,
-    "labels_pending": true
+    "privacy": false
   },
   {
     "id": "WRENCH-1",
     "description": "filter: runs that exploited the verifier",
-    "privacy": false,
-    "labels_pending": true
+    "privacy": false
   },
   {
     "id": "WRENCH-2",
     "description": "score: exploited the verifier -> the 100 highest scores",
-    "privacy": false,
-    "labels_pending": true
+    "privacy": false
   },
   {
     "id": "WRENCH-3",
     "description": "exploited the verifier -> classify: the kind of exploit",
-    "privacy": false,
-    "labels_pending": true
+    "privacy": false
   },
   {
     "id": "WRENCH-4",
     "description": "agent steps -> filter: part of an exploit -> per run: flagged steps, at least two, most first, 50",
-    "privacy": false,
-    "labels_pending": true
+    "privacy": false
   },
   {
     "id": "WRENCH-5",
     "description": "where: baseline runs -> filter: exploited the verifier -> flagged runs per agent model, most first",
-    "privacy": false,
-    "labels_pending": true
+    "privacy": false
   },
   {
     "id": "SALES-1",
     "description": "filter: calls that name a competitor",
-    "privacy": false,
-    "labels_pending": true
+    "privacy": false
   },
   {
     "id": "SALES-2",
     "description": "classify each call: the customer's main concern -> calls per concern, most first",
-    "privacy": false,
-    "labels_pending": true
+    "privacy": false
   },
   {
     "id": "SALES-3",
     "description": "join over pairs: each call x the next call of the same deal, the rep quotes a different price or discount",
-    "privacy": false,
-    "labels_pending": true
+    "privacy": false
   },
   {
     "id": "SALES-4",
     "description": "2 filters: the rep offers a discount + the customer commits to buying",
-    "privacy": false,
-    "labels_pending": true
+    "privacy": false
   },
   {
     "id": "SALES-5",
     "description": "where: deals in negotiation -> score: the customer commits to buying -> the 25 highest scores",
-    "privacy": false,
-    "labels_pending": true
+    "privacy": false
   },
   {
     "id": "CUAD-1",
     "description": "extract: the governing law of each contract",
-    "privacy": false,
-    "labels_pending": true
+    "privacy": false
   },
   {
     "id": "CUAD-2",
     "description": "extract: the agreement date of each contract",
-    "privacy": false,
-    "labels_pending": true
+    "privacy": false
   },
   {
     "id": "CUAD-3",
     "description": "extract: the cap on liability clause, null without one",
-    "privacy": false,
-    "labels_pending": true
+    "privacy": false
   },
   {
     "id": "CUAD-4",
     "description": "extract: the parties, several spans per contract",
-    "privacy": false,
-    "labels_pending": true
+    "privacy": false
   },
   {
     "id": "CUAD-5",
     "description": "filter: termination for convenience",
-    "privacy": false,
-    "labels_pending": true
+    "privacy": false
   },
   {
     "id": "CUAD-6",
     "description": "2 filters: non-compete + exclusivity",
-    "privacy": false,
-    "labels_pending": true
+    "privacy": false
   },
   {
     "id": "CUAD-7",
     "description": "filter: audit rights -> extract: the audit rights clause",
-    "privacy": false,
-    "labels_pending": true
+    "privacy": false
   },
   {
     "id": "CUAD-8",
     "description": "2 filters: cap on liability + insurance -> extract: the cap on liability clause",
-    "privacy": false,
-    "labels_pending": true
+    "privacy": false
   },
   {
     "id": "CUAD-9",
     "description": "2 filters: license grant + non-transferable license -> extract: the license grant",
-    "privacy": false,
-    "labels_pending": true
+    "privacy": false
   },
   {
     "id": "CUAD-10",
     "description": "3 extracts: the agreement date, the expiration date, and the governing law of each contract",
-    "privacy": false,
-    "labels_pending": true
+    "privacy": false
   },
   {
     "id": "CUAD-11",
     "description": "classify each contract: its governing law -> contracts per law, most first",
-    "privacy": false,
-    "labels_pending": true
+    "privacy": false
   },
   {
     "id": "CUAD-12",
     "description": "filter: insurance -> classify: the governing law -> contracts per law, most first",
-    "privacy": false,
-    "labels_pending": true
+    "privacy": false
   },
   {
     "id": "CUAD-13",
     "description": "join: contracts x clause types (33 types)",
-    "privacy": false,
-    "labels_pending": true
+    "privacy": false
   },
   {
     "id": "CUAD-14",
     "description": "filter: change of control -> join: clause types",
-    "privacy": false,
-    "labels_pending": true
+    "privacy": false
   },
   {
     "id": "CUAD-15",
     "description": "filter: termination for convenience -> extract: the expiration date -> by id, 20",
-    "privacy": false,
-    "labels_pending": true
+    "privacy": false
   },
   {
     "id": "PRIV-1",
