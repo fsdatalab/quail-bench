@@ -10,6 +10,7 @@ one exact corpus.
 import hashlib
 import heapq
 import json
+import re
 from pathlib import Path
 
 import numpy as np
@@ -26,7 +27,7 @@ from quail_b._files import (
 from quail_b._files import PUBLIC_BUCKET as PUBLIC_BUCKET
 
 DATA_SEED = 20260818
-CACHE_SCHEMA_VERSION = 10
+CACHE_SCHEMA_VERSION = 11
 # The labeled corpus for each scale factor, saved beside its labels in
 # the public bucket. build_sets downloads it instead of rebuilding from
 # the sources; the corpus id is checked after download.
@@ -108,6 +109,25 @@ CRMARENA_URL = (
 SALES_DOMAINS = ("b2b", "b2c")
 SALES_DEALS = {"b2b": 1_170, "b2c": 2_290}
 
+# CUAD: 510 commercial contracts from SEC filings, with 41 clause
+# categories marked by lawyers. A contract over the token cap is left
+# out, as an agent trace is; the kept contracts are numbered in title
+# order, and a scale factor keeps a seeded sample of them. The 8
+# categories answered with text, such as the parties or the governing
+# law, are extraction targets; the other 33 are answered Yes or No,
+# and the clause_types table holds each with the question its
+# labelers answered, for joins.
+CUAD_REPO = "theatticusproject/cuad"
+CUAD_JSON = "CUAD_v1/CUAD_v1.json"
+CUAD_CSV = "CUAD_v1/master_clauses.csv"
+CUAD_MAX_TOKENS = 24_000
+CUAD_CONTRACTS = 449    # the contracts within the cap at the pinned revision
+CUAD_FIELD_CATEGORIES = (
+    "Document Name", "Parties", "Agreement Date", "Effective Date",
+    "Expiration Date", "Renewal Term", "Notice Period To Terminate Renewal",
+    "Governing Law",
+)
+
 # Exact source snapshots for the benchmark corpus.  The row selection below
 # is deterministic only when the upstream revisions are fixed as well as the
 # sampling seed.
@@ -129,6 +149,7 @@ SOURCE_REVISIONS = {
     WRENCH_REPO: "6ab64c43a4c6a4d9aa53c2425f37e715257123a3",
     WRENCH_INDEX_REPO: "622449769ec6ddf33f770794489b8cd21712a0ad",
     "SalesforceAIResearch/CRMArena": CRMARENA_COMMIT,
+    CUAD_REPO: "a3c393f5d103fd0c516374e4fdff676c8176dcb1",
 }
 
 # Base document counts at sf=1. LePaRD scales sampled citation pairs
@@ -139,6 +160,7 @@ SETS = {
     "claims": 5_000,
     "agent_traces": AGENT_TRACE_DOCUMENTS,
     "policies": 1_000_000,
+    "contracts": CUAD_CONTRACTS,
 }
 
 ASPECTS = ["the acting", "the plot", "the directing", "the cinematography",
@@ -1387,6 +1409,101 @@ def _build_sales(d, sf, force=False):
                    path, compression="zstd", use_dictionary=False)
 
 
+# ------------------------------------------------ CUAD contracts
+
+CONTRACT_SCHEMA = pa.schema([
+    ("id", pa.string()),
+    ("title", pa.string()),
+    ("text", pa.string()),
+    ("token_count", pa.int32()),
+])
+CLAUSE_TYPE_SCHEMA = pa.schema([
+    ("id", pa.string()),
+    ("name", pa.string()),
+    ("question", pa.string()),
+])
+
+
+def _n_contracts(sf):
+    return min(CUAD_CONTRACTS, max(8, round(CUAD_CONTRACTS * sf)))
+
+
+def cuad_source() -> list[dict]:
+    """Read the CUAD contracts at the pinned revision, in title order."""
+    from huggingface_hub import hf_hub_download
+
+    path = hf_hub_download(CUAD_REPO, CUAD_JSON, repo_type="dataset",
+                           revision=SOURCE_REVISIONS[CUAD_REPO])
+    with open(path, encoding="utf-8") as stream:
+        contracts = json.load(stream)["data"]
+    return sorted(contracts, key=lambda contract: contract["title"])
+
+
+def cuad_title_key(title: str) -> str:
+    """Return a contract title as the CUAD CSV and JSON both spell it.
+
+    The CSV keeps an ampersand or apostrophe the JSON writes as an
+    underscore, and a few CSV names end in a space or a dash.
+    """
+    return re.sub(r"[&']", "_", title).rstrip(" -")
+
+
+def cuad_categories(contracts) -> list[tuple[str, str]]:
+    """Return (name, question) per category, in the dataset's order.
+
+    A question is the labelers' instruction after "Details:", as
+    written; the name is the quoted category in the same instruction.
+    """
+    out = []
+    for qa in contracts[0]["paragraphs"][0]["qas"]:
+        name = qa["question"].split('"')[1]
+        question = qa["question"].split("Details:", 1)[1].strip()
+        out.append((name, question))
+    return out
+
+
+def _contract_rows(contracts, tokenizer) -> list[dict]:
+    """Return the contracts within the token cap, numbered in title order."""
+    rows = []
+    for contract in contracts:
+        (paragraph,) = contract["paragraphs"]
+        text = paragraph["context"]
+        token_count = len(tokenizer.encode(text, add_special_tokens=False))
+        if token_count > CUAD_MAX_TOKENS:
+            continue
+        rows.append({"id": f"ct{len(rows)}", "title": contract["title"],
+                     "text": text, "token_count": token_count})
+    return rows
+
+
+def _build_cuad(d, sf, force=False):
+    """Build the CUAD contracts and clause types."""
+    contract_path = d / "contracts.parquet"
+    type_path = d / "clause_types.parquet"
+    if contract_path.exists() and type_path.exists() and not force:
+        return
+    from transformers import AutoTokenizer
+
+    contracts = cuad_source()
+    tokenizer = AutoTokenizer.from_pretrained(
+        AGENT_TRACE_TOKENIZER, revision=AGENT_TRACE_TOKENIZER_REVISION)
+    rows = _contract_rows(contracts, tokenizer)
+    if len(rows) != CUAD_CONTRACTS:
+        raise ValueError(
+            f"{len(rows)} contracts fit the cap, expected {CUAD_CONTRACTS}")
+    order = np.random.default_rng(DATA_SEED).permutation(len(rows))
+    kept = sorted(order[:_n_contracts(sf)].tolist())
+    pq.write_table(
+        pa.Table.from_pylist([rows[i] for i in kept], schema=CONTRACT_SCHEMA),
+        contract_path, compression="zstd", use_dictionary=False)
+    types = [{"id": f"ty{i}", "name": name, "question": question}
+             for i, (name, question) in enumerate(
+                 (name, question) for name, question in cuad_categories(contracts)
+                 if name not in CUAD_FIELD_CATEGORIES)]
+    pq.write_table(pa.Table.from_pylist(types, schema=CLAUSE_TYPE_SCHEMA),
+                   type_path, compression="zstd", use_dictionary=False)
+
+
 def _fetch_published_corpus(d, sf, root=None) -> bool:
     """Download the labeled corpus for this scale factor into d.
 
@@ -1467,6 +1584,7 @@ def build_sets(data_dir, sf, lf=1, fetch=True):
             _build_issue_runs(d, sf)
             _build_wrench(d, sf)
             _build_sales(d, sf)
+            _build_cuad(d, sf)
             return d
         rebuilt_sources = (
             "TIGER-Lab/SWE-Next-SFT-Trajectories",
@@ -1475,6 +1593,7 @@ def build_sets(data_dir, sf, lf=1, fetch=True):
             WRENCH_REPO,
             WRENCH_INDEX_REPO,
             "SalesforceAIResearch/CRMArena",
+            CUAD_REPO,
         )
         base_sources = {
             name: revision for name, revision in SOURCE_REVISIONS.items()
@@ -1500,6 +1619,7 @@ def build_sets(data_dir, sf, lf=1, fetch=True):
             _build_issue_runs(d, sf, force=True)
             _build_wrench(d, sf, force=True)
             _build_sales(d, sf, force=True)
+            _build_cuad(d, sf, force=True)
             marker.write_text(json.dumps(expected, indent=2, sort_keys=True))
             return d
     if fetch and _fetch_published_corpus(d, sf):
@@ -1508,6 +1628,7 @@ def build_sets(data_dir, sf, lf=1, fetch=True):
         _build_issue_runs(d, sf)
         _build_wrench(d, sf)
         _build_sales(d, sf)
+        _build_cuad(d, sf)
         marker.write_text(json.dumps(expected, indent=2, sort_keys=True))
         return d
     d.mkdir(parents=True, exist_ok=True)
@@ -1555,6 +1676,7 @@ def build_sets(data_dir, sf, lf=1, fetch=True):
     _build_issue_runs(d, sf, force=True)
     _build_wrench(d, sf, force=True)
     _build_sales(d, sf, force=True)
+    _build_cuad(d, sf, force=True)
 
     marker.write_text(json.dumps(expected, indent=2, sort_keys=True))
     return d
@@ -1583,6 +1705,8 @@ CORPUS_COLUMNS = {
     "wrench_runs": tuple(WRENCH_RUN_SCHEMA.names),
     "wrench_steps": tuple(WRENCH_STEP_SCHEMA.names),
     "sales_calls": tuple(SALES_CALL_SCHEMA.names),
+    "contracts": tuple(CONTRACT_SCHEMA.names),
+    "clause_types": tuple(CLAUSE_TYPE_SCHEMA.names),
 }
 
 

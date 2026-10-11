@@ -51,7 +51,7 @@ def reference_table(spec: QuerySpec, ground_truth, corpus_rows) -> pd.DataFrame:
         table = table[_COMPARE[test.comparison](column, test.value).fillna(False)]
         ids = table[f"{relation.alias}.id"]
     for operator in info.operators:
-        if operator in info.column_tests:
+        if operator in info.column_tests or operator in info.extracts:
             continue
         if operator in info.in_lists:
             column = table[f"{operator.relation}.{operator.output}"]
@@ -128,10 +128,17 @@ def apply_tail(table: pd.DataFrame, spec: QuerySpec,
     return table.reset_index(drop=True)
 
 
+def scored_fields(spec: QuerySpec) -> list[str]:
+    """Return the selected fields the rows are compared on: not an answer."""
+    answers = {f"{operator.relation}.{operator.output}"
+               for operator in spec.info.extracts}
+    return [name for name in spec.info.select if name not in answers]
+
+
 def _select(table: pd.DataFrame, spec: QuerySpec) -> pd.DataFrame:
-    selected = table[list(spec.info.select)]
-    return selected.rename(columns={
-        name: output_name(name) for name in spec.info.select})
+    fields = scored_fields(spec)
+    selected = table[fields]
+    return selected.rename(columns={name: output_name(name) for name in fields})
 
 
 def expected_result(spec: QuerySpec, ground_truth, corpus_rows) -> pa.Table:
@@ -188,7 +195,7 @@ def relational_accuracy(spec: QuerySpec, rows: pa.Table, ground_truth,
     precision at k.
     """
     info = spec.info
-    columns = [output_name(name) for name in info.select]
+    columns = [output_name(name) for name in scored_fields(spec)]
     scored = score_fields(spec)
     sort_scored = info.sort is not None and any(
         name in scored for name, _ in info.sort.keys)
@@ -201,7 +208,7 @@ def relational_accuracy(spec: QuerySpec, rows: pa.Table, ground_truth,
             result["ordered_match"] = predicted == _rows(expected, columns)
         return result
     ranked = apply_tail(reference, spec, fetch=False)
-    identity = [name for name in info.select if name not in scored]
+    identity = [name for name in scored_fields(spec) if name not in scored]
     keys = [(name, descending) for name, descending in info.sort.keys
             if name in scored]
     fetch = info.fetch

@@ -37,6 +37,18 @@ scalar_functions:
           - name: document
             value: string
         return: fp64
+  - name: ai_extract
+    description: >-
+      Return the words of a document that answer a question, copied
+      from the document, or null when the document does not answer it.
+    impls:
+      - args:
+          - name: question
+            value: string
+            constant: true
+          - name: document
+            value: string
+        return: string?
   - name: ai_classify
     description: >-
       Return the label the model scores highest for a document, or for a

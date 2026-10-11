@@ -266,7 +266,8 @@ def test_build_sets_builds_tables_newer_than_the_fetched_corpus(
     built = []
     monkeypatch.setattr(data, "_fetch_published_corpus",
                         lambda d, sf: d.mkdir(parents=True) or True)
-    for name in ("_build_support", "_build_issue_runs", "_build_wrench"):
+    for name in ("_build_support", "_build_issue_runs", "_build_wrench",
+                 "_build_sales", "_build_cuad"):
         monkeypatch.setattr(data, name,
                             lambda d, sf, force=False, name=name:
                             built.append((name, force)))
@@ -274,5 +275,6 @@ def test_build_sets_builds_tables_newer_than_the_fetched_corpus(
     directory = data.build_sets(tmp_path, 0.1)
 
     assert built == [("_build_support", False), ("_build_issue_runs", False),
-                     ("_build_wrench", False)]
+                     ("_build_wrench", False), ("_build_sales", False),
+                     ("_build_cuad", False)]
     assert (directory / "DONE").exists()

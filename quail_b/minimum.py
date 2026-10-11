@@ -104,7 +104,10 @@ def validate_prompt_pieces(spec, pieces) -> dict:
             reference prompt (`render_classify_prompt`), whatever prompt
             the engine sent; its tail ends with the answer cue. A query
             with scores also needs `scores`: a list of `{"id", "tail"}`,
-            read as for a filter.
+            read as for a filter, and one with extractions `extracts`,
+            a list of `{"id", "tail"}` read the same way: the question,
+            the instruction, and the answer template through the cue
+            that opens the answer.
 
     Returns:
         The pieces as plain lists, with every stage of the query named.
@@ -114,7 +117,8 @@ def validate_prompt_pieces(spec, pieces) -> dict:
         raise ValueError("prompt pieces need a tokenizer name")
     checked = {"tokenizer": pieces["tokenizer"],
                "preamble": _token_list(pieces.get("preamble", ()), "preamble"),
-               "filters": [], "joins": [], "classifies": [], "scores": []}
+               "filters": [], "joins": [], "classifies": [], "scores": [],
+               "extracts": []}
     stages = {filter_spec.id for filter_spec in spec.info.filters}
     for item in pieces.get("filters", ()):
         operator_id = item.get("id")
@@ -177,6 +181,19 @@ def validate_prompt_pieces(spec, pieces) -> dict:
     if operator_ids:
         raise ValueError(
             f"prompt pieces: missing score operators {sorted(operator_ids)}")
+    operator_ids = {operator.id for operator in spec.info.extracts}
+    for item in pieces.get("extracts", ()):
+        operator_id = item.get("id")
+        if operator_id not in operator_ids:
+            raise ValueError(
+                f"prompt pieces: unknown extract operator {operator_id!r}")
+        operator_ids.remove(operator_id)
+        checked["extracts"].append({
+            "id": operator_id,
+            "tail": _token_list(item.get("tail", ()), "extract tail")})
+    if operator_ids:
+        raise ValueError(
+            f"prompt pieces: missing extract operators {sorted(operator_ids)}")
     return checked
 
 
@@ -316,7 +333,8 @@ def _encoded(column) -> tuple[np.ndarray, pa.Array]:
 
 def minimum_input_tokens(spec, pieces, filter_answers, join_answers,
                          documents: DocumentTokens,
-                         classify_answers=None, score_answers=None) -> int:
+                         classify_answers=None, score_answers=None,
+                         extract_answers=None) -> int:
     """Return the fewest input tokens the run's requests need.
 
     A join can hold tens of millions of pairs, so the pairs are
@@ -335,6 +353,8 @@ def minimum_input_tokens(spec, pieces, filter_answers, join_answers,
             row classified.
         score_answers: Score operator ID to a table with the relation's
             alias column, one row per document scored.
+        extract_answers: Extract operator ID to a table with the
+            relation's alias column, one row per document read.
 
     Returns:
         The token count.
@@ -370,6 +390,18 @@ def minimum_input_tokens(spec, pieces, filter_answers, join_answers,
         if table is None:
             continue
         alias = scores[piece["id"]].relation
+        ids = pc.unique(pc.cast(table.column(alias), pa.string()))
+        for row_id in ids.to_pylist():
+            record(alias, row_id).suffixes.add(tuple(piece["tail"]))
+    # an extraction asks a question and reads the answer from the
+    # document's own tokens, so it is a suffix of the document like a
+    # filter; the tokens fed to read the answer are the engine's regret
+    extracts = {operator.id: operator for operator in spec.info.extracts}
+    for piece in pieces["extracts"]:
+        table = (extract_answers or {}).get(piece["id"])
+        if table is None:
+            continue
+        alias = extracts[piece["id"]].relation
         ids = pc.unique(pc.cast(table.column(alias), pa.string()))
         for row_id in ids.to_pylist():
             record(alias, row_id).suffixes.add(tuple(piece["tail"]))
@@ -467,7 +499,8 @@ def _reported_input_tokens(measurements) -> int | None:
 
 def input_tokens(spec, pieces, filter_answers, join_answers,
                  documents: DocumentTokens,
-                 classify_answers=None, score_answers=None) -> int | None:
+                 classify_answers=None, score_answers=None,
+                 extract_answers=None) -> int | None:
     """Count full prompt inputs, or return None for missing answer tables."""
     sets = {
         relation.alias: (relation.table, relation.text_column)
@@ -518,6 +551,13 @@ def input_tokens(spec, pieces, filter_answers, join_answers,
             return None
         total += len(table) * (preamble + len(piece["tail"]))
         total += document_tokens(table, scores[piece["id"]].relation)
+    extracts = {operator.id: operator for operator in spec.info.extracts}
+    for piece in pieces["extracts"]:
+        table = (extract_answers or {}).get(piece["id"])
+        if table is None:
+            return None
+        total += len(table) * (preamble + len(piece["tail"]))
+        total += document_tokens(table, extracts[piece["id"]].relation)
     return total
 
 
@@ -557,13 +597,16 @@ def token_metrics(spec, output, corpus_rows, stores=None) -> dict:
         raise ValueError("prompt pieces need classify answers")
     if spec.info.scores and output.score_answers is None:
         raise ValueError("prompt pieces need score answers")
+    if spec.info.extracts and output.extract_answers is None:
+        raise ValueError("prompt pieces need extract answers")
     pieces = validate_prompt_pieces(spec, output.prompt_pieces)
     stores = {} if stores is None else stores
     name = pieces["tokenizer"]
     if name not in stores:
         stores[name] = DocumentTokens(corpus_rows, load_tokenizer(name))
     answers = (output.filter_answers, output.join_answers, stores[name],
-               output.classify_answers, output.score_answers)
+               output.classify_answers, output.score_answers,
+               output.extract_answers)
     minimum = minimum_input_tokens(spec, pieces, *answers)
     piece_input = input_tokens(spec, pieces, *answers)
     if reported_input is not None:

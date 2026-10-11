@@ -28,6 +28,7 @@ from quail_b.scoring import (
 from quail_b.substrait import (
     Classify,
     ColumnTest,
+    Extract,
     Filter,
     InList,
     Join,
@@ -84,6 +85,14 @@ def _query_hash(spec):
                 # hashes of the one-document queries stay as published
                 **({"partner": operator.partner}
                    if operator.partner is not None else {}),
+            })
+        elif isinstance(operator, Extract):
+            operators.append({
+                "kind": "extract",
+                "id": operator.id,
+                "relation": operator.relation,
+                "prompt": operator.prompt,
+                "output": operator.output,
             })
         elif isinstance(operator, InList):
             operators.append({
@@ -169,10 +178,13 @@ def _save_output(directory, output, spec):
         paths["classifications"] = None
     if output.score_answers is not None:
         paths["scores"] = None
+    if output.extract_answers is not None:
+        paths["extracts"] = None
     for kind, answers in (
             ("filters", output.filter_answers), ("joins", output.join_answers),
             ("classifications", output.classify_answers),
-            ("scores", output.score_answers)):
+            ("scores", output.score_answers),
+            ("extracts", output.extract_answers)):
         if answers is None:
             continue
         paths[kind] = []
@@ -199,6 +211,7 @@ def _read_output(directory, record, rows=True):
     joins = paths["joins"]
     classifications = paths.get("classifications")
     scores = paths.get("scores")
+    extracts = paths.get("extracts")
     pieces = paths.get("prompt_pieces")
     return RunOutput(
         None if filters is None else {
@@ -214,7 +227,10 @@ def _read_output(directory, record, rows=True):
             for item in classifications},
         None if scores is None else {
             item["key"]: pq.read_table(file(item["path"]))
-            for item in scores})
+            for item in scores},
+        None if extracts is None else {
+            item["key"]: pq.read_table(file(item["path"]))
+            for item in extracts})
 
 
 ROW_SAMPLE = 100_000    # rows of a traced result checked one by one
@@ -282,6 +298,40 @@ def _validate_output(spec, output, tables):
                     f"a {name} label is not one of the query's labels")
 
     returned = [name for name in columns if name in label_names]
+    extract_names = {
+        operator.output: operator for operator in spec.info.extracts}
+
+    def validate_answers(table, names):
+        for name in names:
+            column = table[name]
+            if not pa.types.is_string(column.type):
+                raise ValueError("extracted answers must be strings or null")
+
+    def rows_follow_extracts(rows):
+        # a returned answer is the one the engine's answer table holds
+        for name in columns:
+            operator = extract_names.get(name)
+            table = (output.extract_answers or {}).get(
+                operator.id if operator else None)
+            if operator is None or table is None:
+                continue
+            alias = operator.relation
+            known = pa.table({
+                alias: table[alias].cast(pa.string()),
+                "known": table["answer"].cast(pa.string())})
+            joined = pa.table({
+                alias: rows[alias].cast(pa.string()),
+                "returned": rows[name].cast(pa.string()),
+            }).join(known, keys=[alias], join_type="left outer")
+            same = pc.or_kleene(
+                pc.equal(joined["returned"], joined["known"]),
+                pc.and_(pc.is_null(joined["returned"]),
+                        pc.is_null(joined["known"])))
+            if joined.num_rows and not pc.all(same.fill_null(False)).as_py():
+                raise ValueError(
+                    f"a returned {name} answer differs from the engine's "
+                    "answer table")
+
     answers = scores_from_answers(spec, output, tables)
     if spec.info.relational:
         if output.rows is None:
@@ -295,6 +345,9 @@ def _validate_output(spec, output, tables):
                 f"the engine returned {output.rows.num_rows:,} rows for a "
                 f"fetch of {fetch.count:,}")
         validate_ids(output.rows, selected)
+        validate_answers(output.rows,
+                         [name for name in columns if name in extract_names])
+        rows_follow_extracts(output.rows)
     elif output.rows is None:
         # a saved run rescored from its answers: its rows were checked
         # when they were saved
@@ -307,6 +360,9 @@ def _validate_output(spec, output, tables):
         validate_ids(output.rows, selected)
         if output.rows.num_rows:
             validate_labels(output.rows, returned)
+        validate_answers(output.rows,
+                         [name for name in columns if name in extract_names])
+        rows_follow_extracts(output.rows)
     else:
         # a traced run's rows are implied by its answers: the count must
         # agree, and a sample of the rows must all be implied; the
@@ -326,6 +382,9 @@ def _validate_output(spec, output, tables):
             answer_labels(spec, output.classify_answers))
         if not (pc.all(mask).as_py() if sample.num_rows else True):
             raise ValueError("a returned row is not implied by the answers")
+        validate_answers(sample,
+                         [name for name in columns if name in extract_names])
+        rows_follow_extracts(sample)
     filters = {
         filter_spec.id: filter_spec for filter_spec in spec.info.filters
     }
@@ -362,6 +421,13 @@ def _validate_output(spec, output, tables):
         if table["score"].null_count or not pa.types.is_floating(
                 table["score"].type):
             raise ValueError("scores must be non-null floats")
+    extracts = {operator.id: operator for operator in spec.info.extracts}
+    for operator_id, table in (output.extract_answers or {}).items():
+        if operator_id not in extracts:
+            raise ValueError(f"unknown extract operator {operator_id!r}")
+        validate_ids(table, [extracts[operator_id].relation])
+        if not pa.types.is_string(table["answer"].type):
+            raise ValueError("extracted answers must be strings or null")
 
 
 def _score(spec, output, suite, gpu_count, gpu_hourly_rate_usd, tokens=None):

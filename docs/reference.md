@@ -147,6 +147,12 @@ joined_text = render_classify_prompt(template, anchor, labels, descriptions,
                                      partner=partner)
 ```
 
+Extractions have their own, described under [Extraction](#extraction):
+
+```python
+extract_text = render_extract_prompt(question, document)
+```
+
 The published labels use these templates and this rendering. A different
 prompt defines a different predicate, and its results are incomparable with
 the labels.
@@ -163,6 +169,7 @@ the labels.
 | `prompt_pieces` | `dict \| None` | Token and KV metrics |
 | `classify_answers` | `dict[str, pa.Table] \| None` | Label accuracy and token metrics |
 | `score_answers` | `dict[str, pa.Table] \| None` | Token metrics of a query with a score |
+| `extract_answers` | `dict[str, pa.Table] \| None` | Span accuracy and token metrics of a query with an extraction |
 
 ### Result rows
 
@@ -470,13 +477,88 @@ filter stores its boolean `answer`. The manifest's predicate lists the
   partner's, as in a join's label set. The label set has a row only for the
   rows the reference join keeps.
 
+An extraction label set stores `left_id`, a null `right_id`, and an `answers`
+column: the list of the reference spans' text, empty where the document does
+not answer the question.
+
+## Extraction
+
+`ai_extract(question, document)` returns the words of the document that
+answer the question, copied from the document, or null when the document does
+not answer it. The call's `ProjectRel` adds one nullable string column to the
+relation, named like a label column, and a query returns it by selecting
+`alias.column`. The question is the string argument as written; it has no
+placeholder.
+
+### Prompt and reference answer
+
+`render_extract_prompt` produces the text the reference answers were read
+after:
+
+```text
+DOCUMENT:
+<document>
+
+Question: <question>
+
+Copy the words that answer the question from the document. Copy them
+exactly. Use the fewest words that answer it. If the document does not
+answer the question, write none.
+Answer in this format:
+Phrase: "<copied words>"
+Phrase: "
+```
+
+The text ends with the cue that opens the answer. The answer is the text up to
+the closing quote, located in the document, or null when the model writes
+`none`. An engine may wrap the text in the model's chat turn, as the answers
+of the CUAD queries were measured inside it; the document still comes first,
+so its KV is reused across questions.
+
+The CUAD reference answers are the spans lawyers marked, not a model's
+answers. A document can have several spans for one question, for example a
+contract that names its parties in the preamble and again in the signature
+block, and it can have none.
+
+### Answers
+
+`extract_answers` maps each extract operator ID to a table with the
+relation's alias column and a string `answer` column, null where the engine
+found no answer, one row per document the engine read:
+
+```python
+extract_answers = {
+    "extract-1": pa.table({
+        "c": ["ct17", "ct42"],
+        "answer": ["New York", None],
+    }),
+}
+```
+
+The result rows carry the same answers in the selected answer column, and
+the harness checks that they agree. The rows are compared with the reference
+result on their ID and label columns; an answer column is scored from the
+answer table.
+
+### Span accuracy
+
+An answer is scored against its document's reference spans by the SQuAD
+convention: exact match and token F1 after lowercasing and dropping
+punctuation, articles, and extra spaces, taking the best-matching span. A
+null answer scores 1 where the document has no span and 0 where it has one;
+a non-null answer scores 0 where the document has no span. Span accuracy is
+the mean token F1 over the engine's answers; `run.json` also records the
+exact match rate.
+
 ### Queries waiting for labels
 
 A query marked `labels_pending` in the catalog has no published labels yet.
 `quail_b.queries()` leaves it out; `queries(include_pending=True)` and
 `get_query` return it. Running one needs a label collection that includes its
 predicates, passed with `root` or `collection_id`. The `SUPPORT-`, `RUNS-`,
-`WRENCH-`, and `SALES-` queries are pending.
+`WRENCH-`, `SALES-`, and `CUAD-` queries are pending. The CUAD labels come
+from the dataset's own annotations; `tools/make_cuad_labels.py` writes them
+as a local collection from a built corpus.
 
 ## Measurements
 
@@ -519,6 +601,7 @@ must compute.
 | `joins` | `list[dict]` | One join description per join |
 | `classifies` | `list[dict]` | One description per classification |
 | `scores` | `list[dict]` | One `id` and `tail` token list per score, as for a filter |
+| `extracts` | `list[dict]` | One `id` and `tail` token list per extraction, as for a filter: the question, the instruction, and the answer template through the cue |
 
 Each filter description has:
 
@@ -569,9 +652,10 @@ minimum tokens, recomputed tokens, and KV regret.
 | Join throughput | Answer tables for every join, or a reported pair count |
 | Predicate-level accuracy | Predicate answers |
 | Label accuracy | Classification answers |
+| Span accuracy | Extraction answers |
 | Fresh tokens | `measurements["fresh_tokens"]` |
 | Input tokens and their throughput | Prompt pieces, or reported input tokens |
-| Minimum tokens and KV regret | All answer tables, score answers included, prompt pieces, and fresh tokens |
+| Minimum tokens and KV regret | All answer tables, score and extract answers included, prompt pieces, and fresh tokens |
 | GPU cost | `gpu_count` and `gpu_hourly_rate_usd` |
 | Cost per million input tokens | GPU cost and a positive input token count |
 

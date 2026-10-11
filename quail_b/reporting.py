@@ -36,6 +36,8 @@ MEASUREMENT_SCHEMA = pa.schema([
     ("answers_correct", pa.int64()),
     ("labels_evaluated", pa.int64()),
     ("labels_correct", pa.int64()),
+    ("spans_evaluated", pa.int64()),
+    ("span_token_f1", pa.float64()),
     ("predicted_rows", pa.int64()),
     ("expected_rows", pa.int64()),
     ("matching_rows", pa.int64()),
@@ -76,6 +78,10 @@ def measurement_rows(record) -> list[dict]:
         labels_evaluated: Classification answers compared to the labels.
             Null when the query has no classification or none was saved.
         labels_correct: Those classification answers that matched.
+        spans_evaluated: Extraction answers compared to the reference
+            spans. Null when the query has no extraction or none was
+            saved.
+        span_token_f1: Their mean token F1 against the best reference span.
         predicted_rows: Distinct result rows the engine produced.
         expected_rows: Distinct result rows the labels require. Null for
             a fetch sorted by a score, which precision at k scores.
@@ -93,6 +99,7 @@ def measurement_rows(record) -> list[dict]:
         metrics = item["metrics"]
         answers = metrics["accuracy"]["answer_accuracy"] or {}
         labels = metrics["accuracy"].get("label_accuracy") or {}
+        spans = metrics["accuracy"].get("span_accuracy") or {}
         output = metrics["accuracy"]["output_accuracy"]
         rows.append({
             "query": item["id"],
@@ -109,6 +116,8 @@ def measurement_rows(record) -> list[dict]:
             "answers_correct": answers.get("correct"),
             "labels_evaluated": labels.get("evaluated"),
             "labels_correct": labels.get("correct"),
+            "spans_evaluated": spans.get("evaluated"),
+            "span_token_f1": spans.get("token_f1"),
             "predicted_rows": output.get("predicted_rows"),
             "expected_rows": output.get("expected_rows"),
             "matching_rows": output.get("matching_rows"),
@@ -165,19 +174,23 @@ def _write_report(directory, record):
     lines.extend([
         "", "## Accuracy", "",
         "| Query | Predicate accuracy | Evaluated answers | Label accuracy | "
-        "Evaluated labels | Output precision | Output recall |",
-        "| --- | ---: | ---: | ---: | ---: | ---: | ---: |",
+        "Evaluated labels | Span token F1 | Evaluated spans | "
+        "Output precision | Output recall |",
+        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
     ])
     for item in record["queries"]:
         accuracy = item.get("metrics", {}).get("accuracy", {})
         answers = accuracy.get("answer_accuracy") or {}
         labels = accuracy.get("label_accuracy") or {}
+        spans = accuracy.get("span_accuracy") or {}
         output = accuracy.get("output_accuracy", {})
         lines.append(
             f"| {item['id']} | {_number(answers.get('accuracy'))} | "
             f"{_number(answers.get('evaluated'))} | "
             f"{_number(labels.get('accuracy'))} | "
             f"{_number(labels.get('evaluated'))} | "
+            f"{_number(spans.get('token_f1'))} | "
+            f"{_number(spans.get('evaluated'))} | "
             f"{_number(output.get('precision'))} | {_number(output.get('recall'))} |")
     lines.extend([
         "", "## Input rows and token counts", "",

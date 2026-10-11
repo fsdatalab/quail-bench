@@ -2,7 +2,10 @@
 
 A filter or join answer is TRUE or FALSE. A classification answer is
 one of the predicate's labels, stored in a `label` column; a pair
-classification labels a document pair, like a join.
+classification labels a document pair, like a join. An extraction's
+answer is the list of the document's spans that answer the question,
+stored in an `answers` column, empty when the document does not
+answer it.
 
 A label set holds every answer of one predicate over one corpus. A
 collection names one complete label set per predicate for one corpus
@@ -29,11 +32,26 @@ LABEL_FILE_COLUMNS = ("predicate_key", "label_set_id", *LABEL_COLUMNS)
 CLASSIFY_LABEL_COLUMNS = ("left_id", "right_id", "label")
 CLASSIFY_LABEL_FILE_COLUMNS = (
     "predicate_key", "label_set_id", *CLASSIFY_LABEL_COLUMNS)
+EXTRACT_LABEL_COLUMNS = ("left_id", "right_id", "answers")
+EXTRACT_LABEL_FILE_COLUMNS = (
+    "predicate_key", "label_set_id", *EXTRACT_LABEL_COLUMNS)
 
 
 def _answer_column(kind: str) -> tuple[str, pa.DataType]:
-    return ("label", pa.string()) if kind == "classify" else (
-        "answer", pa.bool_())
+    if kind == "classify":
+        return "label", pa.string()
+    if kind == "extract":
+        return "answers", pa.list_(pa.string())
+    return "answer", pa.bool_()
+
+
+def label_columns(kind: str) -> tuple[str, ...]:
+    """Return the columns of a label set of one predicate kind."""
+    if kind == "classify":
+        return CLASSIFY_LABEL_COLUMNS
+    if kind == "extract":
+        return EXTRACT_LABEL_COLUMNS
+    return LABEL_COLUMNS
 
 
 def _answer_table(answers, kind: str = "filter") -> pa.Table:
@@ -43,7 +61,8 @@ def _answer_table(answers, kind: str = "filter") -> pa.Table:
         answers: A table with those columns, or a dict of
             (left_id, right_id or None) -> answer.
         kind: The predicate kind. A classification's answer column is
-            the string `label`; the others' is the boolean `answer`.
+            the string `label`, an extraction's the string list
+            `answers`; the others' is the boolean `answer`.
     """
     column, dtype = _answer_column(kind)
     if isinstance(answers, pa.Table):
@@ -72,9 +91,10 @@ class PredicateLabels:
         label_set_id: The label set the answers came from.
         predicate: The predicate as its manifest records it.
         table: One row per labeled document or pair: `left_id`,
-            `right_id` (null for a filter or a one-document
-            classification), and the boolean `answer`, or for a
-            classification the string `label`.
+            `right_id` (null for a filter, a one-document
+            classification, or an extraction), and the boolean
+            `answer`, or for a classification the string `label`, or
+            for an extraction the string list `answers`.
         source_rows: Rows per source the label set was built from.
     """
 
@@ -104,7 +124,7 @@ class PredicateLabels:
     @property
     def true_pairs(self) -> pa.Table:
         """The rows answered TRUE."""
-        if self.kind == "classify":
+        if self.kind in ("classify", "extract"):
             raise TypeError(f"{self.key} answers with labels, not TRUE")
         return self.table.filter(self.table.column("answer"))
 
@@ -179,6 +199,11 @@ def _read_label_file(root, path: str) -> pa.Table:
 
 def _read_classify_label_file(root, path: str) -> pa.Table:
     return _read_parquet_columns(root, path, CLASSIFY_LABEL_FILE_COLUMNS,
+                                 CONSTANT_LABEL_COLUMNS)
+
+
+def _read_extract_label_file(root, path: str) -> pa.Table:
+    return _read_parquet_columns(root, path, EXTRACT_LABEL_FILE_COLUMNS,
                                  CONSTANT_LABEL_COLUMNS)
 
 
@@ -363,7 +388,7 @@ def _read_label_set(parts: list[pa.Table], key: str, label_set_id: str,
                     rows: int, predicate: dict | None = None) -> pa.Table:
     """Check one label set's Parquet parts as columns."""
     kind = (predicate or {}).get("kind", "filter")
-    columns = CLASSIFY_LABEL_COLUMNS if kind == "classify" else LABEL_COLUMNS
+    columns = label_columns(kind)
     table = pa.concat_tables(parts)
     for column, expected in (("predicate_key", key),
                              ("label_set_id", label_set_id)):
@@ -433,16 +458,16 @@ def _load_ground_truth_collection(root, collection: dict, templates=None
         if not part_paths:
             raise FileNotFoundError(f"label set {label_set_id} has no rows")
         data_paths[key] = part_paths
-    classify_keys = {
-        key for key in data_paths
-        if manifests[key]["predicate"]["kind"] == "classify"}
-    data_tables = _read_many(
-        root, [path for key, paths in data_paths.items()
-               if key not in classify_keys for path in paths],
-        _read_label_file)
-    data_tables.update(_read_many(
-        root, [path for key in classify_keys for path in data_paths[key]],
-        _read_classify_label_file) if classify_keys else {})
+    readers = {"classify": _read_classify_label_file,
+               "extract": _read_extract_label_file}
+    data_tables = {}
+    for kind, read in ((None, _read_label_file), *readers.items()):
+        paths = [path for key, paths in data_paths.items()
+                 if readers.get(manifests[key]["predicate"]["kind"],
+                                _read_label_file) is read
+                 for path in paths]
+        if paths:
+            data_tables.update(_read_many(root, paths, read))
     predicates = {}
     for key, label_set_id in sorted(wanted.items()):
         manifest = manifests[key]

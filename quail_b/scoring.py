@@ -8,7 +8,10 @@ object is needed to score a run.
 
 from __future__ import annotations
 
+import re
+import string
 import tempfile
+from collections import Counter
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -61,6 +64,11 @@ class RunOutput:
             alias column and a float `score` column, one row per
             document the engine scored. Token metrics need it for a
             query with a score.
+        extract_answers: Extract operator ID to a table with the
+            relation's alias column and a string `answer` column, null
+            where the engine found no answer, one row per document the
+            engine read. Answer accuracy and token metrics need it for
+            a query with an extraction.
     """
 
     filter_answers: dict[str, pa.Table] | None
@@ -71,6 +79,7 @@ class RunOutput:
     prompt_pieces: dict | None = None
     classify_answers: dict[str, pa.Table] | None = None
     score_answers: dict[str, pa.Table] | None = None
+    extract_answers: dict[str, pa.Table] | None = None
 
 
 def output_columns(spec: QuerySpec) -> list[str]:
@@ -78,10 +87,27 @@ def output_columns(spec: QuerySpec) -> list[str]:
     return [output_name(name) for name in spec.info.select]
 
 
+def scored_columns(spec: QuerySpec) -> list[str]:
+    """Return the result columns the rows are compared on: not an answer.
+
+    An extracted answer is scored against its reference spans from the
+    answer table, not as part of a result row.
+    """
+    answers = {operator.output for operator in spec.info.extracts}
+    return [name for name in output_columns(spec) if name not in answers]
+
+
 def _selected_labels(spec: QuerySpec):
     """Return the classify operators whose label column the query returns."""
     selected = set(output_columns(spec))
     return [operator for operator in spec.info.classifies
+            if operator.output in selected]
+
+
+def selected_extracts(spec: QuerySpec):
+    """Return the extract operators whose answer column the query returns."""
+    selected = set(output_columns(spec))
+    return [operator for operator in spec.info.extracts
             if operator.output in selected]
 
 @dataclass
@@ -158,6 +184,76 @@ class LabelCounts:
             "evaluated": self.evaluated,
             "unlabeled": self.unlabeled,
             "accuracy": (round(self.correct / self.evaluated, 6)
+                         if self.evaluated else None),
+        }
+
+
+def normalize_answer(text: str) -> list[str]:
+    """Return an answer's words for comparison, as SQuAD normalizes them.
+
+    Case, punctuation, the articles a, an, and the, and extra spaces
+    are dropped.
+    """
+    text = "".join(c for c in text.lower() if c not in string.punctuation)
+    return re.sub(r"\b(a|an|the)\b", " ", text).split()
+
+
+def span_scores(answer: str | None, references) -> tuple[float, float]:
+    """Return (exact match, token F1) of one answer against reference spans.
+
+    A document without a reference span is answered right by null
+    alone; one with spans is answered against its best-matching span.
+    """
+    references = list(references)
+    if answer is None:
+        return (1.0, 1.0) if not references else (0.0, 0.0)
+    if not references:
+        return 0.0, 0.0
+    predicted = normalize_answer(answer)
+    best = (0.0, 0.0)
+    for reference in references:
+        expected = normalize_answer(reference)
+        exact = float(predicted == expected)
+        common = sum((Counter(predicted) & Counter(expected)).values())
+        if not predicted or not expected:
+            f1 = float(predicted == expected)
+        elif common == 0:
+            f1 = 0.0
+        else:
+            precision = common / len(predicted)
+            recall = common / len(expected)
+            f1 = 2 * precision * recall / (precision + recall)
+        best = max(best, (exact, f1))
+    return best
+
+
+@dataclass
+class SpanCounts:
+    """Agreement of extraction answers with the reference spans.
+
+    Attributes:
+        evaluated: Answers with a reference row, null answers included.
+        exact: Answers that match a reference span word for word, or
+            are null where no span exists.
+        f1_total: The sum of the answers' token F1 scores.
+    """
+
+    evaluated: int = 0
+    exact: int = 0
+    f1_total: float = 0.0
+
+    def merge(self, other: "SpanCounts") -> None:
+        self.evaluated += other.evaluated
+        self.exact += other.exact
+        self.f1_total += other.f1_total
+
+    def as_dict(self) -> dict:
+        return {
+            "evaluated": self.evaluated,
+            "exact": self.exact,
+            "exact_match": (round(self.exact / self.evaluated, 6)
+                            if self.evaluated else None),
+            "token_f1": (round(self.f1_total / self.evaluated, 6)
                          if self.evaluated else None),
         }
 
@@ -364,12 +460,13 @@ def _apply_joined_labels(spec: QuerySpec, join, pairs: pa.Table,
 
 
 def answer_relations(spec: QuerySpec, filter_answers, join_answers,
-                     corpus_rows=None, classify_answers=None):
+                     corpus_rows=None, classify_answers=None,
+                     extract_answers=None):
     """Return (survivors, relations) an engine's own answers imply.
 
     survivors maps each alias to the string ids that passed every filter
-    and IN-list filter on it and have every label column the query uses,
-    or None when nothing narrows it. relations holds one table per join,
+    and IN-list filter on it and have every label and answer column the
+    query uses, or None when nothing narrows it. relations holds one table per join,
     in written order, with the pairs that answered TRUE, satisfy the
     join's equality conditions, survived, and have every joined-row label
     the query returns. corpus_rows is needed only
@@ -380,6 +477,8 @@ def answer_relations(spec: QuerySpec, filter_answers, join_answers,
         return None
     labels = answer_labels(spec, classify_answers)
     if labels is None:
+        return None
+    if spec.info.extracts and extract_answers is None:
         return None
     survivors = {
         relation.alias: None for relation in spec.info.relations
@@ -398,6 +497,13 @@ def answer_relations(spec: QuerySpec, filter_answers, join_answers,
         kept = survivors[alias]
         survivors[alias] = passed if kept is None else kept & passed
     _apply_labels(spec, survivors, labels)
+    # a document with no answer row cannot appear with its answer column
+    for operator in selected_extracts(spec):
+        table = extract_answers.get(operator.id)
+        if table is None:
+            return None
+        _narrow(survivors, operator.relation,
+                pc.cast(table.column(operator.relation), pa.string()).to_pylist())
     relations = []
     for join in spec.info.joins:
         table = join_answers.get(join.id)
@@ -420,11 +526,12 @@ def _with_labels(rows: pa.Table, spec: QuerySpec, labels: dict) -> pa.Table:
     for operator in _selected_labels(spec):
         rows = rows.join(labels[operator.output],
                          keys=list(operator.relations), join_type="inner")
-    return _distinct(rows.select(sorted(output_columns(spec))))
+    return _distinct(rows.select(sorted(scored_columns(spec))))
 
 
 def rows_from_answers(spec: QuerySpec, filter_answers, join_answers,
-                      corpus_rows=None, classify_answers=None) -> pa.Table:
+                      corpus_rows=None, classify_answers=None,
+                      extract_answers=None) -> pa.Table:
     """Return the final rows an engine's own answers imply.
 
     For a run that saved its predicate answers but not its rows: a row
@@ -434,7 +541,8 @@ def rows_from_answers(spec: QuerySpec, filter_answers, join_answers,
     when a join has equality conditions.
     """
     survivors, relations = answer_relations(
-        spec, filter_answers, join_answers, corpus_rows, classify_answers)
+        spec, filter_answers, join_answers, corpus_rows, classify_answers,
+        extract_answers)
     if relations:
         rows = _join_all(relations)
     else:
@@ -531,7 +639,7 @@ def scores_from_answers(spec: QuerySpec, output: RunOutput, corpus_rows):
     """
     answers = answer_relations(
         spec, output.filter_answers, output.join_answers, corpus_rows,
-        output.classify_answers)
+        output.classify_answers, output.extract_answers)
     if answers is None:
         return None
     selected = {name.split(".")[0] for name in spec.info.select}
@@ -557,6 +665,15 @@ def reference_answer(ground_truth, template: str, ids: tuple[str, ...]) -> bool:
 def _labels(ground_truth, template: str):
     """Return the labels of one prompt template as written."""
     return ground_truth.predicates[ground_truth.key_for_template(template)]
+
+
+def _extract_labels(ground_truth, operator):
+    """Return the reference spans of one extract operator."""
+    labels = _labels(ground_truth, operator.prompt)
+    if labels.kind != "extract":
+        raise ValueError(
+            f"{labels.key} is not an extraction, as {operator.id} is")
+    return labels
 
 
 def _classify_labels(ground_truth, operator):
@@ -733,6 +850,35 @@ def label_agreement(table: pa.Table, aliases, labels) -> LabelCounts:
                        unlabeled=unlabeled)
 
 
+def span_agreement(table: pa.Table, alias: str, labels) -> SpanCounts:
+    """Count an extract answer table's agreement with its reference spans.
+
+    Args:
+        table: The alias's id column and a string `answer` column, null
+            where the engine found no answer.
+        alias: The id column.
+        labels: The `PredicateLabels` of the extraction.
+
+    Raises:
+        KeyError: A document the engine answered has no reference row.
+    """
+    reference = dict(zip(labels.table.column("left_id").to_pylist(),
+                         labels.table.column("answers").to_pylist()))
+    counts = SpanCounts()
+    ids = pc.cast(table.column(alias), pa.string()).to_pylist()
+    answers = pc.cast(table.column("answer"), pa.string()).to_pylist()
+    missing = sum(row_id not in reference for row_id in ids)
+    if missing:
+        raise KeyError(
+            f"no ground truth for {labels.key} and {missing} answered rows")
+    for row_id, answer in zip(ids, answers):
+        exact, f1 = span_scores(answer, reference[row_id])
+        counts.evaluated += 1
+        counts.exact += int(exact)
+        counts.f1_total += f1
+    return counts
+
+
 def agreement(table: pa.Table, aliases, labels) -> BinaryCounts:
     """Count an answer table's agreement with the labels, in one join.
 
@@ -883,7 +1029,7 @@ def row_counts(spec: QuerySpec, output: RunOutput, ground_truth,
     """
     import duckdb
 
-    selected = output_columns(spec)
+    selected = scored_columns(spec)
     selected_aliases = {name.split(".")[0] for name in spec.info.select}
     aliases = [relation.alias for relation in spec.info.relations]
     # with every alias selected, the joined tuples are already distinct;
@@ -1009,6 +1155,16 @@ def evaluate(spec: QuerySpec, output: RunOutput, ground_truth, corpus_rows) -> d
         per_predicate.append({
             "predicate_key": labels.key, "op": "classify",
             "alias": operator.relation, **counts.as_dict()})
+    extracts = {operator.id: operator for operator in spec.info.extracts}
+    span_total = SpanCounts()
+    for operator_id, table in (output.extract_answers or {}).items():
+        operator = extracts[operator_id]
+        labels = _extract_labels(ground_truth, operator)
+        counts = span_agreement(table, operator.relation, labels)
+        span_total.merge(counts)
+        per_predicate.append({
+            "predicate_key": labels.key, "op": "extract",
+            "alias": operator.relation, **counts.as_dict()})
 
     if spec.info.relational:
         if output.rows is None:
@@ -1034,6 +1190,8 @@ def evaluate(spec: QuerySpec, output: RunOutput, ground_truth, corpus_rows) -> d
         "answer_accuracy": (total.as_dict() if total.evaluated else None),
         "label_accuracy": (
             label_total.as_dict() if label_total.evaluated else None),
+        "span_accuracy": (
+            span_total.as_dict() if span_total.evaluated else None),
         "output_accuracy": output_accuracy,
         "per_predicate": per_predicate,
         "input_document_rows": input_document_rows,

@@ -140,6 +140,35 @@ def render_classify_prompt(template: str, document: str, labels,
             + render_categories(labels, descriptions) + ANSWER_CUE)
 
 
+# An extraction's prompt: the document, the question, the instruction,
+# the answer template, and the cue that opens the answer. The answer
+# is the document's words up to the closing quote, or "none".
+EXTRACT_QUESTION_LABEL = "\n\nQuestion: "
+EXTRACT_INSTRUCTION = (
+    "Copy the words that answer the question from the document. Copy them "
+    "exactly. Use the fewest words that answer it. If the document does not "
+    "answer the question, write none.")
+EXTRACT_FORMAT = "Answer in this format:"
+EXTRACT_PHRASE_FORMAT = 'Phrase: "<copied words>"'
+EXTRACT_CUE = '\nPhrase: "'
+EXTRACT_NONE = "none"
+
+
+def render_extract_prompt(question: str, document: str) -> str:
+    """Return the complete text of one extraction question over one document.
+
+    The text ends with the cue that opens the answer; the model's
+    answer is read up to the closing quote. An engine may wrap the
+    text in the model's chat turn, as the reference answers were
+    read inside it.
+    """
+    if "{" in question or "}" in question:
+        raise ValueError("an extraction question has no placeholder")
+    return (SHARED_PRE + document + EXTRACT_QUESTION_LABEL + question
+            + "\n\n" + EXTRACT_INSTRUCTION + "\n" + EXTRACT_FORMAT + "\n"
+            + EXTRACT_PHRASE_FORMAT + EXTRACT_CUE)
+
+
 def join_label(placeholder: int) -> str:
     return JOIN_DOC_LABEL.format(_marker(placeholder))
 
