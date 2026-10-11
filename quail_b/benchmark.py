@@ -1,5 +1,7 @@
 """Load and validate benchmark inputs and reference labels."""
 
+from concurrent.futures import ThreadPoolExecutor
+from contextvars import copy_context
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -72,14 +74,17 @@ def load_benchmark(only=None, *, scale_factor=0.1, data_dir=None,
         for spec in specs
         for relation in spec.info.relations
     })
-    tables = {
-        name: (
-            load_table(name, scale_factor=scale_factor, root=root).select(
-                CORPUS_COLUMNS[name])
-            if data_dir is None else pq.read_table(
-                Path(data_dir) / f"{name}.parquet", columns=list(CORPUS_COLUMNS[name])))
-        for name in names
-    }
+
+    def read(name):
+        if data_dir is not None:
+            return pq.read_table(Path(data_dir) / f"{name}.parquet",
+                                 columns=list(CORPUS_COLUMNS[name]))
+        return load_table(name, scale_factor=scale_factor, root=root).select(
+            CORPUS_COLUMNS[name])
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        futures = [pool.submit(copy_context().run, read, name) for name in names]
+        tables = dict(zip(names, (future.result() for future in futures)))
     identity = corpus_identity(tables, scale_factor, DATA_SEED, SOURCE_REVISIONS)
     for name in names:
         if identity["tables"][name] != manifest["tables"][name]:

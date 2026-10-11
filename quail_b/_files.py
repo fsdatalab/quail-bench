@@ -6,6 +6,7 @@ import shutil
 import tempfile
 from contextlib import contextmanager
 from contextvars import ContextVar
+from functools import cache
 from pathlib import Path
 
 from pyarrow import fs
@@ -50,8 +51,10 @@ def _cached_file(root, path):
         with tempfile.NamedTemporaryFile(dir=directory, delete=False) as stream:
             temporary = Path(stream.name)
             try:
-                with filesystem.open_input_file(source) as remote:
-                    shutil.copyfileobj(remote, stream)
+                # a sequential stream; reads from a random access S3 file
+                # are one HTTP request each
+                with filesystem.open_input_stream(source) as remote:
+                    shutil.copyfileobj(remote, stream, 8 << 20)
                 stream.flush()
                 temporary.replace(cached)
             finally:
@@ -59,10 +62,15 @@ def _cached_file(root, path):
     return cached
 
 
+@cache
+def _anonymous_s3() -> fs.S3FileSystem:
+    return fs.S3FileSystem(anonymous=True)
+
+
 def _location(root, path):
     root = f"s3://{PUBLIC_BUCKET}" if root is None else str(root)
     if root.startswith("s3://"):
-        filesystem = fs.S3FileSystem(anonymous=True)
+        filesystem = _anonymous_s3()
         base = root.removeprefix("s3://").rstrip("/")
     else:
         filesystem = fs.LocalFileSystem()
