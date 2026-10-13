@@ -490,15 +490,12 @@ document, so an answer is one span or null.
 - The question is the string argument as written. It has no placeholder.
 - The call's `ProjectRel` adds one nullable string column to the relation.
   The column is named like a label column.
-- A query returns its answer columns as the fields of one struct column. The
-  root `ProjectRel` builds the struct with a Substrait nested struct
-  expression over the answer columns, and the root names give the struct's
-  name followed by its field names. For example, CUAD-1 returns
-  `c.governing_law` in the struct `contract`, so `rows` has a `contract`
-  column of type `struct<governing_law: string>`.
-- CUAD-10 asks three questions of each contract and returns the three answers
-  as the fields of one `contract` struct. Each question is still its own
-  extract operator, with its own answer table and reference spans.
+- A query returns its answers as fields of one struct column. The root
+  `ProjectRel` builds the struct with a Substrait nested struct expression.
+  The root names list the struct name, then its field names. For example,
+  CUAD-1 returns a `contract` column of type `struct<governing_law: string>`.
+- CUAD-10 returns three answers as three fields of `contract`. Each answer
+  has its own extract operator, answer table, and reference spans.
 
 ### Prompt and reference answer
 
