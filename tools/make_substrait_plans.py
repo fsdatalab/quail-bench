@@ -287,6 +287,19 @@ class Join:
 
 
 @dataclass(frozen=True)
+class Struct:
+    """Return answer columns as the fields of one struct column.
+
+    Attributes:
+        name: The struct column's name.
+        fields: The answer columns, as `alias.column`, in field order.
+    """
+
+    name: str
+    fields: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class Query:
     """One benchmark query.
 
@@ -296,7 +309,8 @@ class Query:
         tree: The operator tree.
         privacy: Whether the query reads the privacy policy corpus.
         select: Returned columns: an alias for its id, `alias.column`
-            for a label column; None returns every relation's id.
+            for a label column, or a Struct of answer columns; None
+            returns every relation's id.
     """
 
     id: str
@@ -698,8 +712,9 @@ def build_plan(tree, select=None) -> plan_pb2.Plan:
     Args:
         tree: The query tree, with any relational steps on top.
         select: Returned columns, an alias for its id, `alias.column`
-            for another column, or a bare measure name, or None for
-            every relation's id in scan order.
+            for another column, a bare measure name, or a Struct of
+            answer columns, or None for every relation's id in scan
+            order.
     """
     emitter = _Emitter()
     rel, field_names = _emit_tail(emitter, tree)
@@ -707,10 +722,17 @@ def build_plan(tree, select=None) -> plan_pb2.Plan:
         select = [alias for alias, column in
                   (name.split(".", 1) for name in field_names if "." in name)
                   if column == "id"]
-    columns = [name if name in field_names else f"{name}.id"
-               for name in select]
-    names = [output_name(column) for column in columns]
-    expressions = [_field(field_names.index(column)) for column in columns]
+    names, expressions = [], []
+    for item in select:
+        if isinstance(item, Struct):
+            names.extend((item.name, *map(output_name, item.fields)))
+            expressions.append(algebra.Expression(nested=algebra.Expression.Nested(
+                struct=algebra.Expression.Nested.Struct(fields=[
+                    _field(field_names.index(name)) for name in item.fields]))))
+            continue
+        column = item if item in field_names else f"{item}.id"
+        names.append(output_name(column))
+        expressions.append(_field(field_names.index(column)))
     project = algebra.Rel(
         project=algebra.ProjectRel(
             common=algebra.RelCommon(
@@ -1294,16 +1316,16 @@ QUERIES = (
     # are not published yet.
     Query("CUAD-1", "extract: the governing law of each contract",
           _cuad_extract(_contracts(), "Governing Law", "governing_law"),
-          select=("c", "c.governing_law")),
+          select=("c", Struct("contract", ("c.governing_law",)))),
     Query("CUAD-2", "extract: the agreement date of each contract",
           _cuad_extract(_contracts(), "Agreement Date", "agreement_date"),
-          select=("c", "c.agreement_date")),
+          select=("c", Struct("contract", ("c.agreement_date",)))),
     Query("CUAD-3", "extract: the cap on liability clause, null without one",
           _cuad_extract(_contracts(), "Cap On Liability", "liability_cap"),
-          select=("c", "c.liability_cap")),
+          select=("c", Struct("contract", ("c.liability_cap",)))),
     Query("CUAD-4", "extract: the parties, several spans per contract",
           _cuad_extract(_contracts(), "Parties", "parties"),
-          select=("c", "c.parties")),
+          select=("c", Struct("contract", ("c.parties",)))),
     Query("CUAD-5", "filter: termination for convenience",
           _cuad_filters(_contracts(), "Termination For Convenience")),
     Query("CUAD-6", "2 filters: non-compete + exclusivity",
@@ -1311,27 +1333,27 @@ QUERIES = (
     Query("CUAD-7", "filter: audit rights -> extract: the audit rights clause",
           _cuad_extract(_cuad_filters(_contracts(), "Audit Rights"),
                         "Audit Rights", "audit_rights"),
-          select=("c", "c.audit_rights")),
+          select=("c", Struct("contract", ("c.audit_rights",)))),
     Query("CUAD-8", "2 filters: cap on liability + insurance -> extract: "
           "the cap on liability clause",
           _cuad_extract(_cuad_filters(_contracts(), "Cap On Liability",
                                       "Insurance"),
                         "Cap On Liability", "liability_cap"),
-          select=("c", "c.liability_cap")),
+          select=("c", Struct("contract", ("c.liability_cap",)))),
     Query("CUAD-9", "2 filters: license grant + non-transferable license -> "
           "extract: the license grant",
           _cuad_extract(_cuad_filters(_contracts(), "License Grant",
                                       "Non-Transferable License"),
                         "License Grant", "license_grant"),
-          select=("c", "c.license_grant")),
+          select=("c", Struct("contract", ("c.license_grant",)))),
     Query("CUAD-10", "3 extracts: the agreement date, the expiration date, "
           "and the governing law of each contract",
           _cuad_extract(_cuad_extract(_cuad_extract(
               _contracts(), "Agreement Date", "agreement_date"),
               "Expiration Date", "expiration_date"),
               "Governing Law", "governing_law"),
-          select=("c", "c.agreement_date", "c.expiration_date",
-                  "c.governing_law")),
+          select=("c", Struct("contract", (
+              "c.agreement_date", "c.expiration_date", "c.governing_law")))),
     Query("CUAD-11", "classify each contract: its governing law -> contracts "
           "per law, most first",
           _law_counts(_contracts()),
@@ -1351,7 +1373,7 @@ QUERIES = (
               _cuad_filters(_contracts(), "Termination For Convenience"),
               "Expiration Date", "expiration_date"),
               (("c.id", False),)), 20),
-          select=("c", "c.expiration_date")),
+          select=("c", Struct("contract", ("c.expiration_date",)))),
 
     # PrivacyPolicies: only when that corpus is available.
     Query("PRIV-1", "2 filters: P_MSG + P_LOC",

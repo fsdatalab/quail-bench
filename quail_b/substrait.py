@@ -138,13 +138,28 @@ class Extract:
 
     The prompt is the question; the answer is the words of the document
     that answer it, copied from the document, or null when the document
-    does not answer it.
+    does not answer it. A query returns the answer as a field of an
+    AnswerStruct, named `output`.
     """
 
     id: str
     relation: str
     prompt: str
     output: str
+
+
+@dataclass(frozen=True)
+class AnswerStruct:
+    """A result column that holds the answers of extractions as a struct.
+
+    Attributes:
+        name: The result column's name.
+        fields: The selected answer fields, as `alias.column`, in struct
+            field order. Each struct field is named by its column.
+    """
+
+    name: str
+    fields: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -213,7 +228,8 @@ class PlanInfo:
     root projection, bottom up: at most an aggregate, a having, a
     sort, and a fetch. `fields` names the columns the root projection
     selects from, as `alias.column` for source and label columns and a
-    bare name for a measure.
+    bare name for a measure. `select` lists the selected fields, the
+    answer fields of `structs` included.
     """
 
     relations: tuple[Relation, ...]
@@ -221,6 +237,24 @@ class PlanInfo:
     select: tuple[str, ...]
     tail: tuple[Step, ...] = ()
     fields: tuple[str, ...] = ()
+    structs: tuple[AnswerStruct, ...] = ()
+
+    @property
+    def columns(self) -> tuple[str, ...]:
+        """The result column names, in order: answers under their struct."""
+        owner = {name: struct.name for struct in self.structs
+                 for name in struct.fields}
+        columns = []
+        for name in self.select:
+            column = owner.get(name, output_name(name))
+            if column not in columns:
+                columns.append(column)
+        return tuple(columns)
+
+    def struct_of(self, operator: "Extract") -> AnswerStruct:
+        """Return the struct column that holds an extraction's answer."""
+        name = f"{operator.relation}.{operator.output}"
+        return next(struct for struct in self.structs if name in struct.fields)
 
     @property
     def filters(self) -> tuple[Filter, ...]:
@@ -1029,17 +1063,26 @@ def inspect_plan(plan: plan_pb2.Plan) -> PlanInfo:
         raise ValueError("QUAIL-B root must contain a ProjectRel")
     project = root.input.project
     decoded, tail, fields = _decode_tail(project.input, _function_names(plan))
-    select = tuple(
-        fields[_selection_index(expression)]
-        for expression in project.expressions
-    )
+    select, structs, names = [], [], []
+    for expression in project.expressions:
+        if expression.HasField("nested"):
+            if len(root.names) <= len(names):
+                raise ValueError("QUAIL-B root names do not name every struct")
+            struct = _answer_struct(expression, fields, root.names[len(names)])
+            structs.append(struct)
+            select.extend(struct.fields)
+            names.extend((struct.name, *map(output_name, struct.fields)))
+            continue
+        name = fields[_selection_index(expression)]
+        select.append(name)
+        names.append(output_name(name))
     expected_mapping = tuple(
         len(fields) + index
         for index in range(len(project.expressions))
     )
     if tuple(project.common.emit.output_mapping) != expected_mapping:
         raise ValueError("QUAIL-B ProjectRel has an invalid output mapping")
-    if tuple(root.names) != tuple(output_name(name) for name in select):
+    if tuple(root.names) != tuple(names):
         raise ValueError("QUAIL-B root names do not match selected relations")
     text_columns = dict(decoded.text_columns)
     relations = []
@@ -1047,9 +1090,44 @@ def inspect_plan(plan: plan_pb2.Plan) -> PlanInfo:
         if alias not in text_columns:
             raise ValueError(f"relation {alias!r} is not read by an AI function")
         relations.append(Relation(alias, table, text_columns[alias]))
-    info = PlanInfo(tuple(relations), decoded.operators, select, tail, fields)
+    info = PlanInfo(tuple(relations), decoded.operators, tuple(select), tail,
+                    fields, tuple(structs))
     _validate_info(info)
+    _validate_structs(info)
     return info
+
+
+def _answer_struct(expression: algebra_pb2.Expression, fields: tuple[str, ...],
+                   name: str) -> AnswerStruct:
+    """Decode a root struct expression over selected answer fields."""
+    nested = expression.nested
+    if nested.WhichOneof("nested_type") != "struct" or not nested.struct.fields:
+        raise ValueError("a QUAIL-B root struct holds at least one field")
+    return AnswerStruct(name, tuple(
+        fields[_selection_index(field)] for field in nested.struct.fields))
+
+
+def _validate_structs(info: PlanInfo) -> None:
+    """Check that the answer structs hold every returned answer, and only them."""
+    answers = {f"{operator.relation}.{operator.output}": operator
+               for operator in info.extracts}
+    held = [name for struct in info.structs for name in struct.fields]
+    if len(set(held)) != len(held):
+        raise ValueError("a QUAIL-B answer belongs to one struct")
+    for struct in info.structs:
+        if not struct.name or "." in struct.name:
+            raise ValueError(f"a struct needs a bare name, got {struct.name!r}")
+        if any(name not in answers for name in struct.fields):
+            raise ValueError(f"struct {struct.name!r} holds only answer columns")
+        if len({answers[name].relation for name in struct.fields}) != 1:
+            raise ValueError(f"struct {struct.name!r} holds answers of one relation")
+    for name in info.select:
+        if name in answers and name not in held:
+            raise ValueError(f"answer column {name!r} is returned in a struct")
+    columns = info.columns
+    plain = [output_name(name) for name in info.select if name not in held]
+    if len(columns) != len(plain) + len(info.structs):
+        raise ValueError("QUAIL-B result column names must be unique")
 
 
 def output_name(field: str) -> str:

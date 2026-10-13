@@ -44,13 +44,21 @@
                 }
               },
               {
-                "selection": {
-                  "direct_reference": {
-                    "struct_field": {
-                      "field": 2
-                    }
-                  },
-                  "root_reference": {}
+                "nested": {
+                  "struct": {
+                    "fields": [
+                      {
+                        "selection": {
+                          "direct_reference": {
+                            "struct_field": {
+                              "field": 2
+                            }
+                          },
+                          "root_reference": {}
+                        }
+                      }
+                    ]
+                  }
                 }
               }
             ],
@@ -183,6 +191,7 @@
         },
         "names": [
           "c",
+          "contract",
           "audit_rights"
         ]
       }
