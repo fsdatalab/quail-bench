@@ -10,12 +10,13 @@ import quail_b
 from quail_b import predicates, prompts, rendering
 from quail_b.queries import queries
 from quail_b.scoring import normalize_answer, span_scores
-from quail_b.substrait import AI_EXTRACT_NAME, Extract
+from quail_b.substrait import AI_EXTRACT_NAME, AnswerStruct, Extract
 from tools.make_substrait_plans import Extract as ExtractNode
 from tools.make_substrait_plans import (
     Fetch,
     Scan,
     Sort,
+    Struct,
     build_plan,
 )
 
@@ -49,10 +50,16 @@ def test_extract_plans_name_the_question_and_the_answer_column():
     (extract,) = info.extracts
     assert extract == Extract("extract-1", "c", AUDIT_RIGHTS, "audit_rights")
     assert info.select == ("c.id", "c.audit_rights")
+    # the answer is returned as the field of a struct column
+    assert info.structs == (AnswerStruct("contract", ("c.audit_rights",)),)
+    assert info.columns == ("c", "contract")
     assert info.filters[0].prompt == prompts.cuad_filter("Audit Rights")
     plan = quail_b.get_query("CUAD-7").plan
-    assert list(plan.relations[0].root.names) == ["c", "audit_rights"]
-    project = plan.relations[0].root.input.project.input.project
+    assert list(plan.relations[0].root.names) == ["c", "contract", "audit_rights"]
+    root = plan.relations[0].root.input.project
+    assert [field.selection.direct_reference.struct_field.field
+            for field in root.expressions[1].nested.struct.fields] == [2]
+    project = root.input.project
     assert project.common.hint.alias == "extract-1"
     assert project.input.filter.common.hint.alias == "filter-1"
     (declaration,) = [d for d in plan.extensions
@@ -68,6 +75,8 @@ def test_extract_plans_name_the_question_and_the_answer_column():
         "agreement_date", "expiration_date", "governing_law"]
     assert chained.select == ("c.id", "c.agreement_date", "c.expiration_date",
                               "c.governing_law")
+    assert chained.structs == (AnswerStruct("contract", (
+        "c.agreement_date", "c.expiration_date", "c.governing_law")),)
     relational = quail_b.get_query("CUAD-15").info
     assert relational.relational and relational.fetch.count == 20
     assert relational.extracts[0].output == "expiration_date"
@@ -92,6 +101,16 @@ def test_invalid_extract_uses_are_rejected():
     with pytest.raises(ValueError, match="never used"):
         _spec(Fetch(Sort(ExtractNode(contracts, GOVERNING_LAW, "law"),
                          (("c.id", False),)), 5), ("c",))
+    # an answer is returned in a struct, and a struct holds only answers
+    with pytest.raises(ValueError, match="returned in a struct"):
+        _spec(ExtractNode(contracts, GOVERNING_LAW, "law"), ("c", "c.law"))
+    with pytest.raises(ValueError, match="holds only answer columns"):
+        _spec(ExtractNode(contracts, GOVERNING_LAW, "law"),
+              ("c", Struct("contract", ("c.law", "c.id"))))
+    # a struct's name is a result column name of its own
+    with pytest.raises(ValueError, match="must be unique"):
+        _spec(ExtractNode(contracts, GOVERNING_LAW, "law"),
+              ("c", Struct("c", ("c.law",))))
 
 
 def test_extract_prompt_text():
@@ -195,9 +214,9 @@ def _cuad_7_output(wrong_answer=False):
     })
     rows = pa.table({
         "c": ["c0", "c2"],
-        "audit_rights": pa.array(
-            ["Audit yearly" if not wrong_answer else "yearly", None],
-            pa.string()),
+        "contract": pa.StructArray.from_arrays(
+            [pa.array(["Audit yearly" if not wrong_answer else "yearly", None],
+                      pa.string())], names=["audit_rights"]),
     })
     return quail_b.RunOutput(
         {"filter-1": pa.table({"c": ["c0", "c1", "c2"],
@@ -236,9 +255,17 @@ def test_extraction_run_scores_spans_and_rows(tmp_path):
     with pytest.raises(ValueError, match="differs from the engine"):
         output = _cuad_7_output()
         output.rows = output.rows.set_column(
-            1, "audit_rights", pa.array(["x", None], pa.string()))
+            1, "contract", pa.StructArray.from_arrays(
+                [pa.array(["x", None], pa.string())], names=["audit_rights"]))
         quail_b.run(lambda spec, tables: output, queries=["CUAD-7"],
                     output_dir=tmp_path / "bad", root=tmp_path)
+    # the answers come as a struct of strings named by their columns
+    with pytest.raises(ValueError, match="struct of string answers"):
+        output = _cuad_7_output()
+        output.rows = output.rows.set_column(
+            1, "contract", pa.array(["Audit yearly", None], pa.string()))
+        quail_b.run(lambda spec, tables: output, queries=["CUAD-7"],
+                    output_dir=tmp_path / "flat", root=tmp_path)
 
 
 def test_extraction_token_metrics_count_the_question_as_a_suffix(tmp_path):

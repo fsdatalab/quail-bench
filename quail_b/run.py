@@ -24,6 +24,7 @@ from quail_b.scoring import (
     implied_rows_mask,
     output_columns,
     scores_from_answers,
+    selected_extracts,
 )
 from quail_b.substrait import (
     Classify,
@@ -33,6 +34,7 @@ from quail_b.substrait import (
     InList,
     Join,
     Score,
+    output_name,
 )
 
 RUN_SCHEMA_VERSION = 2
@@ -298,30 +300,35 @@ def _validate_output(spec, output, tables):
                     f"a {name} label is not one of the query's labels")
 
     returned = [name for name in columns if name in label_names]
-    extract_names = {
-        operator.output: operator for operator in spec.info.extracts}
+    structs = {struct.name: struct for struct in spec.info.structs}
+    returned_answers = selected_extracts(spec)
 
-    def validate_answers(table, names):
-        for name in names:
+    def validate_answers(table):
+        for name, struct in structs.items():
             column = table[name]
-            if not pa.types.is_string(column.type):
-                raise ValueError("extracted answers must be strings or null")
+            fields = [output_name(field) for field in struct.fields]
+            if (not pa.types.is_struct(column.type)
+                    or [item.name for item in column.type] != fields
+                    or not all(pa.types.is_string(item.type)
+                               for item in column.type)):
+                raise ValueError(
+                    f"{name} must be a struct of string answers named {fields}")
 
     def rows_follow_extracts(rows):
         # a returned answer is the one the engine's answer table holds
-        for name in columns:
-            operator = extract_names.get(name)
-            table = (output.extract_answers or {}).get(
-                operator.id if operator else None)
-            if operator is None or table is None:
+        for operator in returned_answers:
+            table = (output.extract_answers or {}).get(operator.id)
+            if table is None:
                 continue
             alias = operator.relation
+            struct = spec.info.struct_of(operator).name
             known = pa.table({
                 alias: table[alias].cast(pa.string()),
                 "known": table["answer"].cast(pa.string())})
             joined = pa.table({
                 alias: rows[alias].cast(pa.string()),
-                "returned": rows[name].cast(pa.string()),
+                "returned": pc.struct_field(
+                    rows[struct], operator.output).cast(pa.string()),
             }).join(known, keys=[alias], join_type="left outer")
             same = pc.or_kleene(
                 pc.equal(joined["returned"], joined["known"]),
@@ -329,8 +336,8 @@ def _validate_output(spec, output, tables):
                         pc.is_null(joined["known"])))
             if joined.num_rows and not pc.all(same.fill_null(False)).as_py():
                 raise ValueError(
-                    f"a returned {name} answer differs from the engine's "
-                    "answer table")
+                    f"a returned {struct}.{operator.output} answer differs "
+                    "from the engine's answer table")
 
     answers = scores_from_answers(spec, output, tables)
     if spec.info.relational:
@@ -345,8 +352,7 @@ def _validate_output(spec, output, tables):
                 f"the engine returned {output.rows.num_rows:,} rows for a "
                 f"fetch of {fetch.count:,}")
         validate_ids(output.rows, selected)
-        validate_answers(output.rows,
-                         [name for name in columns if name in extract_names])
+        validate_answers(output.rows)
         rows_follow_extracts(output.rows)
     elif output.rows is None:
         # a saved run rescored from its answers: its rows were checked
@@ -360,8 +366,7 @@ def _validate_output(spec, output, tables):
         validate_ids(output.rows, selected)
         if output.rows.num_rows:
             validate_labels(output.rows, returned)
-        validate_answers(output.rows,
-                         [name for name in columns if name in extract_names])
+        validate_answers(output.rows)
         rows_follow_extracts(output.rows)
     else:
         # a traced run's rows are implied by its answers: the count must
@@ -377,13 +382,12 @@ def _validate_output(spec, output, tables):
         validate_ids(sample, selected)
         mask = implied_rows_mask(
             pa.table({name: sample[name].cast(pa.string())
-                      for name in columns}),
+                      for name in columns if name not in structs}),
             survivors, relations, spec,
             answer_labels(spec, output.classify_answers))
         if not (pc.all(mask).as_py() if sample.num_rows else True):
             raise ValueError("a returned row is not implied by the answers")
-        validate_answers(sample,
-                         [name for name in columns if name in extract_names])
+        validate_answers(sample)
         rows_follow_extracts(sample)
     filters = {
         filter_spec.id: filter_spec for filter_spec in spec.info.filters

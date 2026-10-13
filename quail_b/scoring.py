@@ -22,7 +22,6 @@ from quail_b._keys import lookup, tuple_keys
 from quail_b.data import _ids
 from quail_b.queries import QuerySpec
 from quail_b.relational import relational_accuracy
-from quail_b.substrait import output_name
 
 
 @dataclass
@@ -83,8 +82,8 @@ class RunOutput:
 
 
 def output_columns(spec: QuerySpec) -> list[str]:
-    """Return the result column names: aliases for ids, then label names."""
-    return [output_name(name) for name in spec.info.select]
+    """Return the result column names: aliases for ids, label and struct names."""
+    return list(spec.info.columns)
 
 
 def scored_columns(spec: QuerySpec) -> list[str]:
@@ -93,7 +92,7 @@ def scored_columns(spec: QuerySpec) -> list[str]:
     An extracted answer is scored against its reference spans from the
     answer table, not as part of a result row.
     """
-    answers = {operator.output for operator in spec.info.extracts}
+    answers = {struct.name for struct in spec.info.structs}
     return [name for name in output_columns(spec) if name not in answers]
 
 
@@ -105,10 +104,10 @@ def _selected_labels(spec: QuerySpec):
 
 
 def selected_extracts(spec: QuerySpec):
-    """Return the extract operators whose answer column the query returns."""
-    selected = set(output_columns(spec))
+    """Return the extract operators whose answer the query returns."""
+    selected = set(spec.info.select)
     return [operator for operator in spec.info.extracts
-            if operator.output in selected]
+            if f"{operator.relation}.{operator.output}" in selected]
 
 @dataclass
 class BinaryCounts:

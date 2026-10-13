@@ -304,7 +304,8 @@ prompt, the answer tables, and label accuracy.
 Nine queries copy the answer to a question out of each document, with
 `ai_extract(question, document)`. The answer is a span: a run of words copied
 from the document. When the document does not answer the question, the answer
-is null.
+is null. A query returns its answers as the fields of one struct column, named
+`contract` in the CUAD queries.
 
 - The reference answers are the spans lawyers marked in CUAD. A contract that
   states one thing in several places has several spans.

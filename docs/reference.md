@@ -490,8 +490,15 @@ document, so an answer is one span or null.
 - The question is the string argument as written. It has no placeholder.
 - The call's `ProjectRel` adds one nullable string column to the relation.
   The column is named like a label column.
-- A query returns the column by selecting `alias.column`. For example, CUAD-1
-  selects `c.governing_law`, so `rows` has a `governing_law` column.
+- A query returns its answer columns as the fields of one struct column. The
+  root `ProjectRel` builds the struct with a Substrait nested struct
+  expression over the answer columns, and the root names give the struct's
+  name followed by its field names. For example, CUAD-1 returns
+  `c.governing_law` in the struct `contract`, so `rows` has a `contract`
+  column of type `struct<governing_law: string>`.
+- CUAD-10 asks three questions of each contract and returns the three answers
+  as the fields of one `contract` struct. Each question is still its own
+  extract operator, with its own answer table and reference spans.
 
 ### Prompt and reference answer
 
@@ -545,17 +552,19 @@ extract_answers = {
 }
 rows = pa.table({
     "c": ["ct17", "ct42"],
-    "governing_law": ["New York", None],
+    "contract": pa.StructArray.from_arrays(
+        [pa.array(["New York", None], pa.string())], names=["governing_law"]),
 })
 ```
 
 A null answer does not remove its row: `ct42` stays in `rows` with a null
-`governing_law`.
+`governing_law` field.
 
-- `rows` carries the same answers in the selected answer column. The harness
-  checks that they agree with the answer table.
+- `rows` carries the same answers in the struct's fields. The harness checks
+  that the struct's fields are strings named by their answer columns, and that
+  they agree with the answer tables.
 - QUAIL-B compares `rows` with the reference result on the ID and label
-  columns only. It scores an answer column from the answer table.
+  columns only. It scores an answer from its answer table.
 
 ### Span accuracy
 
