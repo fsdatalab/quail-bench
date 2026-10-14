@@ -301,10 +301,10 @@ prompt, the answer tables, and label accuracy.
 
 ### Extraction queries
 
-Nine queries call `ai_extract(question, document)`. The call returns a span,
-a run of words from the document that answers the question, or null if the
-document does not answer it. Each query returns its answers as fields of one
-struct column, `contract`.
+Nine queries use `ai_extract(question, document)`. This function returns a
+span: a run of words from the document that answers the question. If the
+document does not answer the question, the function returns null. Each query
+returns its answers as fields of one struct column, `contract`.
 
 - The reference answers are the spans lawyers marked in CUAD. A contract that
   states one thing in several places has several spans.
