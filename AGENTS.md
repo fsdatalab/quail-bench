@@ -6,7 +6,7 @@ scoring harness. It does not include an execution engine.
 
 The SEC queries use a fixed sample of 100,000 8-K filings. Reference answers
 are not available yet, so run them separately from the default 85 queries.
-See `docs/sec-filings.md` for the queries and download instructions.
+See the SEC filings section in `README.md` for queries and download instructions.
 
 Read `README.md` for the public benchmark contract and metric definitions.
 

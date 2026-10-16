@@ -53,17 +53,6 @@ The [reference](docs/reference.md) specifies the full adapter contract,
 including the optional predicate answers and token data, and the exact rules
 for each metric.
 
-### SEC filings
-
-You can also run [six SEC queries](docs/sec-filings.md) on 100,000 company
-filings from TeraflopAI/SEC-EDGAR. They find CEO departures, extract names,
-dates, and reasons, and classify the replacement CEOs. One query counts
-matching filings by month and replacement category.
-
-The data download and query plans are ready. Reference answers are not
-available yet, so you can run the queries but cannot score accuracy yet.
-Select them separately from the default set of 85 queries.
-
 ## Getting started
 
 QUAIL-B requires Python 3.12:
@@ -368,6 +357,83 @@ the reference labels:
 | CUAD-13 | Which clause types does each contract contain? | `ai_join` of contracts to the 33 clause types; 19% of pairs match |
 | CUAD-14 | Which clause types do contracts with a change of control clause contain? | `ai_filter`, then the `ai_join` |
 | CUAD-15 | When do the first 20 contracts terminable for convenience expire? | `ai_filter`, `ai_extract`, `ORDER BY`, `LIMIT` |
+
+### SEC filings
+
+The six `SEC-` queries use 100,000 8-K filings from
+[TeraflopAI/SEC-EDGAR](https://huggingface.co/datasets/TeraflopAI/SEC-EDGAR).
+Companies file 8-K reports with the SEC to announce important events.
+The sample includes all topics, not just CEO changes.
+
+| Query | Task |
+| --- | --- |
+| SEC-1 | Keep filings that announce a CEO departure. |
+| SEC-2 | Extract the departing CEO's name from each filing. |
+| SEC-3 | Extract the date when the CEO leaves from each filing. |
+| SEC-4 | Keep CEO departure filings, then extract the name, date, and reason. |
+| SEC-5 | Keep CEO departure filings, then classify the replacement CEO. |
+| SEC-6 | Count those filings by filing month and replacement CEO category. |
+
+A departure includes resignation, retirement, removal, death, or another end
+of service as CEO. Interim CEOs and co-CEOs count. The departure must concern
+the filing company and may take effect now or in the future. Hypothetical
+changes and past departures mentioned as background do not count. If several
+CEOs leave, all answers refer to the first departing CEO mentioned in the text.
+
+SEC-2 through SEC-4 return the filing ID as `f` and extracted fields in a
+`departure` struct. The fields are `ceo_name`, `departure_date`, and, for
+SEC-4, `departure_reason`. SEC-2 returns only the name; SEC-3 returns only the
+date. Answers are copied from the text or null when missing. Dates stay as
+written, and reasons must be stated in the text. SEC-2 and SEC-3 return every
+filing; SEC-4 returns only filings that pass the filter.
+
+SEC-5 returns `f` and `successor_status` for the person who takes over
+immediately. The categories are `interim`, `permanent`, and `unspecified`.
+The filing must state that the replacement is interim, acting, temporary,
+or permanent. Otherwise, use `unspecified`, including when no replacement
+is named. SEC-6 returns `filing_month`, `successor_status`, and `filings`,
+sorted by month and category. It counts each matching filing once and uses
+the filing month, not the departure date.
+
+Download the sample from this repository:
+
+```sh
+uv run --frozen python tools/make_sec_corpus.py
+```
+
+The command saves `sec_filings.parquet` and `manifest.json` in `results/sec/`.
+It caches downloads in `results/sec-source/`. Git ignores both directories.
+The table has four string columns: `id` (the SEC accession number), `text`,
+`filing_date` (`YYYY-MM-DD`), and `filing_month` (`YYYY-MM`). Text is unchanged.
+
+The download uses all 217 files in the source's `8-K` directory at revision
+`43de32c4c3cd4a56c26757345a4ec6db04fccda0`. It keeps rows with valid IDs,
+valid dates, and nonempty text. For duplicate IDs, it keeps the first valid
+row in filename order. It selects the 100,000 lowest SHA-256 hashes of
+`"20260818:<accession>"` and sorts the sample by ID. The loader checks the
+sample against the manifest. See [sec.py](quail_b/sec.py) for the full rules.
+
+Reference answers are not available yet, so these queries are separate from
+the default 85 queries. Load them at `scale_factor=1.0` with `accuracy=False`
+and pass them to your engine adapter:
+
+```python
+import quail_b
+
+suite = quail_b.load_benchmark(
+    [f"SEC-{i}" for i in range(1, 7)],
+    scale_factor=1.0,
+    data_dir="results/sec",
+    accuracy=False,
+)
+for query in suite.queries:
+    output = my_engine_adapter(query, suite.tables)
+    print(query.id, output.runtime_s)
+```
+
+Replace `my_engine_adapter` with your adapter function. Smaller samples and
+runs mixed with other query families are not supported. `quail_b.run` requires
+reference answers, so use the loop above until a reference collection is ready.
 
 ### Relational queries
 
