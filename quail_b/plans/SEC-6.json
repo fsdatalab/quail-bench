@@ -1,0 +1,358 @@
+{
+  "extension_urns": [
+    {
+      "extension_urn_anchor": 1,
+      "urn": "extension:org.fsdatalab.quail_b:functions_ai"
+    },
+    {
+      "extension_urn_anchor": 4,
+      "urn": "extension:io.substrait:functions_aggregate_generic"
+    }
+  ],
+  "extensions": [
+    {
+      "extension_function": {
+        "extension_urn_reference": 1,
+        "function_anchor": 1,
+        "name": "ai_filter:str_str"
+      }
+    },
+    {
+      "extension_function": {
+        "extension_urn_reference": 1,
+        "function_anchor": 5,
+        "name": "ai_classify:str_str_list_list"
+      }
+    },
+    {
+      "extension_function": {
+        "extension_urn_reference": 4,
+        "function_anchor": 13,
+        "name": "count:any"
+      }
+    }
+  ],
+  "relations": [
+    {
+      "root": {
+        "input": {
+          "project": {
+            "common": {
+              "emit": {
+                "output_mapping": [
+                  3,
+                  4,
+                  5
+                ]
+              }
+            },
+            "expressions": [
+              {
+                "selection": {
+                  "direct_reference": {
+                    "struct_field": {}
+                  },
+                  "root_reference": {}
+                }
+              },
+              {
+                "selection": {
+                  "direct_reference": {
+                    "struct_field": {
+                      "field": 1
+                    }
+                  },
+                  "root_reference": {}
+                }
+              },
+              {
+                "selection": {
+                  "direct_reference": {
+                    "struct_field": {
+                      "field": 2
+                    }
+                  },
+                  "root_reference": {}
+                }
+              }
+            ],
+            "input": {
+              "sort": {
+                "common": {
+                  "direct": {},
+                  "hint": {
+                    "alias": "sort-1"
+                  }
+                },
+                "input": {
+                  "aggregate": {
+                    "common": {
+                      "direct": {},
+                      "hint": {
+                        "alias": "aggregate-1",
+                        "output_names": [
+                          "f.filing_month",
+                          "f.successor_status",
+                          "filings"
+                        ]
+                      }
+                    },
+                    "grouping_expressions": [
+                      {
+                        "selection": {
+                          "direct_reference": {
+                            "struct_field": {
+                              "field": 2
+                            }
+                          },
+                          "root_reference": {}
+                        }
+                      },
+                      {
+                        "selection": {
+                          "direct_reference": {
+                            "struct_field": {
+                              "field": 3
+                            }
+                          },
+                          "root_reference": {}
+                        }
+                      }
+                    ],
+                    "groupings": [
+                      {
+                        "expression_references": [
+                          0,
+                          1
+                        ]
+                      }
+                    ],
+                    "input": {
+                      "project": {
+                        "common": {
+                          "direct": {},
+                          "hint": {
+                            "alias": "classify-1",
+                            "output_names": [
+                              "f.id",
+                              "f.text",
+                              "f.filing_month",
+                              "f.successor_status"
+                            ]
+                          }
+                        },
+                        "expressions": [
+                          {
+                            "scalar_function": {
+                              "arguments": [
+                                {
+                                  "value": {
+                                    "literal": {
+                                      "string": "{0}\n\nIs the departing CEO's immediate successor interim or permanent? A CEO departure is an announced resignation, retirement, removal, death, or other end of service as the filing company's chief executive officer, including an interim or co-CEO, effective now or later. Hypothetical departures, past departures given as background, and departures from other roles or other companies do not count. If several CEOs depart, use the one mentioned first. Use the person who takes over first, even if a permanent successor is also named. Do not infer permanent status from the absence of 'interim'."
+                                    }
+                                  }
+                                },
+                                {
+                                  "value": {
+                                    "selection": {
+                                      "direct_reference": {
+                                        "struct_field": {
+                                          "field": 1
+                                        }
+                                      },
+                                      "root_reference": {}
+                                    }
+                                  }
+                                },
+                                {
+                                  "value": {
+                                    "literal": {
+                                      "list": {
+                                        "values": [
+                                          {
+                                            "string": "interim"
+                                          },
+                                          {
+                                            "string": "permanent"
+                                          },
+                                          {
+                                            "string": "unspecified"
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  }
+                                },
+                                {
+                                  "value": {
+                                    "literal": {
+                                      "list": {
+                                        "values": [
+                                          {
+                                            "string": "The immediate successor is explicitly interim, acting, or temporary."
+                                          },
+                                          {
+                                            "string": "The immediate successor is explicitly permanent or non-interim."
+                                          },
+                                          {
+                                            "string": "No departure, no immediate successor, or no explicit status."
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  }
+                                }
+                              ],
+                              "function_reference": 5,
+                              "output_type": {
+                                "string": {
+                                  "nullability": "NULLABILITY_REQUIRED"
+                                }
+                              }
+                            }
+                          }
+                        ],
+                        "input": {
+                          "filter": {
+                            "common": {
+                              "direct": {},
+                              "hint": {
+                                "alias": "filter-1"
+                              }
+                            },
+                            "condition": {
+                              "scalar_function": {
+                                "arguments": [
+                                  {
+                                    "value": {
+                                      "literal": {
+                                        "string": "{0}\n\nDoes this filing announce a CEO departure? A CEO departure is an announced resignation, retirement, removal, death, or other end of service as the filing company's chief executive officer, including an interim or co-CEO, effective now or later. Hypothetical departures, past departures given as background, and departures from other roles or other companies do not count."
+                                      }
+                                    }
+                                  },
+                                  {
+                                    "value": {
+                                      "selection": {
+                                        "direct_reference": {
+                                          "struct_field": {
+                                            "field": 1
+                                          }
+                                        },
+                                        "root_reference": {}
+                                      }
+                                    }
+                                  }
+                                ],
+                                "function_reference": 1,
+                                "output_type": {
+                                  "bool": {
+                                    "nullability": "NULLABILITY_REQUIRED"
+                                  }
+                                }
+                              }
+                            },
+                            "input": {
+                              "read": {
+                                "base_schema": {
+                                  "names": [
+                                    "id",
+                                    "text",
+                                    "filing_month"
+                                  ],
+                                  "struct": {
+                                    "nullability": "NULLABILITY_REQUIRED",
+                                    "types": [
+                                      {
+                                        "string": {
+                                          "nullability": "NULLABILITY_REQUIRED"
+                                        }
+                                      },
+                                      {
+                                        "string": {
+                                          "nullability": "NULLABILITY_REQUIRED"
+                                        }
+                                      },
+                                      {
+                                        "string": {
+                                          "nullability": "NULLABILITY_REQUIRED"
+                                        }
+                                      }
+                                    ]
+                                  }
+                                },
+                                "common": {
+                                  "direct": {},
+                                  "hint": {
+                                    "alias": "f"
+                                  }
+                                },
+                                "named_table": {
+                                  "names": [
+                                    "sec_filings"
+                                  ]
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "measures": [
+                      {
+                        "measure": {
+                          "function_reference": 13,
+                          "invocation": "AGGREGATION_INVOCATION_ALL",
+                          "output_type": {
+                            "i64": {
+                              "nullability": "NULLABILITY_REQUIRED"
+                            }
+                          },
+                          "phase": "AGGREGATION_PHASE_INITIAL_TO_RESULT"
+                        }
+                      }
+                    ]
+                  }
+                },
+                "sorts": [
+                  {
+                    "direction": "SORT_DIRECTION_ASC_NULLS_LAST",
+                    "expr": {
+                      "selection": {
+                        "direct_reference": {
+                          "struct_field": {}
+                        },
+                        "root_reference": {}
+                      }
+                    }
+                  },
+                  {
+                    "direction": "SORT_DIRECTION_ASC_NULLS_LAST",
+                    "expr": {
+                      "selection": {
+                        "direct_reference": {
+                          "struct_field": {
+                            "field": 1
+                          }
+                        },
+                        "root_reference": {}
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "names": [
+          "filing_month",
+          "successor_status",
+          "filings"
+        ]
+      }
+    }
+  ],
+  "version": {
+    "minor_number": 103,
+    "producer": "quail-b"
+  }
+}

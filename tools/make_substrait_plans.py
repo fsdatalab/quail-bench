@@ -311,6 +311,7 @@ class Query:
         select: Returned columns: an alias for its id, `alias.column`
             for a label column, or a Struct of answer columns; None
             returns every relation's id.
+        draft: Exclude this query from the default published suite.
     """
 
     id: str
@@ -318,6 +319,7 @@ class Query:
     tree: "Scan | Filter | Join | Classify | InList | Extract"
     privacy: bool = False
     select: tuple[str, ...] | None = None
+    draft: bool = False
 
 
 def _string_type():
@@ -883,6 +885,21 @@ def _contracts(alias="c"):
     return Scan("contracts", alias, "text")
 
 
+def _sec_filings():
+    return Scan("sec_filings", "f", "text", ("filing_month",))
+
+
+def _sec_departures():
+    return Filter(_sec_filings(), prompts.SEC_CEO_DEPARTURE)
+
+
+def _sec_successors():
+    return _classify(
+        _sec_departures(), prompts.SEC_CEO_SUCCESSOR,
+        prompts.SEC_CEO_SUCCESSOR_LABELS, "successor_status",
+        prompts.SEC_CEO_SUCCESSOR_DESCRIPTIONS)
+
+
 def _clause_types():
     return Scan("clause_types", "k", "question")
 
@@ -1284,6 +1301,17 @@ QUERIES = (
               ("w.model",), (("flagged", "count", None),)),
                (("flagged", True), ("w.model", False))),
           select=("w.model", "flagged")),
+    Query("WRENCH-6", "filter: runs that exploited the verifier -> extract: "
+          "the exploiting command or edit",
+          Extract(_filters(_wrench_runs(), WRENCH_EXPLOITED),
+                  prompts.WRENCH_EXPLOIT_ACTION, "exploit_action"),
+          select=("w", Struct("exploit", ("w.exploit_action",))), draft=True),
+    Query("WRENCH-7", "filter: steps that are part of an exploit -> extract: "
+          "the file or check each step tampers with",
+          Extract(_filters(_wrench_steps(), WRENCH_STEP_EXPLOIT),
+                  prompts.WRENCH_EXPLOIT_TARGET, "exploit_target"),
+          select=("s", Struct("exploit", ("s.exploit_target",))),
+          draft=True),
 
     # CRMArena-Pro sales calls. Their reference labels are not published
     # yet.
@@ -1375,6 +1403,36 @@ QUERIES = (
               (("c.id", False),)), 20),
           select=("c", Struct("contract", ("c.expiration_date",)))),
 
+    # SEC inputs are built locally until reference labels are published.
+    Query("SEC-1", "filter: announced CEO departure", _sec_departures(),
+          draft=True),
+    Query("SEC-2", "extract: departing CEO name, null without one",
+          Extract(_sec_filings(), prompts.SEC_CEO_NAME, "ceo_name"),
+          select=("f", Struct("departure", ("f.ceo_name",))), draft=True),
+    Query("SEC-3", "extract: effective CEO departure date, null without one",
+          Extract(_sec_filings(), prompts.SEC_CEO_DATE, "departure_date"),
+          select=("f", Struct("departure", ("f.departure_date",))), draft=True),
+    Query("SEC-4", "filter: CEO departure -> extract: name, date, reason",
+          Extract(Extract(Extract(
+              _sec_departures(), prompts.SEC_CEO_NAME, "ceo_name"),
+              prompts.SEC_CEO_DATE, "departure_date"),
+              prompts.SEC_CEO_REASON, "departure_reason"),
+          select=("f", Struct("departure", (
+              "f.ceo_name", "f.departure_date", "f.departure_reason"))),
+          draft=True),
+    Query("SEC-5", "filter: CEO departure -> classify: successor status",
+          _sec_successors(), select=("f", "f.successor_status"), draft=True),
+    Query("SEC-6", "filter: CEO departure -> classify: successor status -> "
+          "filings per month and status",
+          Sort(Aggregate(_sec_successors(),
+                         ("f.filing_month", "f.successor_status"),
+                         (("filings", "count", None),)),
+               (("f.filing_month", False), ("f.successor_status", False))),
+          select=("f.filing_month", "f.successor_status", "filings"), draft=True),
+    Query("SEC-7", "extract: the sentence stating each filing's reported event",
+          Extract(_sec_filings(), prompts.SEC_EVENT_SENTENCE, "event_sentence"),
+          select=("f", Struct("report", ("f.event_sentence",))), draft=True),
+
     # PrivacyPolicies: only when that corpus is available.
     Query("PRIV-1", "2 filters: P_MSG + P_LOC",
           _filters(_policies(), P_MSG, P_LOC), privacy=True),
@@ -1408,6 +1466,8 @@ def write_plans(directory: Path) -> None:
             "description": query.description,
             "privacy": query.privacy,
         }
+        if query.draft:
+            entry["draft"] = True
         catalog.append(entry)
     (directory / "catalog.json").write_text(
         json.dumps(catalog, indent=2) + "\n"

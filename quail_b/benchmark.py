@@ -27,7 +27,7 @@ def select_queries(only=None, *, scale_factor=0.1) -> tuple[QuerySpec, ...]:
     """Validate a scale factor and return the requested query definitions."""
     if scale_factor not in PUBLISHED_CORPORA:
         raise ValueError("scale factor must be 0.1, 0.5, or 1.0")
-    available = queries()
+    available = queries(include_draft=True)
     ids = list(queries()) if only is None else (
         [only] if isinstance(only, str) else list(only))
     unknown = set(ids) - available.keys()
@@ -35,6 +35,9 @@ def select_queries(only=None, *, scale_factor=0.1) -> tuple[QuerySpec, ...]:
         raise ValueError(f"unknown query IDs: {sorted(unknown)}")
     if not ids or len(ids) != len(set(ids)):
         raise ValueError("query IDs must be nonempty and unique")
+    sec = [query_id for query_id in ids if query_id.startswith("SEC-")]
+    if sec and (len(sec) != len(ids) or scale_factor != 1.0):
+        raise ValueError("run SEC queries separately at scale_factor=1.0")
     if isinstance(only, (set, frozenset)):
         ids = [query_id for query_id in available if query_id in only]
     return tuple(available[query_id] for query_id in ids)
@@ -53,17 +56,19 @@ class Benchmark:
 
 def load_benchmark(only=None, *, scale_factor=0.1, data_dir=None,
                    collection_id=None, accuracy=True, root=None) -> Benchmark:
-    """Load selected inputs and labels from the public benchmark.
+    """Load selected inputs and labels, including explicit local SEC inputs.
 
     Args:
         only: Query IDs, or None for all queries.
-        scale_factor: Published scale factor: 0.1, 0.5, or 1.0.
-        data_dir: Optional directory of input Parquet files to validate.
+        scale_factor: Published scale factor: 0.1, 0.5, or 1.0. SEC uses 1.0.
+        data_dir: Directory of input files to validate. Required for SEC.
         collection_id: Reference collection ID, or None for the active one.
         accuracy: Whether to load reference labels for scoring.
         root: Published data root, or None for the public S3 bucket.
     """
     specs = select_queries(only, scale_factor=scale_factor)
+    if specs[0].id.startswith("SEC-"):
+        return _load_sec_benchmark(specs, data_dir, collection_id, accuracy, root)
     corpus_id = PUBLISHED_CORPORA[scale_factor]
     manifest = _read_json(
         root, f"{GROUND_TRUTH_ROOT}/corpora/{corpus_id}/manifest.json")
@@ -89,6 +94,31 @@ def load_benchmark(only=None, *, scale_factor=0.1, data_dir=None,
     for name in names:
         if identity["tables"][name] != manifest["tables"][name]:
             raise ValueError(f"{name} does not match published corpus {corpus_id}")
+    truth = _load_truth(specs, scale_factor, corpus_id,
+                        collection_id, accuracy, root)
+    return Benchmark(specs, tables, scale_factor, corpus_id, truth)
+
+
+def _load_sec_benchmark(specs, data_dir, collection_id, accuracy, root):
+    from quail_b.sec import SEC_TABLE, load_sec_table, sec_identity
+
+    if data_dir is None:
+        raise ValueError(
+            "SEC needs data_dir from tools/make_sec_corpus.py")
+    if accuracy and collection_id is None:
+        raise ValueError(
+            "SEC reference labels are not published; use accuracy=False "
+            "for adapter inputs or provide collection_id")
+    table = load_sec_table(data_dir)
+    tables = {SEC_TABLE: table}
+    corpus_id = sec_identity(table)["corpus_id"]
+    truth = _load_truth(specs, 1.0, corpus_id,
+                        collection_id, accuracy, root)
+    return Benchmark(specs, tables, 1.0, corpus_id, truth)
+
+
+def _load_truth(specs, scale_factor, corpus_id,
+                collection_id, accuracy, root):
     truth = None
     if accuracy:
         # only the label sets the selected queries score against
@@ -117,4 +147,4 @@ def load_benchmark(only=None, *, scale_factor=0.1, data_dir=None,
                 raise ValueError(
                     f"reference labels for {key} use a different prompt format; "
                     "regenerate labels for the current benchmark")
-    return Benchmark(specs, tables, scale_factor, corpus_id, truth)
+    return truth

@@ -1,0 +1,334 @@
+{
+  "extension_urns": [
+    {
+      "extension_urn_anchor": 1,
+      "urn": "extension:org.fsdatalab.quail_b:functions_ai"
+    }
+  ],
+  "extensions": [
+    {
+      "extension_function": {
+        "extension_urn_reference": 1,
+        "function_anchor": 1,
+        "name": "ai_filter:str_str"
+      }
+    },
+    {
+      "extension_function": {
+        "extension_urn_reference": 1,
+        "function_anchor": 19,
+        "name": "ai_extract:str_str"
+      }
+    }
+  ],
+  "relations": [
+    {
+      "root": {
+        "input": {
+          "project": {
+            "common": {
+              "emit": {
+                "output_mapping": [
+                  6,
+                  7
+                ]
+              }
+            },
+            "expressions": [
+              {
+                "selection": {
+                  "direct_reference": {
+                    "struct_field": {}
+                  },
+                  "root_reference": {}
+                }
+              },
+              {
+                "nested": {
+                  "struct": {
+                    "fields": [
+                      {
+                        "selection": {
+                          "direct_reference": {
+                            "struct_field": {
+                              "field": 3
+                            }
+                          },
+                          "root_reference": {}
+                        }
+                      },
+                      {
+                        "selection": {
+                          "direct_reference": {
+                            "struct_field": {
+                              "field": 4
+                            }
+                          },
+                          "root_reference": {}
+                        }
+                      },
+                      {
+                        "selection": {
+                          "direct_reference": {
+                            "struct_field": {
+                              "field": 5
+                            }
+                          },
+                          "root_reference": {}
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            "input": {
+              "project": {
+                "common": {
+                  "direct": {},
+                  "hint": {
+                    "alias": "extract-3",
+                    "output_names": [
+                      "f.id",
+                      "f.text",
+                      "f.filing_month",
+                      "f.ceo_name",
+                      "f.departure_date",
+                      "f.departure_reason"
+                    ]
+                  }
+                },
+                "expressions": [
+                  {
+                    "scalar_function": {
+                      "arguments": [
+                        {
+                          "value": {
+                            "literal": {
+                              "string": "What reason does the filing give for the CEO's departure? A CEO departure is an announced resignation, retirement, removal, death, or other end of service as the filing company's chief executive officer, including an interim or co-CEO, effective now or later. Hypothetical departures, past departures given as background, and departures from other roles or other companies do not count. If several CEOs depart, use the one mentioned first. Copy the shortest passage that states it. Do not infer a reason."
+                            }
+                          }
+                        },
+                        {
+                          "value": {
+                            "selection": {
+                              "direct_reference": {
+                                "struct_field": {
+                                  "field": 1
+                                }
+                              },
+                              "root_reference": {}
+                            }
+                          }
+                        }
+                      ],
+                      "function_reference": 19,
+                      "output_type": {
+                        "string": {
+                          "nullability": "NULLABILITY_NULLABLE"
+                        }
+                      }
+                    }
+                  }
+                ],
+                "input": {
+                  "project": {
+                    "common": {
+                      "direct": {},
+                      "hint": {
+                        "alias": "extract-2",
+                        "output_names": [
+                          "f.id",
+                          "f.text",
+                          "f.filing_month",
+                          "f.ceo_name",
+                          "f.departure_date"
+                        ]
+                      }
+                    },
+                    "expressions": [
+                      {
+                        "scalar_function": {
+                          "arguments": [
+                            {
+                              "value": {
+                                "literal": {
+                                  "string": "When does the CEO's departure take effect? A CEO departure is an announced resignation, retirement, removal, death, or other end of service as the filing company's chief executive officer, including an interim or co-CEO, effective now or later. Hypothetical departures, past departures given as background, and departures from other roles or other companies do not count. If several CEOs depart, use the one mentioned first. Copy the date or phrase as written, such as 'effective immediately'. Do not use the filing date."
+                                }
+                              }
+                            },
+                            {
+                              "value": {
+                                "selection": {
+                                  "direct_reference": {
+                                    "struct_field": {
+                                      "field": 1
+                                    }
+                                  },
+                                  "root_reference": {}
+                                }
+                              }
+                            }
+                          ],
+                          "function_reference": 19,
+                          "output_type": {
+                            "string": {
+                              "nullability": "NULLABILITY_NULLABLE"
+                            }
+                          }
+                        }
+                      }
+                    ],
+                    "input": {
+                      "project": {
+                        "common": {
+                          "direct": {},
+                          "hint": {
+                            "alias": "extract-1",
+                            "output_names": [
+                              "f.id",
+                              "f.text",
+                              "f.filing_month",
+                              "f.ceo_name"
+                            ]
+                          }
+                        },
+                        "expressions": [
+                          {
+                            "scalar_function": {
+                              "arguments": [
+                                {
+                                  "value": {
+                                    "literal": {
+                                      "string": "What is the departing CEO's name? A CEO departure is an announced resignation, retirement, removal, death, or other end of service as the filing company's chief executive officer, including an interim or co-CEO, effective now or later. Hypothetical departures, past departures given as background, and departures from other roles or other companies do not count. If several CEOs depart, use the one mentioned first."
+                                    }
+                                  }
+                                },
+                                {
+                                  "value": {
+                                    "selection": {
+                                      "direct_reference": {
+                                        "struct_field": {
+                                          "field": 1
+                                        }
+                                      },
+                                      "root_reference": {}
+                                    }
+                                  }
+                                }
+                              ],
+                              "function_reference": 19,
+                              "output_type": {
+                                "string": {
+                                  "nullability": "NULLABILITY_NULLABLE"
+                                }
+                              }
+                            }
+                          }
+                        ],
+                        "input": {
+                          "filter": {
+                            "common": {
+                              "direct": {},
+                              "hint": {
+                                "alias": "filter-1"
+                              }
+                            },
+                            "condition": {
+                              "scalar_function": {
+                                "arguments": [
+                                  {
+                                    "value": {
+                                      "literal": {
+                                        "string": "{0}\n\nDoes this filing announce a CEO departure? A CEO departure is an announced resignation, retirement, removal, death, or other end of service as the filing company's chief executive officer, including an interim or co-CEO, effective now or later. Hypothetical departures, past departures given as background, and departures from other roles or other companies do not count."
+                                      }
+                                    }
+                                  },
+                                  {
+                                    "value": {
+                                      "selection": {
+                                        "direct_reference": {
+                                          "struct_field": {
+                                            "field": 1
+                                          }
+                                        },
+                                        "root_reference": {}
+                                      }
+                                    }
+                                  }
+                                ],
+                                "function_reference": 1,
+                                "output_type": {
+                                  "bool": {
+                                    "nullability": "NULLABILITY_REQUIRED"
+                                  }
+                                }
+                              }
+                            },
+                            "input": {
+                              "read": {
+                                "base_schema": {
+                                  "names": [
+                                    "id",
+                                    "text",
+                                    "filing_month"
+                                  ],
+                                  "struct": {
+                                    "nullability": "NULLABILITY_REQUIRED",
+                                    "types": [
+                                      {
+                                        "string": {
+                                          "nullability": "NULLABILITY_REQUIRED"
+                                        }
+                                      },
+                                      {
+                                        "string": {
+                                          "nullability": "NULLABILITY_REQUIRED"
+                                        }
+                                      },
+                                      {
+                                        "string": {
+                                          "nullability": "NULLABILITY_REQUIRED"
+                                        }
+                                      }
+                                    ]
+                                  }
+                                },
+                                "common": {
+                                  "direct": {},
+                                  "hint": {
+                                    "alias": "f"
+                                  }
+                                },
+                                "named_table": {
+                                  "names": [
+                                    "sec_filings"
+                                  ]
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "names": [
+          "f",
+          "departure",
+          "ceo_name",
+          "departure_date",
+          "departure_reason"
+        ]
+      }
+    }
+  ],
+  "version": {
+    "minor_number": 103,
+    "producer": "quail-b"
+  }
+}

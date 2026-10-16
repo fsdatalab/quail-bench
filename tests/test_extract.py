@@ -87,6 +87,23 @@ def _spec(tree, select):
                              .SerializeToString())
 
 
+def test_wrench_extractions_are_drafts_over_flagged_runs_and_steps():
+    drafts = set(queries(include_draft=True)) - set(queries())
+    assert {"WRENCH-6", "WRENCH-7"} <= drafts
+    by_prompt = {p.template: p for p in predicates.WRENCH_EXTRACT_PREDICATES}
+    for query_id, alias, table, question in (
+            ("WRENCH-6", "w", "wrench_runs", prompts.WRENCH_EXPLOIT_ACTION),
+            ("WRENCH-7", "s", "wrench_steps", prompts.WRENCH_EXPLOIT_TARGET)):
+        info = quail_b.get_query(query_id).info
+        assert [op.id for op in info.ai_operators] == ["filter-1", "extract-1"]
+        assert {relation.table for relation in info.relations} == {table}
+        assert info.extracts[0].prompt == question
+        assert info.columns == (alias, "exploit")
+        assert by_prompt[question].left_table == table
+        with pytest.raises(ValueError, match="reference source is not defined"):
+            predicates.label_sources(by_prompt[question])
+
+
 def test_invalid_extract_uses_are_rejected():
     contracts = Scan("contracts", "c", "text")
     # an answer column must be selected

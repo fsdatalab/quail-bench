@@ -448,6 +448,11 @@ compare a filter's answers with the dataset's labels.
 | WRENCH-3 | What kind of exploit did each exploiting run use? | WRENCH-1, then 11 exploit kinds with descriptions, from the dataset's categories |
 | WRENCH-4 | Which runs have the most steps that are part of an exploit? | `ai_filter` over steps, `GROUP BY`, `COUNT`, `HAVING`, `ORDER BY`, `LIMIT` |
 | WRENCH-5 | Among runs not asked to hack, how many exploited the verifier, per agent model? | `WHERE mode = 'baseline'`, `ai_filter`, `GROUP BY`, `COUNT`, `ORDER BY` |
+| WRENCH-6 | Which command or edit exploits the verifier, in each exploiting run? | WRENCH-1, then `ai_extract` |
+| WRENCH-7 | Which file or check does each exploit step tamper with? | `ai_filter` over steps, then `ai_extract` |
+
+WRENCH-6 and WRENCH-7 have no reference answers yet, so they are not part of
+the default 85 queries. Load them by ID with `accuracy=False`.
 
 ### Sales call queries
 
@@ -477,6 +482,55 @@ content can therefore disagree with its deal's stage.
 | SALES-3 | In which pairs of consecutive calls does the rep quote a different price or discount? | `ai_join` of each call to the next call of its deal, on `prev_call_id` |
 | SALES-4 | Which calls have the rep offering a discount and the customer committing to buy? | Two `ai_filter`s over one call |
 | SALES-5 | Among calls on deals in negotiation, which 25 most likely end in a commitment? | `WHERE deal_stage = 'Negotiation'`, `ai_score`, `ORDER BY`, `LIMIT` |
+
+### SEC filing queries
+
+The `SEC` queries read 100,000 8-K filings from
+[TeraflopAI/SEC-EDGAR](https://huggingface.co/datasets/TeraflopAI/SEC-EDGAR).
+A company files an 8-K to announce an important event. The sample covers all
+event types, not only CEO changes.
+
+`sec_filings` has one row per filing, with columns `id` (the SEC accession
+number), `text`, `filing_date`, and `filing_month`. A CEO departure is a
+resignation, retirement, removal, or death of the filing company's CEO,
+including an interim or co-CEO. If several CEOs leave, the answers use the
+first one the filing names.
+
+| Query | Question | Operators |
+| --- | --- | --- |
+| SEC-1 | Which filings announce a CEO departure? | `ai_filter` |
+| SEC-2 | Who is the departing CEO in each filing? | `ai_extract`; null without a departure |
+| SEC-3 | When does the CEO leave, in each filing? | `ai_extract`; null without a departure |
+| SEC-4 | Who left, when, and why, in filings that announce a CEO departure? | `ai_filter`, then three `ai_extract`s of one document |
+| SEC-5 | Is each departing CEO's successor interim or permanent? | `ai_filter`, then 3 labels |
+| SEC-6 | How many CEO departures per month and successor status? | SEC-5, then `GROUP BY`, `COUNT`, `ORDER BY` |
+| SEC-7 | Which sentence states the event each filing reports? | `ai_extract` of a long sentence |
+
+The SEC queries have no reference answers yet, so they are not part of the
+default 85 queries. Load them on their own, at `scale_factor=1.0`, with
+`accuracy=False`. `quail_b.run` needs reference answers, so it does not
+accept them. Download the sample to `results/sec/`, then call your adapter
+directly:
+
+```sh
+uv run --frozen python tools/make_sec_corpus.py
+```
+
+```python
+import quail_b
+
+suite = quail_b.load_benchmark(
+    [f"SEC-{i}" for i in range(1, 8)],
+    scale_factor=1.0,
+    data_dir="results/sec",
+    accuracy=False,
+)
+for query in suite.queries:
+    output = my_engine_adapter(query, suite.tables)
+```
+
+[sec.py](quail_b/sec.py) defines the source revision and how the sample is
+chosen. The loader checks the download against its manifest.
 
 ## Scale factors
 

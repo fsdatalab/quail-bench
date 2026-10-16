@@ -338,8 +338,41 @@ EXTRACT_PREDICATES = tuple(
         ("audit_rights", "Audit Rights"),
         ("license_grant", "License Grant")))
 
-PREDICATE_BY_KEY = {p.key: p for p in (PREDICATES + CLASSIFY_PREDICATES
-                                       + EXTRACT_PREDICATES)}
+# Terminal Wrench extractions, defined before their labels are published.
+WRENCH_EXTRACT_PREDICATES = (
+    PredicateSpec(
+        "quailb.wrench.run.exploit_action", "wrench", "exploit_action",
+        "extract", prompts.WRENCH_EXPLOIT_ACTION, "agent_run", "wrench_runs",
+        "transcript", source_policy="unpublished"),
+    PredicateSpec(
+        "quailb.wrench.step.exploit_target", "wrench", "exploit_target",
+        "extract", prompts.WRENCH_EXPLOIT_TARGET, "agent_step", "wrench_steps",
+        "text", source_policy="unpublished"),
+)
+
+# SEC definitions are available to labelers without changing published sets.
+SEC_PREDICATES = (
+    PredicateSpec(
+        "quailb.sec.filing.ceo_departure", "sec", "ceo_departure", "filter",
+        prompts.SEC_CEO_DEPARTURE, "filing", "sec_filings", "text"),
+    *(PredicateSpec(
+        f"quailb.sec.filing.{slug}", "sec", slug, "extract", question,
+        "filing", "sec_filings", "text", source_policy="unpublished")
+      for slug, question in (
+          ("ceo_name", prompts.SEC_CEO_NAME),
+          ("departure_date", prompts.SEC_CEO_DATE),
+          ("departure_reason", prompts.SEC_CEO_REASON),
+          ("event_sentence", prompts.SEC_EVENT_SENTENCE))),
+    PredicateSpec(
+        "quailb.sec.filing.successor_status", "sec", "successor_status",
+        "classify", prompts.SEC_CEO_SUCCESSOR, "filing", "sec_filings", "text",
+        labels=prompts.SEC_CEO_SUCCESSOR_LABELS,
+        descriptions=prompts.SEC_CEO_SUCCESSOR_DESCRIPTIONS),
+)
+
+PREDICATE_BY_KEY = {p.key: p for p in (
+    PREDICATES + CLASSIFY_PREDICATES + EXTRACT_PREDICATES
+    + WRENCH_EXTRACT_PREDICATES + SEC_PREDICATES)}
 
 WORKLOADS = tuple(dict.fromkeys(spec.workload for spec in PREDICATES))
 
@@ -518,6 +551,8 @@ SOURCE_SPECS = {
 
 def label_sources(spec: PredicateSpec, judge: dict = JUDGE_SPEC) -> list[dict]:
     """The sources of one predicate's labels, the judge first when it has one."""
+    if spec.source_policy == "unpublished":
+        raise ValueError(f"reference source is not defined for {spec.key}")
     sources = []
     if spec.kind == "classify" and judge is JUDGE_SPEC:
         judge = CLASSIFY_JUDGE_SPEC

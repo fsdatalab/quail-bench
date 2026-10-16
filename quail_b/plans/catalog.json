@@ -325,6 +325,18 @@
     "privacy": false
   },
   {
+    "id": "WRENCH-6",
+    "description": "filter: runs that exploited the verifier -> extract: the exploiting command or edit",
+    "privacy": false,
+    "draft": true
+  },
+  {
+    "id": "WRENCH-7",
+    "description": "filter: steps that are part of an exploit -> extract: the file or check each step tampers with",
+    "privacy": false,
+    "draft": true
+  },
+  {
     "id": "SALES-1",
     "description": "filter: calls that name a competitor",
     "privacy": false
@@ -423,6 +435,48 @@
     "id": "CUAD-15",
     "description": "filter: termination for convenience -> extract: the expiration date -> by id, 20",
     "privacy": false
+  },
+  {
+    "id": "SEC-1",
+    "description": "filter: announced CEO departure",
+    "privacy": false,
+    "draft": true
+  },
+  {
+    "id": "SEC-2",
+    "description": "extract: departing CEO name, null without one",
+    "privacy": false,
+    "draft": true
+  },
+  {
+    "id": "SEC-3",
+    "description": "extract: effective CEO departure date, null without one",
+    "privacy": false,
+    "draft": true
+  },
+  {
+    "id": "SEC-4",
+    "description": "filter: CEO departure -> extract: name, date, reason",
+    "privacy": false,
+    "draft": true
+  },
+  {
+    "id": "SEC-5",
+    "description": "filter: CEO departure -> classify: successor status",
+    "privacy": false,
+    "draft": true
+  },
+  {
+    "id": "SEC-6",
+    "description": "filter: CEO departure -> classify: successor status -> filings per month and status",
+    "privacy": false,
+    "draft": true
+  },
+  {
+    "id": "SEC-7",
+    "description": "extract: the sentence stating each filing's reported event",
+    "privacy": false,
+    "draft": true
   },
   {
     "id": "PRIV-1",
