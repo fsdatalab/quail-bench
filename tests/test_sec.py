@@ -23,7 +23,7 @@ SEC_IDS = tuple(f"SEC-{i}" for i in range(1, 8))
 
 def test_sec_plans_are_explicit_and_preserve_the_published_suite():
     assert len(queries()) == 85
-    assert set(queries(include_draft=True)) - set(queries()) == set(SEC_IDS)
+    assert set(SEC_IDS) <= set(queries(include_draft=True)) - set(queries())
     assert query_family_name(SEC_IDS) == "sec"
     specs = quail_b.select_queries(SEC_IDS, scale_factor=1.0)
     assert [tuple(op.id for op in spec.info.ai_operators) for spec in specs] == [

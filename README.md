@@ -448,6 +448,11 @@ compare a filter's answers with the dataset's labels.
 | WRENCH-3 | What kind of exploit did each exploiting run use? | WRENCH-1, then 11 exploit kinds with descriptions, from the dataset's categories |
 | WRENCH-4 | Which runs have the most steps that are part of an exploit? | `ai_filter` over steps, `GROUP BY`, `COUNT`, `HAVING`, `ORDER BY`, `LIMIT` |
 | WRENCH-5 | Among runs not asked to hack, how many exploited the verifier, per agent model? | `WHERE mode = 'baseline'`, `ai_filter`, `GROUP BY`, `COUNT`, `ORDER BY` |
+| WRENCH-6 | Which command or edit exploits the verifier, in each exploiting run? | WRENCH-1, then `ai_extract` |
+| WRENCH-7 | Which file or check does each exploit step tamper with? | `ai_filter` over steps, then `ai_extract` |
+
+WRENCH-6 and WRENCH-7 have no reference answers yet, so they are not part of
+the default 85 queries. Load them by ID with `accuracy=False`.
 
 ### Sales call queries
 

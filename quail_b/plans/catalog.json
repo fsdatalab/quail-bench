@@ -325,6 +325,18 @@
     "privacy": false
   },
   {
+    "id": "WRENCH-6",
+    "description": "filter: runs that exploited the verifier -> extract: the exploiting command or edit",
+    "privacy": false,
+    "draft": true
+  },
+  {
+    "id": "WRENCH-7",
+    "description": "filter: steps that are part of an exploit -> extract: the file or check each step tampers with",
+    "privacy": false,
+    "draft": true
+  },
+  {
     "id": "SALES-1",
     "description": "filter: calls that name a competitor",
     "privacy": false

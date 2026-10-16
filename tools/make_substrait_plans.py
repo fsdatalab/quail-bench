@@ -1301,6 +1301,17 @@ QUERIES = (
               ("w.model",), (("flagged", "count", None),)),
                (("flagged", True), ("w.model", False))),
           select=("w.model", "flagged")),
+    Query("WRENCH-6", "filter: runs that exploited the verifier -> extract: "
+          "the exploiting command or edit",
+          Extract(_filters(_wrench_runs(), WRENCH_EXPLOITED),
+                  prompts.WRENCH_EXPLOIT_ACTION, "exploit_action"),
+          select=("w", Struct("exploit", ("w.exploit_action",))), draft=True),
+    Query("WRENCH-7", "filter: steps that are part of an exploit -> extract: "
+          "the file or check each step tampers with",
+          Extract(_filters(_wrench_steps(), WRENCH_STEP_EXPLOIT),
+                  prompts.WRENCH_EXPLOIT_TARGET, "exploit_target"),
+          select=("s", Struct("exploit", ("s.exploit_target",))),
+          draft=True),
 
     # CRMArena-Pro sales calls. Their reference labels are not published
     # yet.

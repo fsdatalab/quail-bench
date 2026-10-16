@@ -338,6 +338,18 @@ EXTRACT_PREDICATES = tuple(
         ("audit_rights", "Audit Rights"),
         ("license_grant", "License Grant")))
 
+# Terminal Wrench extractions, defined before their labels are published.
+WRENCH_EXTRACT_PREDICATES = (
+    PredicateSpec(
+        "quailb.wrench.run.exploit_action", "wrench", "exploit_action",
+        "extract", prompts.WRENCH_EXPLOIT_ACTION, "agent_run", "wrench_runs",
+        "transcript", source_policy="unpublished"),
+    PredicateSpec(
+        "quailb.wrench.step.exploit_target", "wrench", "exploit_target",
+        "extract", prompts.WRENCH_EXPLOIT_TARGET, "agent_step", "wrench_steps",
+        "text", source_policy="unpublished"),
+)
+
 # SEC definitions are available to labelers without changing published sets.
 SEC_PREDICATES = (
     PredicateSpec(
@@ -358,8 +370,9 @@ SEC_PREDICATES = (
         descriptions=prompts.SEC_CEO_SUCCESSOR_DESCRIPTIONS),
 )
 
-PREDICATE_BY_KEY = {p.key: p for p in (PREDICATES + CLASSIFY_PREDICATES
-                                       + EXTRACT_PREDICATES + SEC_PREDICATES)}
+PREDICATE_BY_KEY = {p.key: p for p in (
+    PREDICATES + CLASSIFY_PREDICATES + EXTRACT_PREDICATES
+    + WRENCH_EXTRACT_PREDICATES + SEC_PREDICATES)}
 
 WORKLOADS = tuple(dict.fromkeys(spec.workload for spec in PREDICATES))
 
