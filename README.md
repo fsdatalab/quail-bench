@@ -496,7 +496,7 @@ first one the filing names.
 | SEC-1 | Which filings announce a CEO departure? | `ai_filter` |
 | SEC-2 | Who is the departing CEO in each filing? | `ai_extract`; null without a departure |
 | SEC-3 | When does the CEO leave, in each filing? | `ai_extract`; null without a departure |
-| SEC-4 | Who left, when, and why, in filings that announce a CEO departure? | `ai_filter`, then `ai_extract` of three fields |
+| SEC-4 | Who left, when, and why, in filings that announce a CEO departure? | `ai_filter`, then three `ai_extract`s of one document |
 | SEC-5 | Is each departing CEO's successor interim or permanent? | `ai_filter`, then 3 labels |
 | SEC-6 | How many CEO departures per month and successor status? | SEC-5, then `GROUP BY`, `COUNT`, `ORDER BY` |
 | SEC-7 | Which sentence states the event each filing reports? | `ai_extract` of a long sentence |
