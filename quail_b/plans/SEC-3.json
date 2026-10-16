@@ -1,0 +1,163 @@
+{
+  "extension_urns": [
+    {
+      "extension_urn_anchor": 1,
+      "urn": "extension:org.fsdatalab.quail_b:functions_ai"
+    }
+  ],
+  "extensions": [
+    {
+      "extension_function": {
+        "extension_urn_reference": 1,
+        "function_anchor": 19,
+        "name": "ai_extract:str_str"
+      }
+    }
+  ],
+  "relations": [
+    {
+      "root": {
+        "input": {
+          "project": {
+            "common": {
+              "emit": {
+                "output_mapping": [
+                  4,
+                  5
+                ]
+              }
+            },
+            "expressions": [
+              {
+                "selection": {
+                  "direct_reference": {
+                    "struct_field": {}
+                  },
+                  "root_reference": {}
+                }
+              },
+              {
+                "nested": {
+                  "struct": {
+                    "fields": [
+                      {
+                        "selection": {
+                          "direct_reference": {
+                            "struct_field": {
+                              "field": 3
+                            }
+                          },
+                          "root_reference": {}
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            "input": {
+              "project": {
+                "common": {
+                  "direct": {},
+                  "hint": {
+                    "alias": "extract-1",
+                    "output_names": [
+                      "f.id",
+                      "f.text",
+                      "f.filing_month",
+                      "f.departure_date"
+                    ]
+                  }
+                },
+                "expressions": [
+                  {
+                    "scalar_function": {
+                      "arguments": [
+                        {
+                          "value": {
+                            "literal": {
+                              "string": "What is the stated effective date of the CEO's departure? A qualifying departure is an announced resignation, retirement, removal, death, or other end of service as chief executive officer of the filing company, including an interim or co-chief executive officer. Include departures effective now or in the future. Exclude hypothetical departures, past departures mentioned only as background, and departures solely from other roles or other companies. If the filing announces several qualifying departures, use the departing CEO first mentioned in document order. Use this same departure for every requested field. Copy the date or effective-time phrase as written, including relative phrases such as 'effective immediately'. Do not substitute the filing date or infer a date. Return no answer if no qualifying departure or effective date is stated."
+                            }
+                          }
+                        },
+                        {
+                          "value": {
+                            "selection": {
+                              "direct_reference": {
+                                "struct_field": {
+                                  "field": 1
+                                }
+                              },
+                              "root_reference": {}
+                            }
+                          }
+                        }
+                      ],
+                      "function_reference": 19,
+                      "output_type": {
+                        "string": {
+                          "nullability": "NULLABILITY_NULLABLE"
+                        }
+                      }
+                    }
+                  }
+                ],
+                "input": {
+                  "read": {
+                    "base_schema": {
+                      "names": [
+                        "id",
+                        "text",
+                        "filing_month"
+                      ],
+                      "struct": {
+                        "nullability": "NULLABILITY_REQUIRED",
+                        "types": [
+                          {
+                            "string": {
+                              "nullability": "NULLABILITY_REQUIRED"
+                            }
+                          },
+                          {
+                            "string": {
+                              "nullability": "NULLABILITY_REQUIRED"
+                            }
+                          },
+                          {
+                            "string": {
+                              "nullability": "NULLABILITY_REQUIRED"
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    "common": {
+                      "direct": {},
+                      "hint": {
+                        "alias": "f"
+                      }
+                    },
+                    "named_table": {
+                      "names": [
+                        "sec_filings"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "names": [
+          "f",
+          "departure",
+          "departure_date"
+        ]
+      }
+    }
+  ],
+  "version": {
+    "minor_number": 103,
+    "producer": "quail-b"
+  }
+}

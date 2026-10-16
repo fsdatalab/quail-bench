@@ -181,11 +181,12 @@ class QuerySpec:
 
 @cache
 def _load_queries() -> tuple[tuple[QuerySpec, ...], ...]:
-    """Return (regular, privacy) query definitions."""
+    """Return (regular, privacy, draft) query definitions."""
     root = files("quail_b").joinpath("plans")
     catalog = json.loads(root.joinpath("catalog.json").read_text())
     regular = []
     privacy = []
+    draft = []
     seen = set()
     for item in catalog:
         query_id = item["id"]
@@ -197,11 +198,13 @@ def _load_queries() -> tuple[tuple[QuerySpec, ...], ...]:
             plan_pb2.Plan(),
         )
         query = QuerySpec.from_plan(query_id, item["description"], plan)
-        if item["privacy"]:
+        if item.get("draft", False):
+            draft.append(query)
+        elif item["privacy"]:
             privacy.append(query)
         else:
             regular.append(query)
-    return tuple(regular), tuple(privacy)
+    return tuple(regular), tuple(privacy), tuple(draft)
 
 
 def __getattr__(name: str):
@@ -209,7 +212,7 @@ def __getattr__(name: str):
     # files on first use, so importing the package does not parse them.
     if name not in ("QUERIES", "PRIVACY_QUERIES", "QUERY_ORDER"):
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    regular, privacy = _load_queries()
+    regular, privacy, _draft = _load_queries()
     globals().update(
         QUERIES=regular,
         PRIVACY_QUERIES=privacy,
@@ -232,17 +235,21 @@ QUERY_FAMILY_WORKLOADS = {
     "WRENCH": "wrench",
     "SALES": "sales",
     "CUAD": "cuad",
+    "SEC": "sec",
 }
 
 
-def queries(include_privacy: bool = False) -> dict[str, QuerySpec]:
+def queries(include_privacy: bool = False, *,
+            include_draft: bool = False) -> dict[str, QuerySpec]:
     """Return the benchmark queries by id, in benchmark order.
 
     Args:
         include_privacy: Also return the privacy policy queries.
+        include_draft: Also return queries without published reference labels.
     """
-    regular, privacy = _load_queries()
-    specs = regular + (privacy if include_privacy else ())
+    regular, privacy, draft = _load_queries()
+    specs = (regular + (privacy if include_privacy else ())
+             + (draft if include_draft else ()))
     return {spec.id: spec for spec in specs}
 
 
@@ -291,4 +298,4 @@ def query_family_name(ids):
 
 def get_query(query_id: str) -> QuerySpec:
     """Return one benchmark query definition by id."""
-    return queries()[query_id]
+    return queries(include_draft=True)[query_id]

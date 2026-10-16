@@ -713,3 +713,53 @@ CUAD_GOVERNING_LAW_DESCRIPTIONS = (
     "a governing law other than those five",
     "the contract names no governing law",
 )
+# SEC 8-K executive changes. Every question selects the same departure.
+SEC_DEPARTURE_SCOPE = (
+    "A qualifying departure is an announced resignation, retirement, removal, "
+    "death, or other end of service as chief executive officer of the filing "
+    "company, including an interim or co-chief executive officer. Include "
+    "departures effective now or in the future. Exclude hypothetical departures, "
+    "past departures mentioned only as background, and departures solely from "
+    "other roles or other companies."
+)
+SEC_DEPARTURE_TARGET = (
+    SEC_DEPARTURE_SCOPE + " If the filing announces several qualifying "
+    "departures, use the departing CEO first mentioned in document order. "
+    "Use this same departure for every requested field."
+)
+SEC_CEO_DEPARTURE = (
+    "{0}\n\nDoes this filing announce a qualifying CEO departure? "
+    + SEC_DEPARTURE_SCOPE
+)
+SEC_CEO_NAME = (
+    "What is the departing CEO's name? " + SEC_DEPARTURE_TARGET
+    + " Return no answer if no qualifying departure or name is stated."
+)
+SEC_CEO_DATE = (
+    "What is the stated effective date of the CEO's departure? "
+    + SEC_DEPARTURE_TARGET
+    + " Copy the date or effective-time phrase as written, including relative "
+    "phrases such as 'effective immediately'. Do not substitute the filing "
+    "date or infer a date. Return no answer if no qualifying departure or "
+    "effective date is stated."
+)
+SEC_CEO_REASON = (
+    "What reason does the filing explicitly state for the CEO's departure? "
+    + SEC_DEPARTURE_TARGET
+    + " Copy the shortest passage stating the reason. Do not infer a reason "
+    "from compensation, a successor's appointment, or the departure alone. "
+    "Return no answer if no qualifying departure or reason is stated."
+)
+SEC_CEO_SUCCESSOR = (
+    "{0}\n\nHow does the filing describe the immediate successor to the departing "
+    "CEO? " + SEC_DEPARTURE_TARGET
+    + " Use the person taking over immediately, even if a later permanent "
+    "successor is also named. Do not infer permanent status merely from the "
+    "absence of the word interim."
+)
+SEC_CEO_SUCCESSOR_LABELS = ("interim", "permanent", "unspecified")
+SEC_CEO_SUCCESSOR_DESCRIPTIONS = (
+    "The immediate successor is explicitly interim, acting, or temporary.",
+    "The immediate successor is explicitly permanent or non-interim.",
+    "No qualifying departure, no immediate successor, or no explicit status.",
+)

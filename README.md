@@ -53,6 +53,15 @@ The [reference](docs/reference.md) specifies the full adapter contract,
 including the optional predicate answers and token data, and the exact rules
 for each metric.
 
+### SEC extraction workload
+
+Six additional [SEC queries](docs/sec-filings.md) use a fixed sample of
+100,000 8-K filings from TeraflopAI/SEC-EDGAR. They filter CEO departures,
+extract names, dates, and reasons, classify successor status, and count
+matching filings by month. The input builder and plans are available.
+Reference labels are not published yet, so the queries are selected
+explicitly and are excluded from the default scored suite.
+
 ## Getting started
 
 QUAIL-B requires Python 3.12:

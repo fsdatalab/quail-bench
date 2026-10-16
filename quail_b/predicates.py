@@ -338,8 +338,27 @@ EXTRACT_PREDICATES = tuple(
         ("audit_rights", "Audit Rights"),
         ("license_grant", "License Grant")))
 
+# SEC definitions are available to labelers without changing published sets.
+SEC_PREDICATES = (
+    PredicateSpec(
+        "quailb.sec.filing.ceo_departure", "sec", "ceo_departure", "filter",
+        prompts.SEC_CEO_DEPARTURE, "filing", "sec_filings", "text"),
+    *(PredicateSpec(
+        f"quailb.sec.filing.{slug}", "sec", slug, "extract", question,
+        "filing", "sec_filings", "text", source_policy="unpublished")
+      for slug, question in (
+          ("ceo_name", prompts.SEC_CEO_NAME),
+          ("departure_date", prompts.SEC_CEO_DATE),
+          ("departure_reason", prompts.SEC_CEO_REASON))),
+    PredicateSpec(
+        "quailb.sec.filing.successor_status", "sec", "successor_status",
+        "classify", prompts.SEC_CEO_SUCCESSOR, "filing", "sec_filings", "text",
+        labels=prompts.SEC_CEO_SUCCESSOR_LABELS,
+        descriptions=prompts.SEC_CEO_SUCCESSOR_DESCRIPTIONS),
+)
+
 PREDICATE_BY_KEY = {p.key: p for p in (PREDICATES + CLASSIFY_PREDICATES
-                                       + EXTRACT_PREDICATES)}
+                                       + EXTRACT_PREDICATES + SEC_PREDICATES)}
 
 WORKLOADS = tuple(dict.fromkeys(spec.workload for spec in PREDICATES))
 
@@ -518,6 +537,8 @@ SOURCE_SPECS = {
 
 def label_sources(spec: PredicateSpec, judge: dict = JUDGE_SPEC) -> list[dict]:
     """The sources of one predicate's labels, the judge first when it has one."""
+    if spec.source_policy == "unpublished":
+        raise ValueError(f"reference source is not defined for {spec.key}")
     sources = []
     if spec.kind == "classify" and judge is JUDGE_SPEC:
         judge = CLASSIFY_JUDGE_SPEC

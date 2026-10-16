@@ -1,0 +1,134 @@
+{
+  "extension_urns": [
+    {
+      "extension_urn_anchor": 1,
+      "urn": "extension:org.fsdatalab.quail_b:functions_ai"
+    }
+  ],
+  "extensions": [
+    {
+      "extension_function": {
+        "extension_urn_reference": 1,
+        "function_anchor": 1,
+        "name": "ai_filter:str_str"
+      }
+    }
+  ],
+  "relations": [
+    {
+      "root": {
+        "input": {
+          "project": {
+            "common": {
+              "emit": {
+                "output_mapping": [
+                  3
+                ]
+              }
+            },
+            "expressions": [
+              {
+                "selection": {
+                  "direct_reference": {
+                    "struct_field": {}
+                  },
+                  "root_reference": {}
+                }
+              }
+            ],
+            "input": {
+              "filter": {
+                "common": {
+                  "direct": {},
+                  "hint": {
+                    "alias": "filter-1"
+                  }
+                },
+                "condition": {
+                  "scalar_function": {
+                    "arguments": [
+                      {
+                        "value": {
+                          "literal": {
+                            "string": "{0}\n\nDoes this filing announce a qualifying CEO departure? A qualifying departure is an announced resignation, retirement, removal, death, or other end of service as chief executive officer of the filing company, including an interim or co-chief executive officer. Include departures effective now or in the future. Exclude hypothetical departures, past departures mentioned only as background, and departures solely from other roles or other companies."
+                          }
+                        }
+                      },
+                      {
+                        "value": {
+                          "selection": {
+                            "direct_reference": {
+                              "struct_field": {
+                                "field": 1
+                              }
+                            },
+                            "root_reference": {}
+                          }
+                        }
+                      }
+                    ],
+                    "function_reference": 1,
+                    "output_type": {
+                      "bool": {
+                        "nullability": "NULLABILITY_REQUIRED"
+                      }
+                    }
+                  }
+                },
+                "input": {
+                  "read": {
+                    "base_schema": {
+                      "names": [
+                        "id",
+                        "text",
+                        "filing_month"
+                      ],
+                      "struct": {
+                        "nullability": "NULLABILITY_REQUIRED",
+                        "types": [
+                          {
+                            "string": {
+                              "nullability": "NULLABILITY_REQUIRED"
+                            }
+                          },
+                          {
+                            "string": {
+                              "nullability": "NULLABILITY_REQUIRED"
+                            }
+                          },
+                          {
+                            "string": {
+                              "nullability": "NULLABILITY_REQUIRED"
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    "common": {
+                      "direct": {},
+                      "hint": {
+                        "alias": "f"
+                      }
+                    },
+                    "named_table": {
+                      "names": [
+                        "sec_filings"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "names": [
+          "f"
+        ]
+      }
+    }
+  ],
+  "version": {
+    "minor_number": 103,
+    "producer": "quail-b"
+  }
+}

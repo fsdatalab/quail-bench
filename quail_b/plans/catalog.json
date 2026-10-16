@@ -425,6 +425,42 @@
     "privacy": false
   },
   {
+    "id": "SEC-1",
+    "description": "filter: announced CEO departure",
+    "privacy": false,
+    "draft": true
+  },
+  {
+    "id": "SEC-2",
+    "description": "extract: departing CEO name, null without one",
+    "privacy": false,
+    "draft": true
+  },
+  {
+    "id": "SEC-3",
+    "description": "extract: effective CEO departure date, null without one",
+    "privacy": false,
+    "draft": true
+  },
+  {
+    "id": "SEC-4",
+    "description": "filter: CEO departure -> extract: name, date, reason",
+    "privacy": false,
+    "draft": true
+  },
+  {
+    "id": "SEC-5",
+    "description": "filter: CEO departure -> classify: successor status",
+    "privacy": false,
+    "draft": true
+  },
+  {
+    "id": "SEC-6",
+    "description": "filter: CEO departure -> classify: successor status -> filings per month and status",
+    "privacy": false,
+    "draft": true
+  },
+  {
     "id": "PRIV-1",
     "description": "2 filters: P_MSG + P_LOC",
     "privacy": true
