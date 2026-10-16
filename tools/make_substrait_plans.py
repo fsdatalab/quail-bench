@@ -1418,6 +1418,9 @@ QUERIES = (
                          (("filings", "count", None),)),
                (("f.filing_month", False), ("f.successor_status", False))),
           select=("f.filing_month", "f.successor_status", "filings"), draft=True),
+    Query("SEC-7", "extract: the sentence stating each filing's reported event",
+          Extract(_sec_filings(), prompts.SEC_EVENT_SENTENCE, "event_sentence"),
+          select=("f", Struct("report", ("f.event_sentence",))), draft=True),
 
     # PrivacyPolicies: only when that corpus is available.
     Query("PRIV-1", "2 filters: P_MSG + P_LOC",

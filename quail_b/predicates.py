@@ -349,7 +349,8 @@ SEC_PREDICATES = (
       for slug, question in (
           ("ceo_name", prompts.SEC_CEO_NAME),
           ("departure_date", prompts.SEC_CEO_DATE),
-          ("departure_reason", prompts.SEC_CEO_REASON))),
+          ("departure_reason", prompts.SEC_CEO_REASON),
+          ("event_sentence", prompts.SEC_EVENT_SENTENCE))),
     PredicateSpec(
         "quailb.sec.filing.successor_status", "sec", "successor_status",
         "classify", prompts.SEC_CEO_SUCCESSOR, "filing", "sec_filings", "text",

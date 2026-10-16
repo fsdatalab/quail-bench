@@ -360,7 +360,7 @@ the reference labels:
 
 ### SEC filings
 
-The six `SEC-` queries use 100,000 8-K filings from
+The seven `SEC-` queries use 100,000 8-K filings from
 [TeraflopAI/SEC-EDGAR](https://huggingface.co/datasets/TeraflopAI/SEC-EDGAR).
 Companies file 8-K reports with the SEC to announce important events.
 The sample includes all topics, not just CEO changes.
@@ -373,6 +373,7 @@ The sample includes all topics, not just CEO changes.
 | SEC-4 | Keep CEO departure filings, then extract the name, date, and reason. |
 | SEC-5 | Keep CEO departure filings, then classify the replacement CEO. |
 | SEC-6 | Count those filings by filing month and replacement CEO category. |
+| SEC-7 | Extract the sentence that states the event each filing reports. |
 
 A departure includes resignation, retirement, removal, death, or another end
 of service as CEO. Interim CEOs and co-CEOs count. The departure must concern
@@ -394,6 +395,12 @@ or permanent. Otherwise, use `unspecified`, including when no replacement
 is named. SEC-6 returns `filing_month`, `successor_status`, and `filings`,
 sorted by month and category. It counts each matching filing once and uses
 the filing month, not the departure date.
+
+SEC-7 returns `f` and an `event_sentence` field in a `report` struct for every
+filing: the sentence in the body of the filing's first Item that states the
+event reported, copied as written, or null when there is none. Most filings
+have one, and it is usually a long sentence, so SEC-7 is the SEC query with
+long extracted answers.
 
 Download the sample from this repository:
 
@@ -421,7 +428,7 @@ and pass them to your engine adapter:
 import quail_b
 
 suite = quail_b.load_benchmark(
-    [f"SEC-{i}" for i in range(1, 7)],
+    [f"SEC-{i}" for i in range(1, 8)],
     scale_factor=1.0,
     data_dir="results/sec",
     accuracy=False,

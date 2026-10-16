@@ -461,6 +461,12 @@
     "draft": true
   },
   {
+    "id": "SEC-7",
+    "description": "extract: the sentence stating each filing's reported event",
+    "privacy": false,
+    "draft": true
+  },
+  {
     "id": "PRIV-1",
     "description": "2 filters: P_MSG + P_LOC",
     "privacy": true

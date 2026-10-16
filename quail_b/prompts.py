@@ -713,53 +713,46 @@ CUAD_GOVERNING_LAW_DESCRIPTIONS = (
     "a governing law other than those five",
     "the contract names no governing law",
 )
-# SEC 8-K executive changes. Every question selects the same departure.
+# SEC 8-K executive changes. Every question is about the same departure.
 SEC_DEPARTURE_SCOPE = (
-    "A qualifying departure is an announced resignation, retirement, removal, "
-    "death, or other end of service as chief executive officer of the filing "
-    "company, including an interim or co-chief executive officer. Include "
-    "departures effective now or in the future. Exclude hypothetical departures, "
-    "past departures mentioned only as background, and departures solely from "
-    "other roles or other companies."
+    "A CEO departure is an announced resignation, retirement, removal, death, "
+    "or other end of service as the filing company's chief executive officer, "
+    "including an interim or co-CEO, effective now or later. Hypothetical "
+    "departures, past departures given as background, and departures from "
+    "other roles or other companies do not count."
 )
 SEC_DEPARTURE_TARGET = (
-    SEC_DEPARTURE_SCOPE + " If the filing announces several qualifying "
-    "departures, use the departing CEO first mentioned in document order. "
-    "Use this same departure for every requested field."
+    SEC_DEPARTURE_SCOPE + " If several CEOs depart, use the one mentioned first."
 )
 SEC_CEO_DEPARTURE = (
-    "{0}\n\nDoes this filing announce a qualifying CEO departure? "
-    + SEC_DEPARTURE_SCOPE
+    "{0}\n\nDoes this filing announce a CEO departure? " + SEC_DEPARTURE_SCOPE
 )
-SEC_CEO_NAME = (
-    "What is the departing CEO's name? " + SEC_DEPARTURE_TARGET
-    + " Return no answer if no qualifying departure or name is stated."
-)
+SEC_CEO_NAME = "What is the departing CEO's name? " + SEC_DEPARTURE_TARGET
 SEC_CEO_DATE = (
-    "What is the stated effective date of the CEO's departure? "
-    + SEC_DEPARTURE_TARGET
-    + " Copy the date or effective-time phrase as written, including relative "
-    "phrases such as 'effective immediately'. Do not substitute the filing "
-    "date or infer a date. Return no answer if no qualifying departure or "
-    "effective date is stated."
+    "When does the CEO's departure take effect? " + SEC_DEPARTURE_TARGET
+    + " Copy the date or phrase as written, such as 'effective immediately'. "
+    "Do not use the filing date."
 )
 SEC_CEO_REASON = (
-    "What reason does the filing explicitly state for the CEO's departure? "
+    "What reason does the filing give for the CEO's departure? "
     + SEC_DEPARTURE_TARGET
-    + " Copy the shortest passage stating the reason. Do not infer a reason "
-    "from compensation, a successor's appointment, or the departure alone. "
-    "Return no answer if no qualifying departure or reason is stated."
+    + " Copy the shortest passage that states it. Do not infer a reason."
 )
 SEC_CEO_SUCCESSOR = (
-    "{0}\n\nHow does the filing describe the immediate successor to the departing "
-    "CEO? " + SEC_DEPARTURE_TARGET
-    + " Use the person taking over immediately, even if a later permanent "
-    "successor is also named. Do not infer permanent status merely from the "
-    "absence of the word interim."
+    "{0}\n\nIs the departing CEO's immediate successor interim or permanent? "
+    + SEC_DEPARTURE_TARGET
+    + " Use the person who takes over first, even if a permanent successor is "
+    "also named. Do not infer permanent status from the absence of 'interim'."
 )
 SEC_CEO_SUCCESSOR_LABELS = ("interim", "permanent", "unspecified")
 SEC_CEO_SUCCESSOR_DESCRIPTIONS = (
     "The immediate successor is explicitly interim, acting, or temporary.",
     "The immediate successor is explicitly permanent or non-interim.",
-    "No qualifying departure, no immediate successor, or no explicit status.",
+    "No departure, no immediate successor, or no explicit status.",
+)
+
+# SEC 8-K reported events, over every filing.
+SEC_EVENT_SENTENCE = (
+    "Copy the whole sentence that states the event this filing reports, from "
+    "the body of its first Item."
 )

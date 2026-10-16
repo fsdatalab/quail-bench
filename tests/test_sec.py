@@ -18,7 +18,7 @@ from quail_b.run import _validate_output
 from quail_b.scoring import RunOutput
 from quail_b.substrait import AnswerStruct
 
-SEC_IDS = tuple(f"SEC-{i}" for i in range(1, 7))
+SEC_IDS = tuple(f"SEC-{i}" for i in range(1, 8))
 
 
 def test_sec_plans_are_explicit_and_preserve_the_published_suite():
@@ -29,7 +29,7 @@ def test_sec_plans_are_explicit_and_preserve_the_published_suite():
     assert [tuple(op.id for op in spec.info.ai_operators) for spec in specs] == [
         ("filter-1",), ("extract-1",), ("extract-1",),
         ("filter-1", "extract-1", "extract-2", "extract-3"),
-        ("filter-1", "classify-1"), ("filter-1", "classify-1"),
+        ("filter-1", "classify-1"), ("filter-1", "classify-1"), ("extract-1",),
     ]
     for spec in specs:
         assert {relation.table for relation in spec.info.relations} == {
@@ -40,6 +40,7 @@ def test_sec_plans_are_explicit_and_preserve_the_published_suite():
         fields = tuple(f"f.{op.output}" for op in spec.info.extracts)
         assert spec.info.structs == (AnswerStruct("departure", fields),)
         assert spec.info.columns == ("f", "departure")
+    assert specs[6].info.structs == (AnswerStruct("report", ("f.event_sentence",)),)
     assert specs[5].info.aggregate.keys == (
         "f.filing_month", "f.successor_status")
     assert specs[5].info.aggregate.measures == (("filings", "count", None),)
@@ -50,7 +51,7 @@ def test_sec_plans_are_explicit_and_preserve_the_published_suite():
 
 def test_sec_prompts_share_the_departure_and_label_definitions():
     by_prompt = {predicate.template: predicate for predicate in SEC_PREDICATES}
-    assert len(by_prompt) == 5
+    assert len(by_prompt) == 6
     used = set()
     for query_id in SEC_IDS:
         for operator in quail_b.get_query(query_id).info.ai_operators:
@@ -62,6 +63,7 @@ def test_sec_prompts_share_the_departure_and_label_definitions():
     for question in (prompts.SEC_CEO_NAME, prompts.SEC_CEO_DATE,
                      prompts.SEC_CEO_REASON, prompts.SEC_CEO_SUCCESSOR):
         assert prompts.SEC_DEPARTURE_TARGET in question
+    assert prompts.SEC_DEPARTURE_SCOPE not in prompts.SEC_EVENT_SENTENCE
     filter_prompt = render_filter_prompt(prompts.SEC_CEO_DEPARTURE, "filing")
     classify_prompt = render_classify_prompt(
         prompts.SEC_CEO_SUCCESSOR, "filing", prompts.SEC_CEO_SUCCESSOR_LABELS,
@@ -237,6 +239,7 @@ def test_sec_queries_run_with_an_explicit_matching_reference_collection(
         "departure_date": [["January 1"], [], [], ["February 2"]],
         "departure_reason": [[], [], ["retirement"], []],
         "successor_status": ["interim", "unspecified", "permanent", "unspecified"],
+        "event_sentence": [["Alex resigned."], [], ["Casey retired."], []],
     }
     labels = {}
     for predicate in SEC_PREDICATES:
@@ -263,7 +266,7 @@ def test_sec_queries_run_with_an_explicit_matching_reference_collection(
                                               "answer": columns[operator.output]})
         if spec.info.extracts:
             answers = [columns.pop(op.output) for op in spec.info.extracts]
-            columns["departure"] = pa.StructArray.from_arrays(
+            columns[spec.info.structs[0].name] = pa.StructArray.from_arrays(
                 answers, names=[op.output for op in spec.info.extracts])
         if spec.info.classifies:
             columns["successor_status"] = [values["successor_status"][i]

@@ -76,7 +76,7 @@
                         {
                           "value": {
                             "literal": {
-                              "string": "What is the departing CEO's name? A qualifying departure is an announced resignation, retirement, removal, death, or other end of service as chief executive officer of the filing company, including an interim or co-chief executive officer. Include departures effective now or in the future. Exclude hypothetical departures, past departures mentioned only as background, and departures solely from other roles or other companies. If the filing announces several qualifying departures, use the departing CEO first mentioned in document order. Use this same departure for every requested field. Return no answer if no qualifying departure or name is stated."
+                              "string": "What is the departing CEO's name? A CEO departure is an announced resignation, retirement, removal, death, or other end of service as the filing company's chief executive officer, including an interim or co-CEO, effective now or later. Hypothetical departures, past departures given as background, and departures from other roles or other companies do not count. If several CEOs depart, use the one mentioned first."
                             }
                           }
                         },
