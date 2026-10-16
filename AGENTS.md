@@ -4,9 +4,9 @@ QUAIL-B is an academic benchmark of 85 AI SQL queries over document tables.
 It publishes Substrait query plans, input tables, reference labels, and a
 scoring harness. It does not include an execution engine.
 
-Six additional SEC queries use a fixed local sample of 100,000 8-K filings.
-Their reference labels are not published, so they are excluded from the
-default scored suite. See `docs/sec-filings.md` for the workload contract.
+The SEC queries use a fixed sample of 100,000 8-K filings. Reference answers
+are not available yet, so run them separately from the default 85 queries.
+See `docs/sec-filings.md` for the queries and download instructions.
 
 Read `README.md` for the public benchmark contract and metric definitions.
 
@@ -17,7 +17,7 @@ Read `README.md` for the public benchmark contract and metric definitions.
 - `quail_b/prompts.py`, `rendering.py`, and `predicates.py`: prompt definitions
   and exact rendered text.
 - `quail_b/data.py` and `labels.py`: published inputs and reference labels.
-- `quail_b/sec.py`: pinned SEC input download, sampling, and validation.
+- `quail_b/sec.py`: download SEC filings, select the sample, and check the data.
 - `quail_b/run.py`, `scoring.py`, `minimum.py`, and `reporting.py`: adapter
   validation, scoring, token accounting, and result reports.
 - `tests/`: tests for the public contract and benchmark data.

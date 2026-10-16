@@ -53,14 +53,16 @@ The [reference](docs/reference.md) specifies the full adapter contract,
 including the optional predicate answers and token data, and the exact rules
 for each metric.
 
-### SEC extraction workload
+### SEC filings
 
-Six additional [SEC queries](docs/sec-filings.md) use a fixed sample of
-100,000 8-K filings from TeraflopAI/SEC-EDGAR. They filter CEO departures,
-extract names, dates, and reasons, classify successor status, and count
-matching filings by month. The input builder and plans are available.
-Reference labels are not published yet, so the queries are selected
-explicitly and are excluded from the default scored suite.
+You can also run [six SEC queries](docs/sec-filings.md) on 100,000 company
+filings from TeraflopAI/SEC-EDGAR. They find CEO departures, extract names,
+dates, and reasons, and classify the replacement CEOs. One query counts
+matching filings by month and replacement category.
+
+The data download and query plans are ready. Reference answers are not
+available yet, so you can run the queries but cannot score accuracy yet.
+Select them separately from the default set of 85 queries.
 
 ## Getting started
 

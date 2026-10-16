@@ -1,109 +1,40 @@
-# SEC executive changes
+# SEC filings
 
-QUAIL-B defines six SEC queries over a fixed sample of 100,000 unique 8-K
-filings. They use extraction, filtering, classification, and aggregation.
-The plans are available through `get_query("SEC-1")` through
-`get_query("SEC-6")`.
+Use these six queries to test an engine on 100,000 company filings. The
+queries find CEO departures, extract details about them, and classify the
+people who replace the departing CEOs.
 
-The input builder is ready to use. Reference labels are not published yet,
-so these queries are marked `draft` in the catalog and are excluded from the
-default scored suite of 85 queries. Select the SEC queries explicitly and
-run them separately at `scale_factor=1.0`. This workload has no smaller
-scale factors.
+The documents are 8-K filings, which companies file with the SEC to report
+important events. They come from
+[TeraflopAI/SEC-EDGAR](https://huggingface.co/datasets/TeraflopAI/SEC-EDGAR).
+The sample includes filings about all topics, not just CEO changes.
 
-## Inputs
+You can download the data and run the queries with your engine. Reference
+answers are not available yet, so you cannot measure accuracy with this
+sample yet. The queries are separate from the default set of 85 queries.
 
-The source is the `8-K` directory of
-[TeraflopAI/SEC-EDGAR](https://huggingface.co/datasets/TeraflopAI/SEC-EDGAR),
-pinned to revision `43de32c4c3cd4a56c26757345a4ec6db04fccda0`.
-The dataset card lists 1,952,207 8-K records. QUAIL-B reads all 217 source
-Parquet files before selecting the sample.
+## Download the data
 
-The builder keeps records with a valid accession number, a valid filing
-date, and nonempty parsed text. For repeated accession numbers, it keeps the
-first valid row in sorted source-file order. It ranks unique filings by
-the SHA-256 hash of `"20260818:<accession>"` and keeps the lowest 100,000
-hashes. It sorts the selected rows by accession number before saving them.
-The sample is not restricted to executive changes, dates, companies, or
-document lengths.
-
-`sec_filings.parquet` has these columns:
-
-| Column | Type | Meaning |
-| --- | --- | --- |
-| `id` | string | SEC accession number |
-| `text` | string | The source's parsed `text`, unchanged |
-| `filing_date` | string | Filing date as `YYYY-MM-DD` |
-| `filing_month` | string | Filing month as `YYYY-MM` |
-
-The builder does not truncate text, fetch additional exhibits, or use the
-source's raw `content` column. Engines must handle the supplied document
-lengths. A statement absent from the supplied text has no extraction answer,
-even if another document on EDGAR contains it.
-
-The manifest records the source revision, sampling rule, source counts, and
-the hash of every input column in row order. The loader checks the table
-against that manifest. The SEC corpus has its own identity and does not
-change the identities of the existing published corpora.
-
-## Queries
-
-Every query reads `sec_filings AS f`. The exact prompts are in
-[`quail_b/prompts.py`](../quail_b/prompts.py), and the Substrait plans are in
-[`quail_b/plans/`](../quail_b/plans/).
-
-| Query | Task | Operators |
-| --- | --- | --- |
-| SEC-1 | Find CEO departures | Filter |
-| SEC-2 | Extract the departing CEO's name | Extract |
-| SEC-3 | Extract the effective departure date | Extract |
-| SEC-4 | Extract name, date, and reason for departures | Filter, three extractions |
-| SEC-5 | Classify the immediate successor's status | Filter, classify |
-| SEC-6 | Count filings by month and status | Filter, classify, group, count, sort |
-
-SEC-1 returns `f`, the accession number. SEC-2 through SEC-4 return `f` and
-an answer struct named `departure`. SEC-2 has the field `ceo_name`, and SEC-3
-has `departure_date`. SEC-4 has `ceo_name`, `departure_date`, and
-`departure_reason`. SEC-5 returns `f` and `successor_status`. SEC-6 returns
-`filing_month`, `successor_status`, and `filings`, sorted by month and status.
-
-A qualifying departure is an announced resignation, retirement, removal,
-death, or other end of service as CEO of the filing company. Interim and
-co-CEOs count. The departure can be effective now or in the future.
-Hypothetical departures, past departures mentioned only as background, and
-departures from other roles or companies do not count.
-
-If a filing announces several qualifying departures, every field refers to
-the departing CEO first mentioned in document order. SEC-6 counts filings,
-so it counts that filing once. Its month comes from the stored filing date,
-not the extracted departure date.
-
-Extraction returns a copied span or null. SEC-2 and SEC-3 return one row per
-input filing, including null answers. SEC-4 returns only filings kept by its
-filter. Dates remain as written, including phrases such as "effective
-immediately". Reasons must be explicit in the text.
-
-The successor classification refers to the person taking over immediately.
-An explicitly interim, acting, or temporary successor is `interim`. An
-explicitly permanent or non-interim successor is `permanent`. An absent
-successor or unstated status is `unspecified`. The absence of the word
-"interim" alone does not establish permanent status.
-
-## Building and loading the sample
-
-From this repository, run:
+Run this command from the repository:
 
 ```sh
 uv run --frozen python tools/make_sec_corpus.py
 ```
 
-The command downloads the required columns from the pinned source into
-`results/sec-source/` and writes the input table and `manifest.json` into
-`results/sec/`. Both directories are ignored by Git. Downloads are cached
-by revision, and an existing completed sample is validated and reused.
-Use `--source-dir` and `--output-dir` to choose other local directories.
+The command reads the required columns from all 217 source files and selects
+100,000 unique filings. It saves these files:
 
-Load the inputs and pass them to an existing engine adapter:
+- `results/sec/sec_filings.parquet` contains the selected filings.
+- `results/sec/manifest.json` records the source, sample rules, and file checks.
+- `results/sec-source/` contains downloaded data for reuse.
+
+Git ignores both directories. Running the command again reuses the downloads
+and checks any completed sample. Use `--source-dir` and `--output-dir` to
+choose other directories.
+
+## Load the queries
+
+Load all six queries and pass each one to your engine adapter:
 
 ```python
 import quail_b
@@ -120,24 +51,120 @@ for query in suite.queries:
     print(query.id, output.runtime_s)
 ```
 
-The adapter receives the usual `QuerySpec` and PyArrow table and returns
-`RunOutput`. QUAIL-B does not add an execution engine. To list the definitions,
-use `quail_b.queries.queries(include_draft=True)`.
+Replace `my_engine_adapter` with your adapter function. It receives a
+`QuerySpec` and a dictionary of PyArrow tables, and returns a `RunOutput`.
+QUAIL-B supplies the queries and data; your engine executes them.
 
-## Reference answers
+Use `scale_factor=1.0` for the full 100,000 filings. Smaller samples are not
+supported. Run the SEC queries separately from the other queries.
 
-The source dataset supplies documents and metadata, not answers to these
-questions. `SEC_PREDICATES` in `quail_b/predicates.py` defines the five distinct
-questions used across the six plans. The extraction questions reuse the
-existing span and null scoring contract.
+Use `accuracy=False` because reference answers are not available.
+`quail_b.run` requires reference answers, so use the adapter loop above for
+now. The SEC queries are marked `draft` in the catalog. To list them along
+with the other queries, use `quail_b.queries.queries(include_draft=True)`.
 
-A future reference collection must include filter answers for the corpus,
-name and date spans for every filing, and reason spans and successor labels
-for the reference filter's matching filings. Empty span lists represent
-absent answers. Reuse the same labels wherever a question recurs.
+## What the queries do
 
-`quail_b.run` requires reference labels. Until they exist, use the input
-loading example above for adapter runs. A completed collection can be
-passed explicitly with `collection_id`, using the SEC manifest's corpus
-identity and the existing label-file format. Do not use model outputs as
-reference labels without recording and reviewing how they were produced.
+Every query reads the `sec_filings` table. In the plans, `f` refers to a
+filing's ID.
+
+| Query | Task |
+| --- | --- |
+| SEC-1 | Keep filings that announce a CEO departure. |
+| SEC-2 | Extract the departing CEO's name from each filing. |
+| SEC-3 | Extract the date when the CEO leaves from each filing. |
+| SEC-4 | Keep CEO departure filings, then extract the name, date, and reason. |
+| SEC-5 | Keep CEO departure filings, then classify the replacement CEO. |
+| SEC-6 | Count those filings by filing month and replacement CEO category. |
+
+A departure means the CEO resigns, retires, is removed, dies, or otherwise
+ends their service at the filing company. Interim CEOs and co-CEOs count.
+The departure may take effect now or in the future. Hypothetical departures,
+past departures mentioned as background, and departures from other roles or
+companies do not count.
+
+If a filing announces more than one CEO departure, use the first departing
+CEO mentioned in the text for every answer.
+
+Extracted answers must be copied from the filing. Return null when an answer
+is missing. Keep dates as written, such as "effective immediately". Return
+a reason only when the filing states one. SEC-2 and SEC-3 return one row for
+every filing. SEC-4 returns rows only for filings that pass the filter.
+
+For SEC-5 and SEC-6, classify the person who takes over immediately:
+
+- `interim` means the filing says the replacement is interim, acting, or temporary.
+- `permanent` means the filing says the replacement is permanent or non-interim.
+- `unspecified` means no replacement is named or their status is not stated.
+
+Do not assume a replacement is permanent just because "interim" is absent.
+SEC-6 counts each matching filing once. It uses the filing month, not the
+extracted departure date, and sorts by month and category.
+
+### Returned columns
+
+| Query | Columns |
+| --- | --- |
+| SEC-1 | `f` |
+| SEC-2 | `f`, `departure` with field `ceo_name` |
+| SEC-3 | `f`, `departure` with field `departure_date` |
+| SEC-4 | `f`, `departure` with `ceo_name`, `departure_date`, `departure_reason` |
+| SEC-5 | `f`, `successor_status` |
+| SEC-6 | `filing_month`, `successor_status`, `filings` |
+
+`departure` is a PyArrow struct column that groups the extracted fields.
+`successor_status` contains one of the three categories above.
+
+The exact questions are in [`quail_b/prompts.py`](../quail_b/prompts.py).
+The query plans are in [`quail_b/plans/`](../quail_b/plans/).
+
+## How the sample is selected
+
+The download uses the dataset's `8-K` directory at revision
+`43de32c4c3cd4a56c26757345a4ec6db04fccda0`. It contains 1,952,207 records.
+The same source and selection rules produce the same sample each time:
+
+1. Read the source files in filename order.
+2. Keep rows with a valid SEC accession number, a valid date, and nonempty text.
+   An accession number is the SEC's identifier for a filing.
+3. For duplicate accession numbers, keep the first valid row.
+4. Compute SHA-256 for `"20260818:<accession>"` and select the 100,000 lowest hashes.
+5. Sort the selected filings by accession number.
+
+There are no extra restrictions on topic, date, company, or document length.
+The saved table has these columns, all stored as strings:
+
+| Column | Value |
+| --- | --- |
+| `id` | SEC accession number |
+| `text` | Parsed text from the source, unchanged |
+| `filing_date` | Date in `YYYY-MM-DD` format |
+| `filing_month` | Month in `YYYY-MM` format |
+
+The download does not use the raw `content` column or fetch extra exhibits.
+It does not shorten the text. Engines must handle the supplied text lengths
+and answer only from that text.
+
+The manifest records the source revision, sample rules, row counts, and a
+hash of each column in row order. The loader checks the table against those
+values. The sample has its own corpus ID, which identifies the input data.
+Existing datasets and their IDs are unchanged.
+
+## Adding reference answers later
+
+Hugging Face supplies the filings, but not answers to these queries. A
+reference answer collection must include:
+
+- A CEO departure filter answer for every filing.
+- Name and date answers for every filing.
+- Reason answers and replacement CEO categories for filings that pass the
+  reference filter.
+
+Use an empty list for a missing extraction answer. Reuse the same reference
+answers when a question appears in more than one query. The five questions
+are defined in `SEC_PREDICATES` in `quail_b/predicates.py`.
+
+Use the existing reference label format and the SEC sample's corpus ID.
+Record and review how model-generated reference answers were produced.
+Once the collection is ready, pass its `collection_id` to `quail_b.run` to
+score results with the existing extraction and classification metrics.
