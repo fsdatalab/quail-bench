@@ -524,22 +524,8 @@ for query in suite.queries:
     output = my_engine_adapter(query, suite.tables)
 ```
 
-The first load downloads the fixed sample and its manifest from the public
-`s3://quail-bench` bucket, without AWS credentials. The download is about
-126 MiB and is cached in `~/.cache/quail-b`. Set `QUAIL_B_CACHE_DIR` to use
-another cache location. The loader verifies the sample against the pinned
-corpus ID and manifest. Pass `data_dir` to load local input files, or `root`
-to use a mirror of the published bucket layout.
-
 [sec.py](quail_b/sec.py) defines the source revision and how the sample is
-chosen. To rebuild it from the 217 upstream Hugging Face files, run:
-
-```sh
-uv run --frozen python tools/make_sec_corpus.py
-```
-
-The rebuilt sample is saved in `results/sec/`. Load it with
-`data_dir="results/sec"`.
+chosen. The loader checks the download against its manifest.
 
 ## Scale factors
 
