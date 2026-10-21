@@ -56,12 +56,12 @@ class Benchmark:
 
 def load_benchmark(only=None, *, scale_factor=0.1, data_dir=None,
                    collection_id=None, accuracy=True, root=None) -> Benchmark:
-    """Load selected inputs and labels, including explicit local SEC inputs.
+    """Load selected inputs and labels, downloading published inputs by default.
 
     Args:
         only: Query IDs, or None for all queries.
         scale_factor: Published scale factor: 0.1, 0.5, or 1.0. SEC uses 1.0.
-        data_dir: Directory of input files to validate. Required for SEC.
+        data_dir: Local input directory, or None to download published inputs.
         collection_id: Reference collection ID, or None for the active one.
         accuracy: Whether to load reference labels for scoring.
         root: Published data root, or None for the public S3 bucket.
@@ -102,14 +102,11 @@ def load_benchmark(only=None, *, scale_factor=0.1, data_dir=None,
 def _load_sec_benchmark(specs, data_dir, collection_id, accuracy, root):
     from quail_b.sec import SEC_TABLE, load_sec_table, sec_identity
 
-    if data_dir is None:
-        raise ValueError(
-            "SEC needs data_dir from tools/make_sec_corpus.py")
     if accuracy and collection_id is None:
         raise ValueError(
             "SEC reference labels are not published; use accuracy=False "
             "for adapter inputs or provide collection_id")
-    table = load_sec_table(data_dir)
+    table = load_sec_table(data_dir, root=root)
     tables = {SEC_TABLE: table}
     corpus_id = sec_identity(table)["corpus_id"]
     truth = _load_truth(specs, 1.0, corpus_id,

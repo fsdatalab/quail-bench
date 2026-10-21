@@ -1,6 +1,7 @@
 """SEC plans, deterministic sampling, input validation, and aggregation."""
 
 import json
+import shutil
 from types import SimpleNamespace
 
 import pyarrow as pa
@@ -9,6 +10,7 @@ import pytest
 
 import quail_b
 from quail_b import prompts, sec
+from quail_b._files import GROUND_TRUTH_ROOT, download_cache
 from quail_b.labels import GroundTruthCollection, PredicateLabels
 from quail_b.predicates import SEC_PREDICATES, label_set_identity, predicate_payload
 from quail_b.queries import queries, query_family_name
@@ -130,8 +132,6 @@ def test_sec_loader_validates_identity_and_requires_explicit_labels(sec_corpus):
     assert loaded.corpus_id == sec.sec_identity(
         loaded.tables[sec.SEC_TABLE])["corpus_id"]
     assert sec.build_sec_corpus(sec_corpus) == sec_corpus
-    with pytest.raises(ValueError, match="data_dir"):
-        quail_b.load_benchmark("SEC-1", scale_factor=1.0, accuracy=False)
     with pytest.raises(ValueError, match="not published"):
         quail_b.load_benchmark("SEC-1", scale_factor=1.0, data_dir=sec_corpus)
     table = loaded.tables[sec.SEC_TABLE]
@@ -148,6 +148,75 @@ def test_sec_loader_rejects_a_different_sample_revision(sec_corpus):
     path.write_text(json.dumps(manifest))
     with pytest.raises(ValueError, match="fixed 100,000 sample"):
         sec.load_sec_table(sec_corpus)
+
+
+@pytest.fixture()
+def published_sec(sec_corpus, monkeypatch, tmp_path):
+    manifest = json.loads((sec_corpus / "manifest.json").read_text())
+    monkeypatch.setattr(sec, "SEC_CORPUS_ID", manifest["corpus_id"])
+    root = tmp_path / "published"
+    directory = root / GROUND_TRUTH_ROOT / "corpora" / sec.SEC_CORPUS_ID
+    shutil.copytree(sec_corpus, directory)
+    return root, directory
+
+
+def test_sec_download_uses_cache_and_works_without_source_files(
+        published_sec, monkeypatch, tmp_path):
+    from quail_b import _files
+
+    root, directory = published_sec
+    local_location = _files._location
+
+    def location(requested_root, path):
+        assert requested_root is None
+        return local_location(root, path)
+
+    monkeypatch.setattr(_files, "_location", location)
+    monkeypatch.setattr(sec, "_location", location)
+    with download_cache(tmp_path / "cache"):
+        first = quail_b.load_benchmark(SEC_IDS, scale_factor=1.0, accuracy=False)
+        shutil.rmtree(directory)
+        second = quail_b.load_benchmark(SEC_IDS, scale_factor=1.0, accuracy=False)
+    assert first.corpus_id == sec.SEC_CORPUS_ID
+    assert first.ground_truth is None
+    assert first.tables[sec.SEC_TABLE].num_rows == 4
+    assert second.tables[sec.SEC_TABLE].equals(first.tables[sec.SEC_TABLE])
+
+
+def test_sec_loads_from_published_mirror(published_sec):
+    root, _ = published_sec
+    suite = quail_b.load_benchmark(
+        SEC_IDS, scale_factor=1.0, accuracy=False, root=root)
+    assert suite.corpus_id == sec.SEC_CORPUS_ID
+    assert suite.tables[sec.SEC_TABLE].num_rows == 4
+
+
+def test_sec_rejects_a_different_published_corpus(published_sec):
+    root, directory = published_sec
+    path = directory / "manifest.json"
+    manifest = json.loads(path.read_text())
+    manifest["corpus_id"] = "c_other"
+    path.write_text(json.dumps(manifest))
+    with pytest.raises(ValueError, match="wrong corpus ID"):
+        sec.load_sec_table(root=root)
+
+
+def test_sec_rejects_modified_published_data(published_sec):
+    root, directory = published_sec
+    path = directory / "sec_filings.parquet"
+    table = pq.read_table(path)
+    pq.write_table(table.set_column(1, "text", pa.array(["changed"] * 4)), path)
+    with pytest.raises(ValueError, match="corpus manifest"):
+        sec.load_sec_table(root=root)
+
+
+def test_sec_requires_labels_before_downloading(monkeypatch):
+    def unexpected_download(*args, **kwargs):
+        pytest.fail("SEC data should not be downloaded without required labels")
+
+    monkeypatch.setattr(sec, "load_sec_table", unexpected_download)
+    with pytest.raises(ValueError, match="not published"):
+        quail_b.load_benchmark("SEC-1", scale_factor=1.0)
 
 
 def test_source_download_pins_revision_and_caches_only_input_columns(

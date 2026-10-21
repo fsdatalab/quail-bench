@@ -1,4 +1,4 @@
-"""Build and validate the fixed SEC 8-K sample from Hugging Face."""
+"""Download, build, and validate the fixed SEC 8-K sample."""
 
 import hashlib
 import heapq
@@ -11,6 +11,7 @@ from pathlib import Path
 import pyarrow as pa
 import pyarrow.parquet as pq
 
+from quail_b._files import GROUND_TRUTH_ROOT, _cached_file, _location, _read_bytes
 from quail_b.data import DATA_SEED, corpus_identity
 
 SEC_REPO = "TeraflopAI/SEC-EDGAR"
@@ -18,6 +19,7 @@ SEC_REVISION = "43de32c4c3cd4a56c26757345a4ec6db04fccda0"
 SEC_DOCUMENTS = 100_000
 SEC_SOURCE_FILES = 217
 SEC_TABLE = "sec_filings"
+SEC_CORPUS_ID = "c_efb9fde11a07a180f072cc379485c0dc"
 SEC_SCHEMA = pa.schema([
     ("id", pa.string()),
     ("text", pa.string()),
@@ -170,13 +172,32 @@ def build_sec_corpus(data_dir, *, source_dir=None) -> Path:
     return directory
 
 
-def load_sec_table(data_dir) -> pa.Table:
-    """Read the fixed SEC sample and verify its manifest and contents."""
-    directory = Path(data_dir)
-    manifest = json.loads((directory / "manifest.json").read_text())
+def load_sec_table(data_dir=None, *, root=None) -> pa.Table:
+    """Load the fixed SEC sample and verify its manifest and contents.
+
+    Args:
+        data_dir: Local input directory, or None to download the published sample.
+        root: Published data root, or None for the public S3 bucket.
+            Downloads use the standard QUAIL-B cache.
+    """
+    if data_dir is not None:
+        directory = Path(data_dir)
+        manifest = json.loads((directory / "manifest.json").read_text())
+    else:
+        prefix = f"{GROUND_TRUTH_ROOT}/corpora/{SEC_CORPUS_ID}"
+        manifest = json.loads(_read_bytes(root, f"{prefix}/manifest.json"))
+        if manifest.get("corpus_id") != SEC_CORPUS_ID:
+            raise ValueError("published SEC manifest has the wrong corpus ID")
     if manifest.get("sample") != _sample_spec():
         raise ValueError("SEC manifest does not describe the fixed 100,000 sample")
-    table = pq.read_table(directory / f"{SEC_TABLE}.parquet")
+    if data_dir is not None:
+        table = pq.read_table(directory / f"{SEC_TABLE}.parquet")
+    else:
+        path = f"{prefix}/{SEC_TABLE}.parquet"
+        cached = _cached_file(root, path)
+        filesystem, _, source = _location(root, path)
+        table = (pq.read_table(cached) if cached is not None else
+                 pq.read_table(source, filesystem=filesystem))
     if table.schema != SEC_SCHEMA or table.num_rows != SEC_DOCUMENTS:
         raise ValueError("SEC input has the wrong schema or document count")
     if any(column.null_count for column in table.columns):
