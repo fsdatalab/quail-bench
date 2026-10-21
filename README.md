@@ -509,12 +509,8 @@ first one the filing names.
 The SEC queries have no reference answers yet, so they are not part of the
 default 85 queries. Load them on their own, at `scale_factor=1.0`, with
 `accuracy=False`. `quail_b.run` needs reference answers, so it does not
-accept them. Download the sample to `results/sec/`, then call your adapter
-directly:
-
-```sh
-uv run --frozen python tools/make_sec_corpus.py
-```
+accept them without a reference collection. Load the sample and call your
+adapter directly:
 
 ```python
 import quail_b
@@ -522,7 +518,6 @@ import quail_b
 suite = quail_b.load_benchmark(
     [f"SEC-{i}" for i in range(1, 8)],
     scale_factor=1.0,
-    data_dir="results/sec",
     accuracy=False,
 )
 for query in suite.queries:
