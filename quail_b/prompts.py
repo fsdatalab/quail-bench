@@ -196,6 +196,10 @@ IMDB_COMPLAINT_LABELS = (
     "poor acting", "poor writing", "poor visual effects", "slow pacing",
     "weak ending", "too long", "too violent", "no specific complaint",
 )
+# Extraction questions over every review: a short answer and a long one.
+# Their reference answers are not published yet.
+IMDB_ACTOR = "Which actor does the reviewer name?"
+IMDB_ACTING = "What does the reviewer say about the acting?"
 
 # MedDRA's system organ classes, less "product issues", which a
 # reaction term does not describe.
@@ -499,6 +503,10 @@ WRENCH_EXPLOIT_TARGET = (
     "Which file, test, binary, or check does this step tamper with or bypass "
     "to fake a passing result?"
 )
+# Two extraction questions over every step, about cheating on the tests.
+# Their reference answers are not published yet.
+WRENCH_CHEAT_PLAN = "Which thought indicates that the agent plans to cheat?"
+WRENCH_CHEAT_COMMAND = "Which command peeks at the tests or their answers?"
 
 # CRMArena-Pro sales calls: filters over one call, a classification of
 # one call, and a join of a call to the next call of the same deal. The

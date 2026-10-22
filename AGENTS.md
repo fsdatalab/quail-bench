@@ -4,8 +4,8 @@ QUAIL-B is an academic benchmark of 85 AI SQL queries over document tables.
 It publishes Substrait query plans, input tables, reference labels, and a
 scoring harness. It does not include an execution engine.
 
-SEC-1 to SEC-7, WRENCH-6, and WRENCH-7 are drafts: they have no reference
-answers yet and are not part of the default 85 queries.
+IMDB-16, IMDB-17, WRENCH-6 to WRENCH-8, and SEC-1 to SEC-7 are drafts: they
+have no reference answers yet and are not part of the default 85 queries.
 
 Read `README.md` for the public benchmark contract and metric definitions.
 

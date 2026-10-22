@@ -338,6 +338,14 @@ EXTRACT_PREDICATES = tuple(
         ("audit_rights", "Audit Rights"),
         ("license_grant", "License Grant")))
 
+# IMDB extractions, defined before their labels are published.
+IMDB_EXTRACT_PREDICATES = tuple(
+    PredicateSpec(
+        f"quailb.imdb.review.{slug}", "imdb", slug, "extract", question,
+        "review", "reviews", "body", source_policy="unpublished")
+    for slug, question in (("actor", prompts.IMDB_ACTOR),
+                           ("acting", prompts.IMDB_ACTING)))
+
 # Terminal Wrench extractions, defined before their labels are published.
 WRENCH_EXTRACT_PREDICATES = (
     PredicateSpec(
@@ -348,6 +356,11 @@ WRENCH_EXTRACT_PREDICATES = (
         "quailb.wrench.step.exploit_target", "wrench", "exploit_target",
         "extract", prompts.WRENCH_EXPLOIT_TARGET, "agent_step", "wrench_steps",
         "text", source_policy="unpublished"),
+    *(PredicateSpec(
+        f"quailb.wrench.step.{slug}", "wrench", slug, "extract", question,
+        "agent_step", "wrench_steps", "text", source_policy="unpublished")
+      for slug, question in (("cheat_plan", prompts.WRENCH_CHEAT_PLAN),
+                             ("cheat_command", prompts.WRENCH_CHEAT_COMMAND))),
 )
 
 # SEC definitions are available to labelers without changing published sets.
@@ -372,7 +385,7 @@ SEC_PREDICATES = (
 
 PREDICATE_BY_KEY = {p.key: p for p in (
     PREDICATES + CLASSIFY_PREDICATES + EXTRACT_PREDICATES
-    + WRENCH_EXTRACT_PREDICATES + SEC_PREDICATES)}
+    + IMDB_EXTRACT_PREDICATES + WRENCH_EXTRACT_PREDICATES + SEC_PREDICATES)}
 
 WORKLOADS = tuple(dict.fromkeys(spec.workload for spec in PREDICATES))
 

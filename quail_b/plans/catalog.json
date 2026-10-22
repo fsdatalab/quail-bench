@@ -75,6 +75,18 @@
     "privacy": false
   },
   {
+    "id": "IMDB-16",
+    "description": "extract: the actor each review names",
+    "privacy": false,
+    "draft": true
+  },
+  {
+    "id": "IMDB-17",
+    "description": "extract: what each review says about the acting",
+    "privacy": false,
+    "draft": true
+  },
+  {
     "id": "BIO-1",
     "description": "filter: serious adverse event",
     "privacy": false
@@ -333,6 +345,12 @@
   {
     "id": "WRENCH-7",
     "description": "filter: steps that are part of an exploit -> extract: the file or check each step tampers with",
+    "privacy": false,
+    "draft": true
+  },
+  {
+    "id": "WRENCH-8",
+    "description": "agent steps -> extract: the thought that plans to cheat and the command that peeks at the tests",
     "privacy": false,
     "draft": true
   },

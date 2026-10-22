@@ -1034,6 +1034,12 @@ QUERIES = (
                    prompts.IMDB_ASPECT_SENTIMENT,
                    prompts.IMDB_ASPECT_SENTIMENT_LABELS, "aspect_sentiment"),
           select=("r", "r.sentiment", "a", "r.aspect_sentiment")),
+    Query("IMDB-16", "extract: the actor each review names",
+          Extract(_reviews(), prompts.IMDB_ACTOR, "actor"),
+          select=("r", Struct("review", ("r.actor",))), draft=True),
+    Query("IMDB-17", "extract: what each review says about the acting",
+          Extract(_reviews(), prompts.IMDB_ACTING, "acting"),
+          select=("r", Struct("review", ("r.acting",))), draft=True),
 
     Query("BIO-1", "filter: serious adverse event",
           _filters(_reports(), SERIOUS_ADVERSE_EVENT)),
@@ -1312,6 +1318,11 @@ QUERIES = (
                   prompts.WRENCH_EXPLOIT_TARGET, "exploit_target"),
           select=("s", Struct("exploit", ("s.exploit_target",))),
           draft=True),
+    Query("WRENCH-8", "agent steps -> extract: the thought that plans to "
+          "cheat and the command that peeks at the tests",
+          Extract(Extract(_wrench_steps(), prompts.WRENCH_CHEAT_PLAN, "plan"),
+                  prompts.WRENCH_CHEAT_COMMAND, "command"),
+          select=("s", Struct("cheat", ("s.plan", "s.command"))), draft=True),
 
     # CRMArena-Pro sales calls. Their reference labels are not published
     # yet.

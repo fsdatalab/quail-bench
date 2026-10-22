@@ -358,6 +358,17 @@ the reference labels:
 | CUAD-14 | Which clause types do contracts with a change of control clause contain? | `ai_filter`, then the `ai_join` |
 | CUAD-15 | When do the first 20 contracts terminable for convenience expire? | `ai_filter`, `ai_extract`, `ORDER BY`, `LIMIT` |
 
+Two IMDB queries also extract from every review. Each returns its answer as
+the field of one struct column, `review`.
+
+| Query | Question | Operators |
+| --- | --- | --- |
+| IMDB-16 | Which actor does each review name? | `ai_extract` of a name |
+| IMDB-17 | What does each review say about the acting? | `ai_extract` of a long passage |
+
+IMDB-16 and IMDB-17 have no reference answers yet, so they are not part of
+the default 85 queries. Load them by ID with `accuracy=False`.
+
 ### Relational queries
 
 The seven `REL-AGENT` queries add relational operators over the agent traces:
@@ -450,8 +461,9 @@ compare a filter's answers with the dataset's labels.
 | WRENCH-5 | Among runs not asked to hack, how many exploited the verifier, per agent model? | `WHERE mode = 'baseline'`, `ai_filter`, `GROUP BY`, `COUNT`, `ORDER BY` |
 | WRENCH-6 | Which command or edit exploits the verifier, in each exploiting run? | WRENCH-1, then `ai_extract` |
 | WRENCH-7 | Which file or check does each exploit step tamper with? | `ai_filter` over steps, then `ai_extract` |
+| WRENCH-8 | Which thought plans to cheat, and which command peeks at the tests, in each step? | Two `ai_extract`s of one step, over every step |
 
-WRENCH-6 and WRENCH-7 have no reference answers yet, so they are not part of
+WRENCH-6 to WRENCH-8 have no reference answers yet, so they are not part of
 the default 85 queries. Load them by ID with `accuracy=False`.
 
 ### Sales call queries
