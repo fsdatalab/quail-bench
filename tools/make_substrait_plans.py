@@ -889,17 +889,18 @@ def _sec_filings():
     return Scan("sec_filings", "f", "text", ("filing_month",))
 
 
-def _sec_long_filings():
-    """The filings of 9,600 to 90,000 characters."""
+def _sec_event_filings():
+    """The filings of 9,600 to 90,000 characters, filed in 2023 or later."""
     scan = Scan("sec_filings", "f", "text", ("filing_month", "text_chars"),
                 integers=("text_chars",))
-    return Where(Where(scan, "text_chars", ">=", sec.SEC_LONG_MIN_CHARS),
-                 "text_chars", "<=", sec.SEC_LONG_MAX_CHARS)
+    return Where(Where(Where(scan, "text_chars", ">=", sec.SEC_LONG_MIN_CHARS),
+                       "text_chars", "<=", sec.SEC_LONG_MAX_CHARS),
+                 "filing_month", ">=", sec.SEC_EVENT_FIRST_MONTH)
 
 
 def _sec_event(prompt, output):
-    """One extraction over each long filing."""
-    return Extract(_sec_long_filings(), prompt, output)
+    """One extraction over each long, recent filing."""
+    return Extract(_sec_event_filings(), prompt, output)
 
 
 def _sec_departures():
@@ -1430,10 +1431,10 @@ QUERIES = (
     # SEC inputs are built locally until reference labels are published.
     Query("SEC-1", "filter: announced CEO departure", _sec_departures(),
           draft=True),
-    Query("SEC-2", "where: long filing -> extract: party in the reported event",
+    Query("SEC-2", "where: long, recent filing -> extract: party in the reported event",
           _sec_event(prompts.SEC_EVENT_PARTY, "event_party"),
           select=("f", Struct("report", ("f.event_party",))), draft=True),
-    Query("SEC-3", "where: long filing -> extract: dollar amount of the event",
+    Query("SEC-3", "where: long, recent filing -> extract: dollar amount of the event",
           _sec_event(prompts.SEC_EVENT_AMOUNT, "event_amount"),
           select=("f", Struct("report", ("f.event_amount",))), draft=True),
     Query("SEC-4", "filter: CEO departure -> extract: name, date, reason",
@@ -1453,10 +1454,10 @@ QUERIES = (
                          (("filings", "count", None),)),
                (("f.filing_month", False), ("f.successor_status", False))),
           select=("f.filing_month", "f.successor_status", "filings"), draft=True),
-    Query("SEC-7", "where: long filing -> extract: sentence stating the event",
+    Query("SEC-7", "where: long, recent filing -> extract: sentence stating the event",
           _sec_event(prompts.SEC_EVENT_SENTENCE, "event_sentence"),
           select=("f", Struct("report", ("f.event_sentence",))), draft=True),
-    Query("SEC-8", "where: long filing -> extract: what the event changes",
+    Query("SEC-8", "where: long, recent filing -> extract: what the event changes",
           _sec_event(prompts.SEC_EVENT_CHANGE, "event_change"),
           select=("f", Struct("report", ("f.event_change",))), draft=True),
 

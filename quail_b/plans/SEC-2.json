@@ -126,7 +126,7 @@
                     "common": {
                       "direct": {},
                       "hint": {
-                        "alias": "where-2"
+                        "alias": "where-3"
                       }
                     },
                     "condition": {
@@ -137,7 +137,7 @@
                               "selection": {
                                 "direct_reference": {
                                   "struct_field": {
-                                    "field": 3
+                                    "field": 2
                                   }
                                 },
                                 "root_reference": {}
@@ -147,12 +147,12 @@
                           {
                             "value": {
                               "literal": {
-                                "i32": 90000
+                                "string": "2023-01"
                               }
                             }
                           }
                         ],
-                        "function_reference": 10,
+                        "function_reference": 12,
                         "output_type": {
                           "bool": {
                             "nullability": "NULLABILITY_REQUIRED"
@@ -165,7 +165,7 @@
                         "common": {
                           "direct": {},
                           "hint": {
-                            "alias": "where-1"
+                            "alias": "where-2"
                           }
                         },
                         "condition": {
@@ -186,12 +186,12 @@
                               {
                                 "value": {
                                   "literal": {
-                                    "i32": 9600
+                                    "i32": 90000
                                   }
                                 }
                               }
                             ],
-                            "function_reference": 12,
+                            "function_reference": 10,
                             "output_type": {
                               "bool": {
                                 "nullability": "NULLABILITY_REQUIRED"
@@ -200,50 +200,91 @@
                           }
                         },
                         "input": {
-                          "read": {
-                            "base_schema": {
-                              "names": [
-                                "id",
-                                "text",
-                                "filing_month",
-                                "text_chars"
-                              ],
-                              "struct": {
-                                "nullability": "NULLABILITY_REQUIRED",
-                                "types": [
-                                  {
-                                    "string": {
-                                      "nullability": "NULLABILITY_REQUIRED"
-                                    }
-                                  },
-                                  {
-                                    "string": {
-                                      "nullability": "NULLABILITY_REQUIRED"
-                                    }
-                                  },
-                                  {
-                                    "string": {
-                                      "nullability": "NULLABILITY_REQUIRED"
-                                    }
-                                  },
-                                  {
-                                    "i32": {
-                                      "nullability": "NULLABILITY_REQUIRED"
-                                    }
-                                  }
-                                ]
-                              }
-                            },
+                          "filter": {
                             "common": {
                               "direct": {},
                               "hint": {
-                                "alias": "f"
+                                "alias": "where-1"
                               }
                             },
-                            "named_table": {
-                              "names": [
-                                "sec_filings"
-                              ]
+                            "condition": {
+                              "scalar_function": {
+                                "arguments": [
+                                  {
+                                    "value": {
+                                      "selection": {
+                                        "direct_reference": {
+                                          "struct_field": {
+                                            "field": 3
+                                          }
+                                        },
+                                        "root_reference": {}
+                                      }
+                                    }
+                                  },
+                                  {
+                                    "value": {
+                                      "literal": {
+                                        "i32": 9600
+                                      }
+                                    }
+                                  }
+                                ],
+                                "function_reference": 12,
+                                "output_type": {
+                                  "bool": {
+                                    "nullability": "NULLABILITY_REQUIRED"
+                                  }
+                                }
+                              }
+                            },
+                            "input": {
+                              "read": {
+                                "base_schema": {
+                                  "names": [
+                                    "id",
+                                    "text",
+                                    "filing_month",
+                                    "text_chars"
+                                  ],
+                                  "struct": {
+                                    "nullability": "NULLABILITY_REQUIRED",
+                                    "types": [
+                                      {
+                                        "string": {
+                                          "nullability": "NULLABILITY_REQUIRED"
+                                        }
+                                      },
+                                      {
+                                        "string": {
+                                          "nullability": "NULLABILITY_REQUIRED"
+                                        }
+                                      },
+                                      {
+                                        "string": {
+                                          "nullability": "NULLABILITY_REQUIRED"
+                                        }
+                                      },
+                                      {
+                                        "i32": {
+                                          "nullability": "NULLABILITY_REQUIRED"
+                                        }
+                                      }
+                                    ]
+                                  }
+                                },
+                                "common": {
+                                  "direct": {},
+                                  "hint": {
+                                    "alias": "f"
+                                  }
+                                },
+                                "named_table": {
+                                  "names": [
+                                    "sec_filings"
+                                  ]
+                                }
+                              }
                             }
                           }
                         }
