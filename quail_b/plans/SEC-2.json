@@ -3,9 +3,27 @@
     {
       "extension_urn_anchor": 1,
       "urn": "extension:org.fsdatalab.quail_b:functions_ai"
+    },
+    {
+      "extension_urn_anchor": 2,
+      "urn": "extension:io.substrait:functions_comparison"
     }
   ],
   "extensions": [
+    {
+      "extension_function": {
+        "extension_urn_reference": 2,
+        "function_anchor": 10,
+        "name": "lte:any_any"
+      }
+    },
+    {
+      "extension_function": {
+        "extension_urn_reference": 2,
+        "function_anchor": 12,
+        "name": "gte:any_any"
+      }
+    },
     {
       "extension_function": {
         "extension_urn_reference": 1,
@@ -22,8 +40,8 @@
             "common": {
               "emit": {
                 "output_mapping": [
-                  4,
-                  5
+                  5,
+                  6
                 ]
               }
             },
@@ -44,7 +62,7 @@
                         "selection": {
                           "direct_reference": {
                             "struct_field": {
-                              "field": 3
+                              "field": 4
                             }
                           },
                           "root_reference": {}
@@ -65,7 +83,8 @@
                       "f.id",
                       "f.text",
                       "f.filing_month",
-                      "f.ceo_name"
+                      "f.text_chars",
+                      "f.event_party"
                     ]
                   }
                 },
@@ -76,7 +95,7 @@
                         {
                           "value": {
                             "literal": {
-                              "string": "What is the departing CEO's name? A CEO departure is an announced resignation, retirement, removal, death, or other end of service as the filing company's chief executive officer, including an interim or co-CEO, effective now or later. Hypothetical departures, past departures given as background, and departures from other roles or other companies do not count. If several CEOs depart, use the one mentioned first."
+                              "string": "Who, other than the filing company and its board, is most involved in the event this filing reports? Copy the name of one person or organization."
                             }
                           }
                         },
@@ -103,44 +122,132 @@
                   }
                 ],
                 "input": {
-                  "read": {
-                    "base_schema": {
-                      "names": [
-                        "id",
-                        "text",
-                        "filing_month"
-                      ],
-                      "struct": {
-                        "nullability": "NULLABILITY_REQUIRED",
-                        "types": [
-                          {
-                            "string": {
-                              "nullability": "NULLABILITY_REQUIRED"
-                            }
-                          },
-                          {
-                            "string": {
-                              "nullability": "NULLABILITY_REQUIRED"
-                            }
-                          },
-                          {
-                            "string": {
-                              "nullability": "NULLABILITY_REQUIRED"
-                            }
-                          }
-                        ]
-                      }
-                    },
+                  "filter": {
                     "common": {
                       "direct": {},
                       "hint": {
-                        "alias": "f"
+                        "alias": "where-2"
                       }
                     },
-                    "named_table": {
-                      "names": [
-                        "sec_filings"
-                      ]
+                    "condition": {
+                      "scalar_function": {
+                        "arguments": [
+                          {
+                            "value": {
+                              "selection": {
+                                "direct_reference": {
+                                  "struct_field": {
+                                    "field": 3
+                                  }
+                                },
+                                "root_reference": {}
+                              }
+                            }
+                          },
+                          {
+                            "value": {
+                              "literal": {
+                                "i32": 90000
+                              }
+                            }
+                          }
+                        ],
+                        "function_reference": 10,
+                        "output_type": {
+                          "bool": {
+                            "nullability": "NULLABILITY_REQUIRED"
+                          }
+                        }
+                      }
+                    },
+                    "input": {
+                      "filter": {
+                        "common": {
+                          "direct": {},
+                          "hint": {
+                            "alias": "where-1"
+                          }
+                        },
+                        "condition": {
+                          "scalar_function": {
+                            "arguments": [
+                              {
+                                "value": {
+                                  "selection": {
+                                    "direct_reference": {
+                                      "struct_field": {
+                                        "field": 3
+                                      }
+                                    },
+                                    "root_reference": {}
+                                  }
+                                }
+                              },
+                              {
+                                "value": {
+                                  "literal": {
+                                    "i32": 9600
+                                  }
+                                }
+                              }
+                            ],
+                            "function_reference": 12,
+                            "output_type": {
+                              "bool": {
+                                "nullability": "NULLABILITY_REQUIRED"
+                              }
+                            }
+                          }
+                        },
+                        "input": {
+                          "read": {
+                            "base_schema": {
+                              "names": [
+                                "id",
+                                "text",
+                                "filing_month",
+                                "text_chars"
+                              ],
+                              "struct": {
+                                "nullability": "NULLABILITY_REQUIRED",
+                                "types": [
+                                  {
+                                    "string": {
+                                      "nullability": "NULLABILITY_REQUIRED"
+                                    }
+                                  },
+                                  {
+                                    "string": {
+                                      "nullability": "NULLABILITY_REQUIRED"
+                                    }
+                                  },
+                                  {
+                                    "string": {
+                                      "nullability": "NULLABILITY_REQUIRED"
+                                    }
+                                  },
+                                  {
+                                    "i32": {
+                                      "nullability": "NULLABILITY_REQUIRED"
+                                    }
+                                  }
+                                ]
+                              }
+                            },
+                            "common": {
+                              "direct": {},
+                              "hint": {
+                                "alias": "f"
+                              }
+                            },
+                            "named_table": {
+                              "names": [
+                                "sec_filings"
+                              ]
+                            }
+                          }
+                        }
+                      }
                     }
                   }
                 }
@@ -150,8 +257,8 @@
         },
         "names": [
           "f",
-          "departure",
-          "ceo_name"
+          "report",
+          "event_party"
         ]
       }
     }

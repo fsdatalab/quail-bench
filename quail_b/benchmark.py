@@ -100,15 +100,15 @@ def load_benchmark(only=None, *, scale_factor=0.1, data_dir=None,
 
 
 def _load_sec_benchmark(specs, data_dir, collection_id, accuracy, root):
-    from quail_b.sec import SEC_TABLE, load_sec_table, sec_identity
+    from quail_b.sec import SEC_TABLE, load_sec_table, sec_identity, with_text_chars
 
     if accuracy and collection_id is None:
         raise ValueError(
             "SEC reference labels are not published; use accuracy=False "
             "for adapter inputs or provide collection_id")
     table = load_sec_table(data_dir, root=root)
-    tables = {SEC_TABLE: table}
     corpus_id = sec_identity(table)["corpus_id"]
+    tables = {SEC_TABLE: with_text_chars(table)}
     truth = _load_truth(specs, 1.0, corpus_id,
                         collection_id, accuracy, root)
     return Benchmark(specs, tables, 1.0, corpus_id, truth)

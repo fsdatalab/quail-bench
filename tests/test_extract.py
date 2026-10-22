@@ -104,6 +104,29 @@ def test_wrench_extractions_are_drafts_over_flagged_runs_and_steps():
             predicates.label_sources(by_prompt[question])
 
 
+def test_review_and_step_extractions_are_drafts_over_every_document():
+    drafts = set(queries(include_draft=True)) - set(queries())
+    assert {"IMDB-16", "IMDB-17", "WRENCH-8"} <= drafts
+    by_prompt = {p.template: p for p in (*predicates.IMDB_EXTRACT_PREDICATES,
+                                         *predicates.WRENCH_EXTRACT_PREDICATES)}
+    for query_id, alias, table, struct, questions in (
+            ("IMDB-16", "r", "reviews", "review", (prompts.IMDB_ACTOR,)),
+            ("IMDB-17", "r", "reviews", "review", (prompts.IMDB_ACTING,)),
+            ("WRENCH-8", "s", "wrench_steps", "cheat",
+             (prompts.WRENCH_CHEAT_PLAN, prompts.WRENCH_CHEAT_COMMAND))):
+        info = quail_b.get_query(query_id).info
+        assert not info.filters
+        assert [op.prompt for op in info.ai_operators] == list(questions)
+        assert {relation.table for relation in info.relations} == {table}
+        assert info.columns == (alias, struct)
+        for question in questions:
+            assert by_prompt[question].left_table == table
+            with pytest.raises(ValueError, match="reference source is not defined"):
+                predicates.label_sources(by_prompt[question])
+    assert quail_b.get_query("WRENCH-8").info.structs == (
+        AnswerStruct("cheat", ("s.plan", "s.command")),)
+
+
 def test_invalid_extract_uses_are_rejected():
     contracts = Scan("contracts", "c", "text")
     # an answer column must be selected

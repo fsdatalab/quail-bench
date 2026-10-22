@@ -20,7 +20,7 @@ from substrait import algebra_pb2 as algebra
 from substrait import plan_pb2, type_pb2
 from substrait.extensions import extensions_pb2
 
-from quail_b import prompts
+from quail_b import prompts, sec
 from quail_b.prompts import (
     AGENT_IMPLEMENTED_FIX,
     AGENT_RECOVERED,
@@ -889,6 +889,19 @@ def _sec_filings():
     return Scan("sec_filings", "f", "text", ("filing_month",))
 
 
+def _sec_long_filings():
+    """The filings of 9,600 to 90,000 characters."""
+    scan = Scan("sec_filings", "f", "text", ("filing_month", "text_chars"),
+                integers=("text_chars",))
+    return Where(Where(scan, "text_chars", ">=", sec.SEC_LONG_MIN_CHARS),
+                 "text_chars", "<=", sec.SEC_LONG_MAX_CHARS)
+
+
+def _sec_event(prompt, output):
+    """One extraction over each long filing."""
+    return Extract(_sec_long_filings(), prompt, output)
+
+
 def _sec_departures():
     return Filter(_sec_filings(), prompts.SEC_CEO_DEPARTURE)
 
@@ -1034,6 +1047,12 @@ QUERIES = (
                    prompts.IMDB_ASPECT_SENTIMENT,
                    prompts.IMDB_ASPECT_SENTIMENT_LABELS, "aspect_sentiment"),
           select=("r", "r.sentiment", "a", "r.aspect_sentiment")),
+    Query("IMDB-16", "extract: the actor each review names",
+          Extract(_reviews(), prompts.IMDB_ACTOR, "actor"),
+          select=("r", Struct("review", ("r.actor",))), draft=True),
+    Query("IMDB-17", "extract: what each review says about the acting",
+          Extract(_reviews(), prompts.IMDB_ACTING, "acting"),
+          select=("r", Struct("review", ("r.acting",))), draft=True),
 
     Query("BIO-1", "filter: serious adverse event",
           _filters(_reports(), SERIOUS_ADVERSE_EVENT)),
@@ -1312,6 +1331,11 @@ QUERIES = (
                   prompts.WRENCH_EXPLOIT_TARGET, "exploit_target"),
           select=("s", Struct("exploit", ("s.exploit_target",))),
           draft=True),
+    Query("WRENCH-8", "agent steps -> extract: the thought that plans to "
+          "cheat and the command that peeks at the tests",
+          Extract(Extract(_wrench_steps(), prompts.WRENCH_CHEAT_PLAN, "plan"),
+                  prompts.WRENCH_CHEAT_COMMAND, "command"),
+          select=("s", Struct("cheat", ("s.plan", "s.command"))), draft=True),
 
     # CRMArena-Pro sales calls. Their reference labels are not published
     # yet.
@@ -1406,12 +1430,12 @@ QUERIES = (
     # SEC inputs are built locally until reference labels are published.
     Query("SEC-1", "filter: announced CEO departure", _sec_departures(),
           draft=True),
-    Query("SEC-2", "extract: departing CEO name, null without one",
-          Extract(_sec_filings(), prompts.SEC_CEO_NAME, "ceo_name"),
-          select=("f", Struct("departure", ("f.ceo_name",))), draft=True),
-    Query("SEC-3", "extract: effective CEO departure date, null without one",
-          Extract(_sec_filings(), prompts.SEC_CEO_DATE, "departure_date"),
-          select=("f", Struct("departure", ("f.departure_date",))), draft=True),
+    Query("SEC-2", "where: long filing -> extract: party in the reported event",
+          _sec_event(prompts.SEC_EVENT_PARTY, "event_party"),
+          select=("f", Struct("report", ("f.event_party",))), draft=True),
+    Query("SEC-3", "where: long filing -> extract: dollar amount of the event",
+          _sec_event(prompts.SEC_EVENT_AMOUNT, "event_amount"),
+          select=("f", Struct("report", ("f.event_amount",))), draft=True),
     Query("SEC-4", "filter: CEO departure -> extract: name, date, reason",
           Extract(Extract(Extract(
               _sec_departures(), prompts.SEC_CEO_NAME, "ceo_name"),
@@ -1429,9 +1453,12 @@ QUERIES = (
                          (("filings", "count", None),)),
                (("f.filing_month", False), ("f.successor_status", False))),
           select=("f.filing_month", "f.successor_status", "filings"), draft=True),
-    Query("SEC-7", "extract: the sentence stating each filing's reported event",
-          Extract(_sec_filings(), prompts.SEC_EVENT_SENTENCE, "event_sentence"),
+    Query("SEC-7", "where: long filing -> extract: sentence stating the event",
+          _sec_event(prompts.SEC_EVENT_SENTENCE, "event_sentence"),
           select=("f", Struct("report", ("f.event_sentence",))), draft=True),
+    Query("SEC-8", "where: long filing -> extract: what the event changes",
+          _sec_event(prompts.SEC_EVENT_CHANGE, "event_change"),
+          select=("f", Struct("report", ("f.event_change",))), draft=True),
 
     # PrivacyPolicies: only when that corpus is available.
     Query("PRIV-1", "2 filters: P_MSG + P_LOC",

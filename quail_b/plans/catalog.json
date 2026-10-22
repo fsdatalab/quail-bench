@@ -75,6 +75,18 @@
     "privacy": false
   },
   {
+    "id": "IMDB-16",
+    "description": "extract: the actor each review names",
+    "privacy": false,
+    "draft": true
+  },
+  {
+    "id": "IMDB-17",
+    "description": "extract: what each review says about the acting",
+    "privacy": false,
+    "draft": true
+  },
+  {
     "id": "BIO-1",
     "description": "filter: serious adverse event",
     "privacy": false
@@ -337,6 +349,12 @@
     "draft": true
   },
   {
+    "id": "WRENCH-8",
+    "description": "agent steps -> extract: the thought that plans to cheat and the command that peeks at the tests",
+    "privacy": false,
+    "draft": true
+  },
+  {
     "id": "SALES-1",
     "description": "filter: calls that name a competitor",
     "privacy": false
@@ -444,13 +462,13 @@
   },
   {
     "id": "SEC-2",
-    "description": "extract: departing CEO name, null without one",
+    "description": "where: long filing -> extract: party in the reported event",
     "privacy": false,
     "draft": true
   },
   {
     "id": "SEC-3",
-    "description": "extract: effective CEO departure date, null without one",
+    "description": "where: long filing -> extract: dollar amount of the event",
     "privacy": false,
     "draft": true
   },
@@ -474,7 +492,13 @@
   },
   {
     "id": "SEC-7",
-    "description": "extract: the sentence stating each filing's reported event",
+    "description": "where: long filing -> extract: sentence stating the event",
+    "privacy": false,
+    "draft": true
+  },
+  {
+    "id": "SEC-8",
+    "description": "where: long filing -> extract: what the event changes",
     "privacy": false,
     "draft": true
   },

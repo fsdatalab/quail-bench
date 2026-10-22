@@ -20,7 +20,8 @@ from quail_b.run import _validate_output
 from quail_b.scoring import RunOutput
 from quail_b.substrait import AnswerStruct
 
-SEC_IDS = tuple(f"SEC-{i}" for i in range(1, 8))
+SEC_IDS = tuple(f"SEC-{i}" for i in range(1, 9))
+LONG = "x" * sec.SEC_LONG_MIN_CHARS
 
 
 def test_sec_plans_are_explicit_and_preserve_the_published_suite():
@@ -32,17 +33,25 @@ def test_sec_plans_are_explicit_and_preserve_the_published_suite():
         ("filter-1",), ("extract-1",), ("extract-1",),
         ("filter-1", "extract-1", "extract-2", "extract-3"),
         ("filter-1", "classify-1"), ("filter-1", "classify-1"), ("extract-1",),
+        ("extract-1",),
     ]
     for spec in specs:
         assert {relation.table for relation in spec.info.relations} == {
             "sec_filings"}
     assert specs[3].info.select == (
         "f.id", "f.ceo_name", "f.departure_date", "f.departure_reason")
-    for spec in specs[1:4]:
-        fields = tuple(f"f.{op.output}" for op in spec.info.extracts)
-        assert spec.info.structs == (AnswerStruct("departure", fields),)
-        assert spec.info.columns == ("f", "departure")
-    assert specs[6].info.structs == (AnswerStruct("report", ("f.event_sentence",)),)
+    assert specs[3].info.structs == (AnswerStruct("departure", (
+        "f.ceo_name", "f.departure_date", "f.departure_reason")),)
+    for spec in [specs[i] for i in (0, 3, 4, 5)]:
+        assert spec.info.column_tests == ()
+    # The event queries read only the long filings.
+    for spec, output in zip([specs[i] for i in (1, 2, 6, 7)], (
+            "event_party", "event_amount", "event_sentence", "event_change")):
+        assert [(test.column, test.comparison, test.value)
+                for test in spec.info.column_tests] == [
+            ("text_chars", ">=", 9_600), ("text_chars", "<=", 90_000)]
+        assert spec.info.structs == (AnswerStruct("report", (f"f.{output}",)),)
+        assert spec.info.columns == ("f", "report")
     assert specs[5].info.aggregate.keys == (
         "f.filing_month", "f.successor_status")
     assert specs[5].info.aggregate.measures == (("filings", "count", None),)
@@ -53,7 +62,7 @@ def test_sec_plans_are_explicit_and_preserve_the_published_suite():
 
 def test_sec_prompts_share_the_departure_and_label_definitions():
     by_prompt = {predicate.template: predicate for predicate in SEC_PREDICATES}
-    assert len(by_prompt) == 6
+    assert len(by_prompt) == 9
     used = set()
     for query_id in SEC_IDS:
         for operator in quail_b.get_query(query_id).info.ai_operators:
@@ -65,7 +74,9 @@ def test_sec_prompts_share_the_departure_and_label_definitions():
     for question in (prompts.SEC_CEO_NAME, prompts.SEC_CEO_DATE,
                      prompts.SEC_CEO_REASON, prompts.SEC_CEO_SUCCESSOR):
         assert prompts.SEC_DEPARTURE_TARGET in question
-    assert prompts.SEC_DEPARTURE_SCOPE not in prompts.SEC_EVENT_SENTENCE
+    for question in (prompts.SEC_EVENT_PARTY, prompts.SEC_EVENT_AMOUNT,
+                     prompts.SEC_EVENT_SENTENCE, prompts.SEC_EVENT_CHANGE):
+        assert prompts.SEC_DEPARTURE_SCOPE not in question
     filter_prompt = render_filter_prompt(prompts.SEC_CEO_DEPARTURE, "filing")
     classify_prompt = render_classify_prompt(
         prompts.SEC_CEO_SUCCESSOR, "filing", prompts.SEC_CEO_SUCCESSOR_LABELS,
@@ -118,7 +129,9 @@ def test_sample_uses_all_shards_and_unique_eligible_accessions(monkeypatch, tmp_
 def sec_corpus(monkeypatch, tmp_path):
     monkeypatch.setattr(sec, "SEC_DOCUMENTS", 4)
     source = tmp_path / "source.parquet"
-    pq.write_table(pa.Table.from_pylist([_source(i) for i in range(4)]), source)
+    texts = [None, LONG, "x" * (sec.SEC_LONG_MAX_CHARS + 1), LONG + "y"]
+    pq.write_table(pa.Table.from_pylist(
+        [_source(i, text) for i, text in enumerate(texts)]), source)
     monkeypatch.setattr(sec, "_download_sec_source", lambda _: [source])
     directory = sec.build_sec_corpus(tmp_path / "corpus")
     return directory
@@ -130,11 +143,13 @@ def test_sec_loader_validates_identity_and_requires_explicit_labels(sec_corpus):
     assert loaded.tables[sec.SEC_TABLE].num_rows == 4
     assert loaded.ground_truth is None
     assert loaded.corpus_id == sec.sec_identity(
-        loaded.tables[sec.SEC_TABLE])["corpus_id"]
+        sec.load_sec_table(sec_corpus))["corpus_id"]
+    assert loaded.tables[sec.SEC_TABLE]["text_chars"].to_pylist() == [
+        8, 9_600, 90_001, 9_601]
     assert sec.build_sec_corpus(sec_corpus) == sec_corpus
     with pytest.raises(ValueError, match="not published"):
         quail_b.load_benchmark("SEC-1", scale_factor=1.0, data_dir=sec_corpus)
-    table = loaded.tables[sec.SEC_TABLE]
+    table = sec.load_sec_table(sec_corpus)
     pq.write_table(table.set_column(1, "text", pa.array(["changed"] * 4)),
                    sec_corpus / "sec_filings.parquet")
     with pytest.raises(ValueError, match="corpus manifest"):
@@ -302,13 +317,17 @@ def test_sec_queries_run_with_an_explicit_matching_reference_collection(
     table = sec.load_sec_table(sec_corpus)
     ids = table["id"].to_pylist()
     kept = [0, 2, 3]
+    long = [1, 3]
     values = {
         "ceo_departure": [True, False, True, True],
         "ceo_name": [["Alex"], [], ["Casey"], ["Dana"]],
         "departure_date": [["January 1"], [], [], ["February 2"]],
         "departure_reason": [[], [], ["retirement"], []],
         "successor_status": ["interim", "unspecified", "permanent", "unspecified"],
-        "event_sentence": [["Alex resigned."], [], ["Casey retired."], []],
+        "event_party": [[], ["Acme Bank"], ["Beta Corp."], []],
+        "event_amount": [[], ["$10.5 million"], [], ["$3,200,000"]],
+        "event_sentence": [[], ["Alex resigned."], ["Casey retired."], []],
+        "event_change": [[], [], [], ["The company will close a plant."]],
     }
     labels = {}
     for predicate in SEC_PREDICATES:
@@ -323,7 +342,8 @@ def test_sec_queries_run_with_an_explicit_matching_reference_collection(
     monkeypatch.setattr(loading, "load_ground_truth", lambda *a, **kw: truth)
 
     def adapter(spec, tables):
-        indices = kept if spec.info.filters else list(range(4))
+        indices = (kept if spec.info.filters else
+                   long if spec.info.column_tests else list(range(4)))
         selected = [ids[i] for i in indices]
         columns = {"f": selected}
         extracts = {}
