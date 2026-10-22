@@ -4,6 +4,7 @@ import hashlib
 import heapq
 import json
 import re
+import unicodedata
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
@@ -28,9 +29,11 @@ SEC_SCHEMA = pa.schema([
     ("filing_month", pa.string()),
 ])
 SEC_SOURCE_COLUMNS = ("metadata_accession-number", "metadata_filing-date", "text")
-# The event queries read long filings: about 2,400 to 22,000 Qwen3 tokens.
+# The event queries read long, recent filings: about 2,400 to 22,000 Qwen3
+# tokens, filed in 2023 or later.
 SEC_LONG_MIN_CHARS = 9_600
 SEC_LONG_MAX_CHARS = 90_000
+SEC_EVENT_FIRST_MONTH = "2023-01"
 
 
 def _sample_spec() -> dict:
@@ -215,12 +218,20 @@ def load_sec_table(data_dir=None, *, root=None) -> pa.Table:
     return table
 
 
-def with_text_chars(table: pa.Table) -> pa.Table:
-    """Add `text_chars`, the length of each filing in Unicode characters.
+def sec_engine_table(table: pa.Table) -> pa.Table:
+    """Return the table that engines read: NFC text and its length.
 
-    The column is computed when the sample loads, so the published sample
-    and its identity do not change.
+    Some filings hold characters that NFC changes, such as U+037E, which
+    becomes ";", or a letter and a combining accent, which become one
+    character. Tokenizers such as Qwen3's apply NFC, so an engine that
+    copies answers from token bytes needs text that NFC does not change.
+    `text_chars` is the length of the normalized text in Unicode
+    characters. Both are computed when the sample loads, so the published
+    sample and its identity do not change.
     """
-    return table.append_column(
-        pa.field("text_chars", pa.int32()),
-        pc.utf8_length(table.column("text")).cast(pa.int32()))
+    # pyarrow's utf8_normalize does not compose combining accents
+    text = pa.array([unicodedata.normalize("NFC", value)
+                     for value in table.column("text").to_pylist()], pa.string())
+    table = table.set_column(table.schema.get_field_index("text"), "text", text)
+    return table.append_column(pa.field("text_chars", pa.int32()),
+                               pc.utf8_length(text).cast(pa.int32()))

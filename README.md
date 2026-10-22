@@ -502,27 +502,20 @@ The `SEC` queries read 100,000 8-K filings from
 A company files an 8-K to announce an important event. The sample covers all
 event types, not only CEO changes.
 
-`sec_filings` has one row per filing, with columns `id` (the SEC accession
-number), `text`, `filing_date`, and `filing_month`. The loader also adds
-`text_chars`, the length of `text` in Unicode characters. A CEO departure is a
-resignation, retirement, removal, or death of the filing company's CEO,
-including an interim or co-CEO. If several CEOs leave, the answers use the
-first one the filing names.
-
-SEC-2, SEC-3, SEC-7, and SEC-8 ask about the event that each filing reports.
-They read only the 9,361 long filings, with 9,600 to 90,000 characters
-(`WHERE text_chars BETWEEN 9600 AND 90000`).
+`sec_filings` has one row for each filing. The loader changes `text` to
+Unicode NFC and adds `text_chars`, its length. SEC-2, SEC-3, SEC-7, and SEC-8
+read only the 1,056 long filings from 2023 or later.
 
 | Query | Question | Operators |
 | --- | --- | --- |
 | SEC-1 | Which filings announce a CEO departure? | `ai_filter` |
-| SEC-2 | Who, other than the company and its board, is most involved in each event? | `WHERE` on length, then `ai_extract` of a name |
-| SEC-3 | Which dollar amount matters most to each event? | `WHERE` on length, then `ai_extract` of an amount |
+| SEC-2 | Who, other than the company and its board, is most involved in each event? | `WHERE` on length and month, then `ai_extract` of a name |
+| SEC-3 | Which dollar amount matters most to each event? | `WHERE` on length and month, then `ai_extract` of an amount |
 | SEC-4 | Who left, when, and why, in filings that announce a CEO departure? | `ai_filter`, then three `ai_extract`s of one document |
 | SEC-5 | Is each departing CEO's successor interim or permanent? | `ai_filter`, then 3 labels |
 | SEC-6 | How many CEO departures per month and successor status? | SEC-5, then `GROUP BY`, `COUNT`, `ORDER BY` |
-| SEC-7 | Which sentence states the event each filing reports? | `WHERE` on length, then `ai_extract` of a long sentence |
-| SEC-8 | What does each event change for the company? | `WHERE` on length, then `ai_extract` of a long passage |
+| SEC-7 | Which sentence states the event each filing reports? | `WHERE` on length and month, then `ai_extract` of a long sentence |
+| SEC-8 | What does each event change for the company? | `WHERE` on length and month, then `ai_extract` of a long passage |
 
 The SEC queries have no reference answers yet, so they are not part of the
 default 85 queries. Load them on their own, at `scale_factor=1.0`, with

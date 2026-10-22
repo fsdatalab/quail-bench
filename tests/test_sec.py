@@ -44,12 +44,13 @@ def test_sec_plans_are_explicit_and_preserve_the_published_suite():
         "f.ceo_name", "f.departure_date", "f.departure_reason")),)
     for spec in [specs[i] for i in (0, 3, 4, 5)]:
         assert spec.info.column_tests == ()
-    # The event queries read only the long filings.
+    # The event queries read only the long, recent filings.
     for spec, output in zip([specs[i] for i in (1, 2, 6, 7)], (
             "event_party", "event_amount", "event_sentence", "event_change")):
         assert [(test.column, test.comparison, test.value)
                 for test in spec.info.column_tests] == [
-            ("text_chars", ">=", 9_600), ("text_chars", "<=", 90_000)]
+            ("text_chars", ">=", 9_600), ("text_chars", "<=", 90_000),
+            ("filing_month", ">=", "2023-01")]
         assert spec.info.structs == (AnswerStruct("report", (f"f.{output}",)),)
         assert spec.info.columns == ("f", "report")
     assert specs[5].info.aggregate.keys == (
@@ -129,9 +130,14 @@ def test_sample_uses_all_shards_and_unique_eligible_accessions(monkeypatch, tmp_
 def sec_corpus(monkeypatch, tmp_path):
     monkeypatch.setattr(sec, "SEC_DOCUMENTS", 4)
     source = tmp_path / "source.parquet"
-    texts = [None, LONG, "x" * (sec.SEC_LONG_MAX_CHARS + 1), LONG + "y"]
+    # filing 0 holds U+037E and a combining accent, which NFC changes;
+    # filing 3 is from 2022
+    texts = ["Roge\u0301t\u037e", LONG, "x" * (sec.SEC_LONG_MAX_CHARS + 1),
+             LONG + "y"]
+    dates = ["20260115"] * 3 + ["20221231"]
     pq.write_table(pa.Table.from_pylist(
-        [_source(i, text) for i, text in enumerate(texts)]), source)
+        [_source(i, text, date)
+         for i, (text, date) in enumerate(zip(texts, dates))]), source)
     monkeypatch.setattr(sec, "_download_sec_source", lambda _: [source])
     directory = sec.build_sec_corpus(tmp_path / "corpus")
     return directory
@@ -144,8 +150,10 @@ def test_sec_loader_validates_identity_and_requires_explicit_labels(sec_corpus):
     assert loaded.ground_truth is None
     assert loaded.corpus_id == sec.sec_identity(
         sec.load_sec_table(sec_corpus))["corpus_id"]
-    assert loaded.tables[sec.SEC_TABLE]["text_chars"].to_pylist() == [
-        8, 9_600, 90_001, 9_601]
+    engine_table = loaded.tables[sec.SEC_TABLE]
+    assert engine_table["text"][0].as_py() == "Rog\u00e9t;"
+    assert sec.load_sec_table(sec_corpus)["text"][0].as_py() == "Roge\u0301t\u037e"
+    assert engine_table["text_chars"].to_pylist() == [6, 9_600, 90_001, 9_601]
     assert sec.build_sec_corpus(sec_corpus) == sec_corpus
     with pytest.raises(ValueError, match="not published"):
         quail_b.load_benchmark("SEC-1", scale_factor=1.0, data_dir=sec_corpus)
@@ -317,7 +325,7 @@ def test_sec_queries_run_with_an_explicit_matching_reference_collection(
     table = sec.load_sec_table(sec_corpus)
     ids = table["id"].to_pylist()
     kept = [0, 2, 3]
-    long = [1, 3]
+    long = [1]
     values = {
         "ceo_departure": [True, False, True, True],
         "ceo_name": [["Alex"], [], ["Casey"], ["Dana"]],

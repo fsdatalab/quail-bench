@@ -462,13 +462,13 @@
   },
   {
     "id": "SEC-2",
-    "description": "where: long filing -> extract: party in the reported event",
+    "description": "where: long, recent filing -> extract: party in the reported event",
     "privacy": false,
     "draft": true
   },
   {
     "id": "SEC-3",
-    "description": "where: long filing -> extract: dollar amount of the event",
+    "description": "where: long, recent filing -> extract: dollar amount of the event",
     "privacy": false,
     "draft": true
   },
@@ -492,13 +492,13 @@
   },
   {
     "id": "SEC-7",
-    "description": "where: long filing -> extract: sentence stating the event",
+    "description": "where: long, recent filing -> extract: sentence stating the event",
     "privacy": false,
     "draft": true
   },
   {
     "id": "SEC-8",
-    "description": "where: long filing -> extract: what the event changes",
+    "description": "where: long, recent filing -> extract: what the event changes",
     "privacy": false,
     "draft": true
   },
