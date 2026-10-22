@@ -4,6 +4,7 @@ import hashlib
 import heapq
 import json
 import re
+import unicodedata
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
@@ -221,13 +222,16 @@ def sec_engine_table(table: pa.Table) -> pa.Table:
     """Return the table that engines read: NFC text and its length.
 
     Some filings hold characters that NFC changes, such as U+037E, which
-    becomes ";". Tokenizers such as Qwen3's apply NFC, so an engine that
+    becomes ";", or a letter and a combining accent, which become one
+    character. Tokenizers such as Qwen3's apply NFC, so an engine that
     copies answers from token bytes needs text that NFC does not change.
     `text_chars` is the length of the normalized text in Unicode
     characters. Both are computed when the sample loads, so the published
     sample and its identity do not change.
     """
-    text = pc.utf8_normalize(table.column("text"), "NFC")
+    # pyarrow's utf8_normalize does not compose combining accents
+    text = pa.array([unicodedata.normalize("NFC", value)
+                     for value in table.column("text").to_pylist()], pa.string())
     table = table.set_column(table.schema.get_field_index("text"), "text", text)
     return table.append_column(pa.field("text_chars", pa.int32()),
                                pc.utf8_length(text).cast(pa.int32()))

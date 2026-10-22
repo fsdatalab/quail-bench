@@ -130,8 +130,9 @@ def test_sample_uses_all_shards_and_unique_eligible_accessions(monkeypatch, tmp_
 def sec_corpus(monkeypatch, tmp_path):
     monkeypatch.setattr(sec, "SEC_DOCUMENTS", 4)
     source = tmp_path / "source.parquet"
-    # filing 0 holds U+037E, which NFC changes; filing 3 is from 2022
-    texts = ["Filing 0\u037e", LONG, "x" * (sec.SEC_LONG_MAX_CHARS + 1),
+    # filing 0 holds U+037E and a combining accent, which NFC changes;
+    # filing 3 is from 2022
+    texts = ["Roge\u0301t\u037e", LONG, "x" * (sec.SEC_LONG_MAX_CHARS + 1),
              LONG + "y"]
     dates = ["20260115"] * 3 + ["20221231"]
     pq.write_table(pa.Table.from_pylist(
@@ -150,9 +151,9 @@ def test_sec_loader_validates_identity_and_requires_explicit_labels(sec_corpus):
     assert loaded.corpus_id == sec.sec_identity(
         sec.load_sec_table(sec_corpus))["corpus_id"]
     engine_table = loaded.tables[sec.SEC_TABLE]
-    assert engine_table["text"][0].as_py() == "Filing 0;"
-    assert sec.load_sec_table(sec_corpus)["text"][0].as_py() == "Filing 0\u037e"
-    assert engine_table["text_chars"].to_pylist() == [9, 9_600, 90_001, 9_601]
+    assert engine_table["text"][0].as_py() == "Rog\u00e9t;"
+    assert sec.load_sec_table(sec_corpus)["text"][0].as_py() == "Roge\u0301t\u037e"
+    assert engine_table["text_chars"].to_pylist() == [6, 9_600, 90_001, 9_601]
     assert sec.build_sec_corpus(sec_corpus) == sec_corpus
     with pytest.raises(ValueError, match="not published"):
         quail_b.load_benchmark("SEC-1", scale_factor=1.0, data_dir=sec_corpus)
