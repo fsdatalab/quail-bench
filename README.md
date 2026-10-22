@@ -502,30 +502,9 @@ The `SEC` queries read 100,000 8-K filings from
 A company files an 8-K to announce an important event. The sample covers all
 event types, not only CEO changes.
 
-`sec_filings` has one row for each filing. It has these columns:
-
-- `id`: the SEC accession number.
-- `text`: the text of the filing.
-- `filing_date` and `filing_month`: the date of the filing.
-- `text_chars`: the number of Unicode characters in `text`. The loader adds
-  this column.
-
-The loader changes `text` to Unicode NFC. Some filings have characters that a
-tokenizer changes, for example U+037E. After NFC, the tokens of a filing agree
-with its text. The published sample does not change.
-
-A CEO departure is the resignation, retirement, removal, or death of the CEO
-of the filing company. An interim CEO or a co-CEO is also a CEO. If more than
-one CEO leaves, the answers use the first CEO in the filing.
-
-SEC-2, SEC-3, SEC-7, and SEC-8 ask about the event of each filing. They read
-only the long filings from 2023 or later:
-
-```sql
-WHERE text_chars BETWEEN 9600 AND 90000 AND filing_month >= '2023-01'
-```
-
-There are 1,056 of these filings, with 16.5 million characters in total.
+`sec_filings` has one row for each filing. The loader changes `text` to
+Unicode NFC and adds `text_chars`, its length. SEC-2, SEC-3, SEC-7, and SEC-8
+read only the 1,056 long filings from 2023 or later.
 
 | Query | Question | Operators |
 | --- | --- | --- |
