@@ -9,6 +9,7 @@ from datetime import datetime
 from pathlib import Path
 
 import pyarrow as pa
+import pyarrow.compute as pc
 import pyarrow.parquet as pq
 
 from quail_b._files import GROUND_TRUTH_ROOT, _cached_file, _location, _read_bytes
@@ -27,6 +28,9 @@ SEC_SCHEMA = pa.schema([
     ("filing_month", pa.string()),
 ])
 SEC_SOURCE_COLUMNS = ("metadata_accession-number", "metadata_filing-date", "text")
+# The event queries read long filings: about 2,400 to 22,000 Qwen3 tokens.
+SEC_LONG_MIN_CHARS = 9_600
+SEC_LONG_MAX_CHARS = 90_000
 
 
 def _sample_spec() -> dict:
@@ -209,3 +213,14 @@ def load_sec_table(data_dir=None, *, root=None) -> pa.Table:
     if any(manifest.get(key) != value for key, value in identity.items()):
         raise ValueError("SEC input does not match its corpus manifest")
     return table
+
+
+def with_text_chars(table: pa.Table) -> pa.Table:
+    """Add `text_chars`, the length of each filing in Unicode characters.
+
+    The column is computed when the sample loads, so the published sample
+    and its identity do not change.
+    """
+    return table.append_column(
+        pa.field("text_chars", pa.int32()),
+        pc.utf8_length(table.column("text")).cast(pa.int32()))

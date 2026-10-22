@@ -770,7 +770,22 @@ SEC_CEO_SUCCESSOR_DESCRIPTIONS = (
     "No departure, no immediate successor, or no explicit status.",
 )
 
-# SEC 8-K reported events, over every filing.
+# SEC 8-K reported events, over the long filings. Most long filings have an
+# answer to each question.
+SEC_EVENT_PARTY = (
+    "Who, other than the filing company and its board, is most involved in "
+    "the event this filing reports? Copy the name of one person or "
+    "organization."
+)
+SEC_EVENT_AMOUNT = (
+    "Which dollar amount matters most to the event this filing reports? "
+    "Copy the amount as written, with its unit."
+)
+SEC_EVENT_CHANGE = (
+    "What does the filing say changes for the filing company because of the "
+    "event it reports? Copy the shortest passage that states it. Do not "
+    "infer a change."
+)
 SEC_EVENT_SENTENCE = (
     "Copy the whole sentence that states the event this filing reports, from "
     "the body of its first Item."

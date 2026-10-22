@@ -462,13 +462,13 @@
   },
   {
     "id": "SEC-2",
-    "description": "extract: departing CEO name, null without one",
+    "description": "where: long filing -> extract: party in the reported event",
     "privacy": false,
     "draft": true
   },
   {
     "id": "SEC-3",
-    "description": "extract: effective CEO departure date, null without one",
+    "description": "where: long filing -> extract: dollar amount of the event",
     "privacy": false,
     "draft": true
   },
@@ -492,7 +492,13 @@
   },
   {
     "id": "SEC-7",
-    "description": "extract: the sentence stating each filing's reported event",
+    "description": "where: long filing -> extract: sentence stating the event",
+    "privacy": false,
+    "draft": true
+  },
+  {
+    "id": "SEC-8",
+    "description": "where: long filing -> extract: what the event changes",
     "privacy": false,
     "draft": true
   },

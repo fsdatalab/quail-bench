@@ -375,7 +375,10 @@ SEC_PREDICATES = (
           ("ceo_name", prompts.SEC_CEO_NAME),
           ("departure_date", prompts.SEC_CEO_DATE),
           ("departure_reason", prompts.SEC_CEO_REASON),
-          ("event_sentence", prompts.SEC_EVENT_SENTENCE))),
+          ("event_party", prompts.SEC_EVENT_PARTY),
+          ("event_amount", prompts.SEC_EVENT_AMOUNT),
+          ("event_sentence", prompts.SEC_EVENT_SENTENCE),
+          ("event_change", prompts.SEC_EVENT_CHANGE))),
     PredicateSpec(
         "quailb.sec.filing.successor_status", "sec", "successor_status",
         "classify", prompts.SEC_CEO_SUCCESSOR, "filing", "sec_filings", "text",
