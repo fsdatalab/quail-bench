@@ -100,8 +100,7 @@ def load_benchmark(only=None, *, scale_factor=0.1, data_dir=None,
 
 
 def _load_sec_benchmark(specs, data_dir, collection_id, accuracy, root):
-    from quail_b.sec import (
-        SEC_TABLE, load_sec_table, sec_identity, with_text_chars)
+    from quail_b.sec import SEC_TABLE, load_sec_table, sec_identity, with_text_chars
 
     if accuracy and collection_id is None:
         raise ValueError(
