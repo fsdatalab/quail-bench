@@ -17,6 +17,10 @@ beyond the minimum is its regret, whatever the cause: an evicted
 anchor computed again, a set scanned twice under two aliases, or a
 prompt prefix the documents share computed once per document.
 
+Rows with the same text hold equal prefixes, so a prefix cache over
+whole requests computes their questions once. The minimum counts them
+as one document, whatever their ids or tables.
+
 The minimum does not depend on how an engine reads a label. A
 classification's tail is the reference prompt's: the question, the
 labels by name, and the answer cue. Reading the label takes no position
@@ -337,7 +341,8 @@ def minimum_input_tokens(spec, pieces, filter_answers, join_answers,
                          extract_answers=None) -> int:
     """Return the fewest input tokens the run's requests need.
 
-    A join can hold tens of millions of pairs, so the pairs are
+    Rows with the same text are one document, whatever their ids or
+    tables. A join can hold tens of millions of pairs, so the pairs are
     grouped by anchor in numpy; Python visits documents and anchors.
 
     Args:
@@ -463,7 +468,7 @@ def minimum_input_tokens(spec, pieces, filter_answers, join_answers,
     partner_sizes: dict = {}
     partner_tries: dict = {}
     partners = frozenset().union(*members_of.values())
-    for document in records.values():
+    for document in _merged_by_text(records, documents).values():
         suffixes = frozenset(document.suffixes)
         if suffixes not in suffix_sizes:
             suffix_sizes[suffixes] = prefix_trie_size(suffixes)
@@ -477,6 +482,19 @@ def minimum_input_tokens(spec, pieces, filter_answers, join_answers,
                     frozenset().union(*(members_of[member] for member in keys)))
             total += partner_sizes[key]
     return total
+
+
+def _merged_by_text(records, documents) -> dict:
+    """Merge the records of rows with the same text into one each."""
+    merged: dict = {}
+    for (table_set, row_id), document in records.items():
+        text = documents[(*table_set, row_id)].tobytes()
+        same = merged.setdefault(
+            text, _Document(alias=document.alias, row_id=document.row_id))
+        same.suffixes |= document.suffixes
+        for group, keys in document.groups.items():
+            same.groups.setdefault(group, set()).update(keys)
+    return merged
 
 
 def _fresh_tokens(measurements) -> int | None:

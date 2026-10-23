@@ -794,7 +794,9 @@ The minimum is the number of input tokens that the requests need when the KV of
 every prompt prefix stays in memory. It counts each distinct prompt prefix one
 time:
 
-- A document counts one time, however many questions ask about it.
+- A document counts one time, however many questions ask about it. Rows with
+  the same text count as one document, even under different IDs or tables,
+  because their prompts are the same.
 - If two questions about one document start with the same tokens, these tokens
   count one time.
 - In a join, the anchor document, the frame, and the partner label count one

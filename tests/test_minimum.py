@@ -19,10 +19,12 @@ from quail_b.queries import QuerySpec
 from quail_b.scoring import RunOutput
 from tools.make_substrait_plans import (
     Classify,
+    Extract,
     Filter,
     Join,
     Scan,
     Score,
+    Struct,
     build_plan,
 )
 
@@ -188,6 +190,94 @@ def test_minimum_input_tokens_of_a_join_is_the_trie_of_its_requests():
     requests = [PRE + _ids(bodies[anchor]) + FRAME + LABEL
                 + _ids(texts[partner]) + TAIL for anchor, partner in pairs]
     assert minimum == prefix_trie_size(requests)
+
+
+def test_minimum_input_tokens_ask_a_repeated_text_once():
+    spec = _spec("TEST-6", "one filter",
+                 Filter(Scan("docs", "d", "body"), "useful {0}"))
+    corpus = {"docs": pa.table({"id": ["a", "b", "c"],
+                                "body": ["same text", "same text", "other"]})}
+    pieces = validate_prompt_pieces(spec, {
+        "tokenizer": "test", "preamble": PRE,
+        "filters": [{"id": "filter-1", "tail": QUESTION}],
+    })
+    filter_answers = {"filter-1": pa.table({
+        "d": ["a", "b", "c"], "answer": [True, True, False]})}
+    documents = DocumentTokens(corpus, _encode)
+    texts = [PRE + _ids(text) for text in ("same text", "other")]
+
+    # rows a and b hold one text, so its question is asked once
+    assert minimum_input_tokens(
+        spec, pieces, filter_answers, {}, documents) == (
+            prefix_trie_size([text + QUESTION for text in texts]))
+
+
+def test_minimum_input_tokens_share_repeated_anchors():
+    spec = _spec(
+        "TEST-7",
+        "one join",
+        Join(Scan("docs", "d", "body"), Scan("notes", "n", "text"),
+             ("d", "n"), "{0} cites {1}"),
+    )
+    corpus = {
+        "docs": pa.table({"id": ["r", "s"], "body": ["red apple", "red apple"]}),
+        "notes": pa.table({"id": ["1", "2"], "text": ["the cat", "a dog"]}),
+    }
+    pieces = validate_prompt_pieces(spec, {
+        "tokenizer": "test", "preamble": PRE,
+        "joins": [{"id": "join-1", "anchor": "d", "frame": FRAME,
+                   "label": LABEL, "tail": TAIL}],
+    })
+    join_answers = {"join-1": pa.table({
+        "d": ["r", "s"], "n": ["1", "2"], "answer": [True, False]})}
+    documents = DocumentTokens(corpus, _encode)
+    partners = [_ids(text) + TAIL for text in ("the cat", "a dog")]
+
+    # r and s hold one text, so its frame and label come once and each
+    # row's partner follows them
+    assert minimum_input_tokens(spec, pieces, {}, join_answers, documents) == (
+        prefix_trie_size([PRE + _ids("red apple") + FRAME + LABEL + partner
+                          for partner in partners]))
+
+
+def test_minimum_input_tokens_read_a_repeated_text_once():
+    spec = _spec("TEST-9", "one extraction",
+                 Extract(Scan("docs", "d", "body"), "When does it end?", "ends"),
+                 ("d", Struct("answers", ("d.ends",))))
+    corpus = {"docs": pa.table({"id": ["a", "b"], "body": ["ends May", "ends May"]})}
+    tail = _ids("\n\nWhen does it end?\nANSWER:")
+    pieces = validate_prompt_pieces(spec, {
+        "tokenizer": "test", "preamble": PRE,
+        "extracts": [{"id": "extract-1", "tail": tail}]})
+    answers = {"extract-1": pa.table({"d": ["a", "b"], "ends": ["May", "May"]})}
+    documents = DocumentTokens(corpus, _encode)
+
+    # rows a and b hold one contract, so its question is read once
+    assert minimum_input_tokens(spec, pieces, {}, {}, documents,
+                                extract_answers=answers) == (
+        len(PRE + _ids("ends May")) + len(tail))
+
+
+def test_token_metrics_reject_fresh_tokens_below_one_ask_of_a_repeated_text(
+        monkeypatch):
+    monkeypatch.setattr("quail_b.minimum.load_tokenizer", lambda _: _encode)
+    spec = _filter_spec()
+    corpus = {"docs": pa.table({"id": ["a", "b"], "body": ["alpha", "alpha"]})}
+    pieces = {"tokenizer": "test", "preamble": PRE,
+              "filters": [{"id": "filter-1", "tail": QUESTION}]}
+    answers = {"filter-1": pa.table({"d": ["a", "b"], "answer": [True, True]})}
+
+    def metrics(fresh):
+        return token_metrics(spec, RunOutput(
+            answers, {}, pa.table({"d": ["a", "b"]}), runtime_s=1.0,
+            measurements={"fresh_tokens": fresh}, prompt_pieces=pieces), corpus)
+
+    once = len(PRE) + 5 + len(QUESTION)
+    assert metrics(once)["minimum_tokens"] == once
+    assert metrics(once)["regret_tokens"] == 0
+    assert metrics(once + len(QUESTION))["regret_tokens"] == len(QUESTION)
+    with pytest.raises(ValueError, match="below the minimum"):
+        metrics(once - 1)
 
 
 def test_partner_trie_size_matches_the_trie_of_any_subset():
