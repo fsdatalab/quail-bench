@@ -80,6 +80,18 @@ def test_extract_plans_name_the_question_and_the_answer_column():
     relational = quail_b.get_query("CUAD-15").info
     assert relational.relational and relational.fetch.count == 20
     assert relational.extracts[0].output == "expiration_date"
+    # CUAD-16, a draft, asks every clause question of each contract
+    assert "CUAD-16" in queries(include_draft=True)
+    assert "CUAD-16" not in queries()
+    every = quail_b.get_query("CUAD-16").info
+    assert [operator.prompt for operator in every.extracts] == list(
+        prompts.CUAD_QUESTIONS.values())
+    outputs = [operator.output for operator in every.extracts]
+    assert len(set(outputs)) == 41
+    assert outputs[:3] == ["document_name", "parties", "agreement_date"]
+    assert "rofr_rofo_rofn" in outputs
+    assert every.structs == (AnswerStruct(
+        "contract", tuple(f"c.{output}" for output in outputs)),)
 
 
 def _spec(tree, select):

@@ -1,0 +1,500 @@
+{
+  "extension_urns": [
+    {
+      "extension_urn_anchor": 1,
+      "urn": "extension:org.fsdatalab.quail_b:functions_ai"
+    },
+    {
+      "extension_urn_anchor": 2,
+      "urn": "extension:io.substrait:functions_comparison"
+    }
+  ],
+  "extensions": [
+    {
+      "extension_function": {
+        "extension_urn_reference": 2,
+        "function_anchor": 10,
+        "name": "lte:any_any"
+      }
+    },
+    {
+      "extension_function": {
+        "extension_urn_reference": 2,
+        "function_anchor": 12,
+        "name": "gte:any_any"
+      }
+    },
+    {
+      "extension_function": {
+        "extension_urn_reference": 1,
+        "function_anchor": 19,
+        "name": "ai_extract:str_str"
+      }
+    }
+  ],
+  "relations": [
+    {
+      "root": {
+        "input": {
+          "project": {
+            "common": {
+              "emit": {
+                "output_mapping": [
+                  8,
+                  9
+                ]
+              }
+            },
+            "expressions": [
+              {
+                "selection": {
+                  "direct_reference": {
+                    "struct_field": {}
+                  },
+                  "root_reference": {}
+                }
+              },
+              {
+                "nested": {
+                  "struct": {
+                    "fields": [
+                      {
+                        "selection": {
+                          "direct_reference": {
+                            "struct_field": {
+                              "field": 4
+                            }
+                          },
+                          "root_reference": {}
+                        }
+                      },
+                      {
+                        "selection": {
+                          "direct_reference": {
+                            "struct_field": {
+                              "field": 5
+                            }
+                          },
+                          "root_reference": {}
+                        }
+                      },
+                      {
+                        "selection": {
+                          "direct_reference": {
+                            "struct_field": {
+                              "field": 6
+                            }
+                          },
+                          "root_reference": {}
+                        }
+                      },
+                      {
+                        "selection": {
+                          "direct_reference": {
+                            "struct_field": {
+                              "field": 7
+                            }
+                          },
+                          "root_reference": {}
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            "input": {
+              "project": {
+                "common": {
+                  "direct": {},
+                  "hint": {
+                    "alias": "extract-4",
+                    "output_names": [
+                      "f.id",
+                      "f.text",
+                      "f.filing_month",
+                      "f.text_chars",
+                      "f.event_party",
+                      "f.event_amount",
+                      "f.event_sentence",
+                      "f.event_change"
+                    ]
+                  }
+                },
+                "expressions": [
+                  {
+                    "scalar_function": {
+                      "arguments": [
+                        {
+                          "value": {
+                            "literal": {
+                              "string": "What does the filing say changes for the filing company because of the event it reports? Copy the shortest passage that states it. Do not infer a change."
+                            }
+                          }
+                        },
+                        {
+                          "value": {
+                            "selection": {
+                              "direct_reference": {
+                                "struct_field": {
+                                  "field": 1
+                                }
+                              },
+                              "root_reference": {}
+                            }
+                          }
+                        }
+                      ],
+                      "function_reference": 19,
+                      "output_type": {
+                        "string": {
+                          "nullability": "NULLABILITY_NULLABLE"
+                        }
+                      }
+                    }
+                  }
+                ],
+                "input": {
+                  "project": {
+                    "common": {
+                      "direct": {},
+                      "hint": {
+                        "alias": "extract-3",
+                        "output_names": [
+                          "f.id",
+                          "f.text",
+                          "f.filing_month",
+                          "f.text_chars",
+                          "f.event_party",
+                          "f.event_amount",
+                          "f.event_sentence"
+                        ]
+                      }
+                    },
+                    "expressions": [
+                      {
+                        "scalar_function": {
+                          "arguments": [
+                            {
+                              "value": {
+                                "literal": {
+                                  "string": "Copy the whole sentence that states the event this filing reports, from the body of its first Item."
+                                }
+                              }
+                            },
+                            {
+                              "value": {
+                                "selection": {
+                                  "direct_reference": {
+                                    "struct_field": {
+                                      "field": 1
+                                    }
+                                  },
+                                  "root_reference": {}
+                                }
+                              }
+                            }
+                          ],
+                          "function_reference": 19,
+                          "output_type": {
+                            "string": {
+                              "nullability": "NULLABILITY_NULLABLE"
+                            }
+                          }
+                        }
+                      }
+                    ],
+                    "input": {
+                      "project": {
+                        "common": {
+                          "direct": {},
+                          "hint": {
+                            "alias": "extract-2",
+                            "output_names": [
+                              "f.id",
+                              "f.text",
+                              "f.filing_month",
+                              "f.text_chars",
+                              "f.event_party",
+                              "f.event_amount"
+                            ]
+                          }
+                        },
+                        "expressions": [
+                          {
+                            "scalar_function": {
+                              "arguments": [
+                                {
+                                  "value": {
+                                    "literal": {
+                                      "string": "Which dollar amount matters most to the event this filing reports? Copy the amount as written, with its unit."
+                                    }
+                                  }
+                                },
+                                {
+                                  "value": {
+                                    "selection": {
+                                      "direct_reference": {
+                                        "struct_field": {
+                                          "field": 1
+                                        }
+                                      },
+                                      "root_reference": {}
+                                    }
+                                  }
+                                }
+                              ],
+                              "function_reference": 19,
+                              "output_type": {
+                                "string": {
+                                  "nullability": "NULLABILITY_NULLABLE"
+                                }
+                              }
+                            }
+                          }
+                        ],
+                        "input": {
+                          "project": {
+                            "common": {
+                              "direct": {},
+                              "hint": {
+                                "alias": "extract-1",
+                                "output_names": [
+                                  "f.id",
+                                  "f.text",
+                                  "f.filing_month",
+                                  "f.text_chars",
+                                  "f.event_party"
+                                ]
+                              }
+                            },
+                            "expressions": [
+                              {
+                                "scalar_function": {
+                                  "arguments": [
+                                    {
+                                      "value": {
+                                        "literal": {
+                                          "string": "Who, other than the filing company and its board, is most involved in the event this filing reports? Copy the name of one person or organization."
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "value": {
+                                        "selection": {
+                                          "direct_reference": {
+                                            "struct_field": {
+                                              "field": 1
+                                            }
+                                          },
+                                          "root_reference": {}
+                                        }
+                                      }
+                                    }
+                                  ],
+                                  "function_reference": 19,
+                                  "output_type": {
+                                    "string": {
+                                      "nullability": "NULLABILITY_NULLABLE"
+                                    }
+                                  }
+                                }
+                              }
+                            ],
+                            "input": {
+                              "filter": {
+                                "common": {
+                                  "direct": {},
+                                  "hint": {
+                                    "alias": "where-3"
+                                  }
+                                },
+                                "condition": {
+                                  "scalar_function": {
+                                    "arguments": [
+                                      {
+                                        "value": {
+                                          "selection": {
+                                            "direct_reference": {
+                                              "struct_field": {
+                                                "field": 2
+                                              }
+                                            },
+                                            "root_reference": {}
+                                          }
+                                        }
+                                      },
+                                      {
+                                        "value": {
+                                          "literal": {
+                                            "string": "2023-01"
+                                          }
+                                        }
+                                      }
+                                    ],
+                                    "function_reference": 12,
+                                    "output_type": {
+                                      "bool": {
+                                        "nullability": "NULLABILITY_REQUIRED"
+                                      }
+                                    }
+                                  }
+                                },
+                                "input": {
+                                  "filter": {
+                                    "common": {
+                                      "direct": {},
+                                      "hint": {
+                                        "alias": "where-2"
+                                      }
+                                    },
+                                    "condition": {
+                                      "scalar_function": {
+                                        "arguments": [
+                                          {
+                                            "value": {
+                                              "selection": {
+                                                "direct_reference": {
+                                                  "struct_field": {
+                                                    "field": 3
+                                                  }
+                                                },
+                                                "root_reference": {}
+                                              }
+                                            }
+                                          },
+                                          {
+                                            "value": {
+                                              "literal": {
+                                                "i32": 90000
+                                              }
+                                            }
+                                          }
+                                        ],
+                                        "function_reference": 10,
+                                        "output_type": {
+                                          "bool": {
+                                            "nullability": "NULLABILITY_REQUIRED"
+                                          }
+                                        }
+                                      }
+                                    },
+                                    "input": {
+                                      "filter": {
+                                        "common": {
+                                          "direct": {},
+                                          "hint": {
+                                            "alias": "where-1"
+                                          }
+                                        },
+                                        "condition": {
+                                          "scalar_function": {
+                                            "arguments": [
+                                              {
+                                                "value": {
+                                                  "selection": {
+                                                    "direct_reference": {
+                                                      "struct_field": {
+                                                        "field": 3
+                                                      }
+                                                    },
+                                                    "root_reference": {}
+                                                  }
+                                                }
+                                              },
+                                              {
+                                                "value": {
+                                                  "literal": {
+                                                    "i32": 9600
+                                                  }
+                                                }
+                                              }
+                                            ],
+                                            "function_reference": 12,
+                                            "output_type": {
+                                              "bool": {
+                                                "nullability": "NULLABILITY_REQUIRED"
+                                              }
+                                            }
+                                          }
+                                        },
+                                        "input": {
+                                          "read": {
+                                            "base_schema": {
+                                              "names": [
+                                                "id",
+                                                "text",
+                                                "filing_month",
+                                                "text_chars"
+                                              ],
+                                              "struct": {
+                                                "nullability": "NULLABILITY_REQUIRED",
+                                                "types": [
+                                                  {
+                                                    "string": {
+                                                      "nullability": "NULLABILITY_REQUIRED"
+                                                    }
+                                                  },
+                                                  {
+                                                    "string": {
+                                                      "nullability": "NULLABILITY_REQUIRED"
+                                                    }
+                                                  },
+                                                  {
+                                                    "string": {
+                                                      "nullability": "NULLABILITY_REQUIRED"
+                                                    }
+                                                  },
+                                                  {
+                                                    "i32": {
+                                                      "nullability": "NULLABILITY_REQUIRED"
+                                                    }
+                                                  }
+                                                ]
+                                              }
+                                            },
+                                            "common": {
+                                              "direct": {},
+                                              "hint": {
+                                                "alias": "f"
+                                              }
+                                            },
+                                            "named_table": {
+                                              "names": [
+                                                "sec_filings"
+                                              ]
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "names": [
+          "f",
+          "report",
+          "event_party",
+          "event_amount",
+          "event_sentence",
+          "event_change"
+        ]
+      }
+    }
+  ],
+  "version": {
+    "minor_number": 103,
+    "producer": "quail-b"
+  }
+}

@@ -20,7 +20,7 @@ from quail_b.run import _validate_output
 from quail_b.scoring import RunOutput
 from quail_b.substrait import AnswerStruct
 
-SEC_IDS = tuple(f"SEC-{i}" for i in range(1, 9))
+SEC_IDS = tuple(f"SEC-{i}" for i in range(1, 10))
 LONG = "x" * sec.SEC_LONG_MIN_CHARS
 
 
@@ -33,7 +33,7 @@ def test_sec_plans_are_explicit_and_preserve_the_published_suite():
         ("filter-1",), ("extract-1",), ("extract-1",),
         ("filter-1", "extract-1", "extract-2", "extract-3"),
         ("filter-1", "classify-1"), ("filter-1", "classify-1"), ("extract-1",),
-        ("extract-1",),
+        ("extract-1",), ("extract-1", "extract-2", "extract-3", "extract-4"),
     ]
     for spec in specs:
         assert {relation.table for relation in spec.info.relations} == {
@@ -53,6 +53,11 @@ def test_sec_plans_are_explicit_and_preserve_the_published_suite():
             ("filing_month", ">=", "2023-01")]
         assert spec.info.structs == (AnswerStruct("report", (f"f.{output}",)),)
         assert spec.info.columns == ("f", "report")
+    # SEC-9 asks the four event questions of each filing at once
+    assert specs[8].info.column_tests == specs[1].info.column_tests
+    assert specs[8].info.structs == (AnswerStruct("report", (
+        "f.event_party", "f.event_amount", "f.event_sentence",
+        "f.event_change")),)
     assert specs[5].info.aggregate.keys == (
         "f.filing_month", "f.successor_status")
     assert specs[5].info.aggregate.measures == (("filings", "count", None),)
