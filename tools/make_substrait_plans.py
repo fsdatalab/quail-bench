@@ -11,6 +11,7 @@ and in `quail_b/prompts.py`, then the files are regenerated.
 from __future__ import annotations
 
 import json
+import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -928,6 +929,18 @@ def _cuad_extract(node, category, output):
     return Extract(node, CUAD_QUESTIONS[category], output)
 
 
+def _cuad_field(category):
+    """The output column of a clause category: "Rofr/Rofo/Rofn" -> rofr_rofo_rofn."""
+    return re.sub(r"[^a-z]+", "_", category.lower()).strip("_")
+
+
+def _cuad_every_clause(node):
+    """One extraction per CUAD category, all over the same contracts."""
+    for category in CUAD_QUESTIONS:
+        node = _cuad_extract(node, category, _cuad_field(category))
+    return node
+
+
 def _governing_law(node):
     return _classify(node, CUAD_GOVERNING_LAW, CUAD_GOVERNING_LAW_LABELS,
                      "governing_law_state", CUAD_GOVERNING_LAW_DESCRIPTIONS)
@@ -1427,6 +1440,12 @@ QUERIES = (
               "Expiration Date", "expiration_date"),
               (("c.id", False),)), 20),
           select=("c", Struct("contract", ("c.expiration_date",)))),
+    Query("CUAD-16", "41 extracts: the text of every clause category in each "
+          "contract",
+          _cuad_every_clause(_contracts()),
+          select=("c", Struct("contract", tuple(
+              f"c.{_cuad_field(category)}" for category in CUAD_QUESTIONS))),
+          draft=True),
 
     # SEC inputs are built locally until reference labels are published.
     Query("SEC-1", "filter: announced CEO departure", _sec_departures(),
@@ -1460,6 +1479,30 @@ QUERIES = (
     Query("SEC-8", "where: long, recent filing -> extract: what the event changes",
           _sec_event(prompts.SEC_EVENT_CHANGE, "event_change"),
           select=("f", Struct("report", ("f.event_change",))), draft=True),
+    Query("SEC-9", "where: long, recent filing -> 4 extracts: the party, the "
+          "amount, the sentence, and the change of the event",
+          Extract(Extract(Extract(Extract(
+              _sec_event_filings(), prompts.SEC_EVENT_PARTY, "event_party"),
+              prompts.SEC_EVENT_AMOUNT, "event_amount"),
+              prompts.SEC_EVENT_SENTENCE, "event_sentence"),
+              prompts.SEC_EVENT_CHANGE, "event_change"),
+          select=("f", Struct("report", (
+              "f.event_party", "f.event_amount", "f.event_sentence",
+              "f.event_change"))), draft=True),
+    Query("SEC-10", "where: long, recent filing -> 2 filters: material agreement "
+          "+ dollar amount -> classify: agreement kind -> 2 extracts: party, "
+          "amount",
+          Extract(Extract(
+              _classify(_filters(_sec_event_filings(),
+                                 prompts.SEC_MATERIAL_AGREEMENT,
+                                 prompts.SEC_AGREEMENT_DOLLARS),
+                        prompts.SEC_AGREEMENT_KIND,
+                        prompts.SEC_AGREEMENT_KIND_LABELS, "agreement_kind",
+                        prompts.SEC_AGREEMENT_KIND_DESCRIPTIONS),
+              prompts.SEC_AGREEMENT_PARTY, "agreement_party"),
+              prompts.SEC_AGREEMENT_AMOUNT, "agreement_amount"),
+          select=("f", "f.agreement_kind", Struct("agreement", (
+              "f.agreement_party", "f.agreement_amount"))), draft=True),
 
     # PrivacyPolicies: only when that corpus is available.
     Query("PRIV-1", "2 filters: P_MSG + P_LOC",

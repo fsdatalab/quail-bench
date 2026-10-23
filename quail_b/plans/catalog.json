@@ -455,6 +455,12 @@
     "privacy": false
   },
   {
+    "id": "CUAD-16",
+    "description": "41 extracts: the text of every clause category in each contract",
+    "privacy": false,
+    "draft": true
+  },
+  {
     "id": "SEC-1",
     "description": "filter: announced CEO departure",
     "privacy": false,
@@ -499,6 +505,18 @@
   {
     "id": "SEC-8",
     "description": "where: long, recent filing -> extract: what the event changes",
+    "privacy": false,
+    "draft": true
+  },
+  {
+    "id": "SEC-9",
+    "description": "where: long, recent filing -> 4 extracts: the party, the amount, the sentence, and the change of the event",
+    "privacy": false,
+    "draft": true
+  },
+  {
+    "id": "SEC-10",
+    "description": "where: long, recent filing -> 2 filters: material agreement + dollar amount -> classify: agreement kind -> 2 extracts: party, amount",
     "privacy": false,
     "draft": true
   },

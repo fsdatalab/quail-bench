@@ -206,7 +206,7 @@ lists the queries that use it.
 | SWE-rebench | RUNS-1 to RUNS-4 | `issue_runs`, `issue_messages` | Repeated coding agent runs of one issue |
 | Terminal Wrench | WRENCH-1 to WRENCH-5 | `wrench_runs`, `wrench_steps` | Reward hacking in terminal agent runs |
 | CRMArena-Pro | SALES-1 to SALES-5 | `sales_calls` | Sales calls about B2B and B2C deals |
-| CUAD | CUAD-1 to CUAD-15 | `contracts`, `clause_types` | Clauses of commercial contracts, labeled by lawyers |
+| CUAD | CUAD-1 to CUAD-16 | `contracts`, `clause_types` | Clauses of commercial contracts, labeled by lawyers |
 
 Within each dataset, the first queries have a single filter or join. Later
 queries chain filters, filter both join inputs, scan one table under two
@@ -357,6 +357,7 @@ the reference labels:
 | CUAD-13 | Which clause types does each contract contain? | `ai_join` of contracts to the 33 clause types; 19% of pairs match |
 | CUAD-14 | Which clause types do contracts with a change of control clause contain? | `ai_filter`, then the `ai_join` |
 | CUAD-15 | When do the first 20 contracts terminable for convenience expire? | `ai_filter`, `ai_extract`, `ORDER BY`, `LIMIT` |
+| CUAD-16 | What is the text of each clause category in each contract? | 41 `ai_extract`s of one document, one for each category; a draft |
 
 Two IMDB queries also extract from every review. Each returns its answer as
 the field of one struct column, `review`.
@@ -503,8 +504,8 @@ A company files an 8-K to announce an important event. The sample covers all
 event types, not only CEO changes.
 
 `sec_filings` has one row for each filing. The loader changes `text` to
-Unicode NFC and adds `text_chars`, its length. SEC-2, SEC-3, SEC-7, and SEC-8
-read only the 1,056 long filings from 2023 or later.
+Unicode NFC and adds `text_chars`, its length. SEC-2, SEC-3, and SEC-7 to
+SEC-10 read only the 1,056 long filings from 2023 or later.
 
 | Query | Question | Operators |
 | --- | --- | --- |
@@ -516,6 +517,8 @@ read only the 1,056 long filings from 2023 or later.
 | SEC-6 | How many CEO departures per month and successor status? | SEC-5, then `GROUP BY`, `COUNT`, `ORDER BY` |
 | SEC-7 | Which sentence states the event each filing reports? | `WHERE` on length and month, then `ai_extract` of a long sentence |
 | SEC-8 | What does each event change for the company? | `WHERE` on length and month, then `ai_extract` of a long passage |
+| SEC-9 | What are the party, the amount, the sentence, and the change of each event? | `WHERE` on length and month, then the four `ai_extract`s of SEC-2, SEC-3, SEC-7, and SEC-8 of one document |
+| SEC-10 | What kind of agreement, with whom, and for how much, in filings that report a material agreement with a dollar amount? | `WHERE` on length and month, two `ai_filter`s, 4 labels, then two `ai_extract`s |
 
 The SEC queries have no reference answers yet, so they are not part of the
 default 85 queries. Load them on their own, at `scale_factor=1.0`, with

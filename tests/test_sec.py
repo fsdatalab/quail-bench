@@ -20,7 +20,7 @@ from quail_b.run import _validate_output
 from quail_b.scoring import RunOutput
 from quail_b.substrait import AnswerStruct
 
-SEC_IDS = tuple(f"SEC-{i}" for i in range(1, 9))
+SEC_IDS = tuple(f"SEC-{i}" for i in range(1, 11))
 LONG = "x" * sec.SEC_LONG_MIN_CHARS
 
 
@@ -33,7 +33,8 @@ def test_sec_plans_are_explicit_and_preserve_the_published_suite():
         ("filter-1",), ("extract-1",), ("extract-1",),
         ("filter-1", "extract-1", "extract-2", "extract-3"),
         ("filter-1", "classify-1"), ("filter-1", "classify-1"), ("extract-1",),
-        ("extract-1",),
+        ("extract-1",), ("extract-1", "extract-2", "extract-3", "extract-4"),
+        ("filter-1", "filter-2", "classify-1", "extract-1", "extract-2"),
     ]
     for spec in specs:
         assert {relation.table for relation in spec.info.relations} == {
@@ -53,6 +54,14 @@ def test_sec_plans_are_explicit_and_preserve_the_published_suite():
             ("filing_month", ">=", "2023-01")]
         assert spec.info.structs == (AnswerStruct("report", (f"f.{output}",)),)
         assert spec.info.columns == ("f", "report")
+    # SEC-9 asks the four event questions of each filing at once
+    assert specs[8].info.column_tests == specs[1].info.column_tests
+    assert specs[8].info.structs == (AnswerStruct("report", (
+        "f.event_party", "f.event_amount", "f.event_sentence",
+        "f.event_change")),)
+    # SEC-10 filters, labels, and extracts the same long, recent filings
+    assert specs[9].info.column_tests == specs[1].info.column_tests
+    assert specs[9].info.columns == ("f", "agreement_kind", "agreement")
     assert specs[5].info.aggregate.keys == (
         "f.filing_month", "f.successor_status")
     assert specs[5].info.aggregate.measures == (("filings", "count", None),)
@@ -63,7 +72,7 @@ def test_sec_plans_are_explicit_and_preserve_the_published_suite():
 
 def test_sec_prompts_share_the_departure_and_label_definitions():
     by_prompt = {predicate.template: predicate for predicate in SEC_PREDICATES}
-    assert len(by_prompt) == 9
+    assert len(by_prompt) == 14
     used = set()
     for query_id in SEC_IDS:
         for operator in quail_b.get_query(query_id).info.ai_operators:
@@ -78,6 +87,9 @@ def test_sec_prompts_share_the_departure_and_label_definitions():
     for question in (prompts.SEC_EVENT_PARTY, prompts.SEC_EVENT_AMOUNT,
                      prompts.SEC_EVENT_SENTENCE, prompts.SEC_EVENT_CHANGE):
         assert prompts.SEC_DEPARTURE_SCOPE not in question
+    for question in (prompts.SEC_AGREEMENT_DOLLARS, prompts.SEC_AGREEMENT_KIND,
+                     prompts.SEC_AGREEMENT_PARTY, prompts.SEC_AGREEMENT_AMOUNT):
+        assert prompts.SEC_AGREEMENT_TARGET in question
     filter_prompt = render_filter_prompt(prompts.SEC_CEO_DEPARTURE, "filing")
     classify_prompt = render_classify_prompt(
         prompts.SEC_CEO_SUCCESSOR, "filing", prompts.SEC_CEO_SUCCESSOR_LABELS,
@@ -324,7 +336,6 @@ def test_sec_queries_run_with_an_explicit_matching_reference_collection(
 
     table = sec.load_sec_table(sec_corpus)
     ids = table["id"].to_pylist()
-    kept = [0, 2, 3]
     long = [1]
     values = {
         "ceo_departure": [True, False, True, True],
@@ -336,7 +347,13 @@ def test_sec_queries_run_with_an_explicit_matching_reference_collection(
         "event_amount": [[], ["$10.5 million"], [], ["$3,200,000"]],
         "event_sentence": [[], ["Alex resigned."], ["Casey retired."], []],
         "event_change": [[], [], [], ["The company will close a plant."]],
+        "material_agreement": [False, True, True, False],
+        "agreement_dollars": [False, True, False, True],
+        "agreement_kind": ["other", "financing", "employment", "other"],
+        "agreement_party": [[], ["Acme Bank"], [], []],
+        "agreement_amount": [[], ["$10.5 million"], [], []],
     }
+    slugs = {predicate.template: predicate.slug for predicate in SEC_PREDICATES}
     labels = {}
     for predicate in SEC_PREDICATES:
         payload = predicate_payload(predicate)
@@ -350,8 +367,9 @@ def test_sec_queries_run_with_an_explicit_matching_reference_collection(
     monkeypatch.setattr(loading, "load_ground_truth", lambda *a, **kw: truth)
 
     def adapter(spec, tables):
-        indices = (kept if spec.info.filters else
-                   long if spec.info.column_tests else list(range(4)))
+        indices = long if spec.info.column_tests else list(range(4))
+        indices = [i for i in indices if all(
+            values[slugs[f.prompt]][i] for f in spec.info.filters)]
         selected = [ids[i] for i in indices]
         columns = {"f": selected}
         extracts = {}
@@ -365,9 +383,9 @@ def test_sec_queries_run_with_an_explicit_matching_reference_collection(
             answers = [columns.pop(op.output) for op in spec.info.extracts]
             columns[spec.info.structs[0].name] = pa.StructArray.from_arrays(
                 answers, names=[op.output for op in spec.info.extracts])
-        if spec.info.classifies:
-            columns["successor_status"] = [values["successor_status"][i]
-                                             for i in indices]
+        for operator in spec.info.classifies:
+            columns[operator.output] = [values[operator.output][i]
+                                        for i in indices]
         if spec.id == "SEC-6":
             rows = pa.table({
                 "filing_month": ["2026-01"] * 3,
