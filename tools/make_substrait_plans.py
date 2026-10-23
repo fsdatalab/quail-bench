@@ -1489,6 +1489,20 @@ QUERIES = (
           select=("f", Struct("report", (
               "f.event_party", "f.event_amount", "f.event_sentence",
               "f.event_change"))), draft=True),
+    Query("SEC-10", "where: long, recent filing -> 2 filters: material agreement "
+          "+ dollar amount -> classify: agreement kind -> 2 extracts: party, "
+          "amount",
+          Extract(Extract(
+              _classify(_filters(_sec_event_filings(),
+                                 prompts.SEC_MATERIAL_AGREEMENT,
+                                 prompts.SEC_AGREEMENT_DOLLARS),
+                        prompts.SEC_AGREEMENT_KIND,
+                        prompts.SEC_AGREEMENT_KIND_LABELS, "agreement_kind",
+                        prompts.SEC_AGREEMENT_KIND_DESCRIPTIONS),
+              prompts.SEC_AGREEMENT_PARTY, "agreement_party"),
+              prompts.SEC_AGREEMENT_AMOUNT, "agreement_amount"),
+          select=("f", "f.agreement_kind", Struct("agreement", (
+              "f.agreement_party", "f.agreement_amount"))), draft=True),
 
     # PrivacyPolicies: only when that corpus is available.
     Query("PRIV-1", "2 filters: P_MSG + P_LOC",

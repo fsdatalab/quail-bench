@@ -504,8 +504,8 @@ A company files an 8-K to announce an important event. The sample covers all
 event types, not only CEO changes.
 
 `sec_filings` has one row for each filing. The loader changes `text` to
-Unicode NFC and adds `text_chars`, its length. SEC-2, SEC-3, SEC-7, SEC-8, and
-SEC-9 read only the 1,056 long filings from 2023 or later.
+Unicode NFC and adds `text_chars`, its length. SEC-2, SEC-3, and SEC-7 to
+SEC-10 read only the 1,056 long filings from 2023 or later.
 
 | Query | Question | Operators |
 | --- | --- | --- |
@@ -518,6 +518,7 @@ SEC-9 read only the 1,056 long filings from 2023 or later.
 | SEC-7 | Which sentence states the event each filing reports? | `WHERE` on length and month, then `ai_extract` of a long sentence |
 | SEC-8 | What does each event change for the company? | `WHERE` on length and month, then `ai_extract` of a long passage |
 | SEC-9 | What are the party, the amount, the sentence, and the change of each event? | `WHERE` on length and month, then the four `ai_extract`s of SEC-2, SEC-3, SEC-7, and SEC-8 of one document |
+| SEC-10 | What kind of agreement, with whom, and for how much, in filings that report a material agreement with a dollar amount? | `WHERE` on length and month, two `ai_filter`s, 4 labels, then two `ai_extract`s |
 
 The SEC queries have no reference answers yet, so they are not part of the
 default 85 queries. Load them on their own, at `scale_factor=1.0`, with

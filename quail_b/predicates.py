@@ -378,7 +378,20 @@ SEC_PREDICATES = (
           ("event_party", prompts.SEC_EVENT_PARTY),
           ("event_amount", prompts.SEC_EVENT_AMOUNT),
           ("event_sentence", prompts.SEC_EVENT_SENTENCE),
-          ("event_change", prompts.SEC_EVENT_CHANGE))),
+          ("event_change", prompts.SEC_EVENT_CHANGE),
+          ("agreement_party", prompts.SEC_AGREEMENT_PARTY),
+          ("agreement_amount", prompts.SEC_AGREEMENT_AMOUNT))),
+    *(PredicateSpec(
+        f"quailb.sec.filing.{slug}", "sec", slug, "filter", prompt,
+        "filing", "sec_filings", "text")
+      for slug, prompt in (
+          ("material_agreement", prompts.SEC_MATERIAL_AGREEMENT),
+          ("agreement_dollars", prompts.SEC_AGREEMENT_DOLLARS))),
+    PredicateSpec(
+        "quailb.sec.filing.agreement_kind", "sec", "agreement_kind",
+        "classify", prompts.SEC_AGREEMENT_KIND, "filing", "sec_filings", "text",
+        labels=prompts.SEC_AGREEMENT_KIND_LABELS,
+        descriptions=prompts.SEC_AGREEMENT_KIND_DESCRIPTIONS),
     PredicateSpec(
         "quailb.sec.filing.successor_status", "sec", "successor_status",
         "classify", prompts.SEC_CEO_SUCCESSOR, "filing", "sec_filings", "text",

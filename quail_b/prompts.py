@@ -790,3 +790,45 @@ SEC_EVENT_SENTENCE = (
     "Copy the whole sentence that states the event this filing reports, from "
     "the body of its first Item."
 )
+
+# SEC 8-K material agreements, over the long, recent filings. Every question
+# is about the same agreement.
+SEC_AGREEMENT_SCOPE = (
+    "A material agreement is a contract outside the ordinary course of "
+    "business, such as a credit agreement, a merger or purchase agreement, or "
+    "an employment agreement. Agreements mentioned only as background do not "
+    "count."
+)
+SEC_AGREEMENT_TARGET = (
+    SEC_AGREEMENT_SCOPE + " If the filing reports several, use the one "
+    "mentioned first."
+)
+SEC_MATERIAL_AGREEMENT = (
+    "{0}\n\nDoes this filing report that the filing company entered into, "
+    "amended, or ended a material agreement? " + SEC_AGREEMENT_SCOPE
+)
+SEC_AGREEMENT_DOLLARS = (
+    "{0}\n\nDoes the filing state a dollar amount for the material agreement "
+    "it reports, such as a loan amount, a purchase price, or a salary? "
+    + SEC_AGREEMENT_TARGET
+)
+SEC_AGREEMENT_KIND = (
+    "{0}\n\nWhat kind of material agreement does this filing report? "
+    + SEC_AGREEMENT_TARGET
+)
+SEC_AGREEMENT_KIND_LABELS = ("financing", "acquisition", "employment", "other")
+SEC_AGREEMENT_KIND_DESCRIPTIONS = (
+    "A loan, credit facility, note, or other borrowing.",
+    "A merger, an acquisition, or a sale of a business or of assets.",
+    "An employment, compensation, or severance agreement with a person.",
+    "Any other material agreement.",
+)
+SEC_AGREEMENT_PARTY = (
+    "Who is the other party to the material agreement this filing reports? "
+    + SEC_AGREEMENT_TARGET + " Copy the name of one person or organization."
+)
+SEC_AGREEMENT_AMOUNT = (
+    "What dollar amount does the filing state for the material agreement it "
+    "reports? " + SEC_AGREEMENT_TARGET
+    + " Copy the amount as written, with its unit."
+)

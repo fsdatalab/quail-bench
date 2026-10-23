@@ -1,0 +1,577 @@
+{
+  "extension_urns": [
+    {
+      "extension_urn_anchor": 1,
+      "urn": "extension:org.fsdatalab.quail_b:functions_ai"
+    },
+    {
+      "extension_urn_anchor": 2,
+      "urn": "extension:io.substrait:functions_comparison"
+    }
+  ],
+  "extensions": [
+    {
+      "extension_function": {
+        "extension_urn_reference": 1,
+        "function_anchor": 1,
+        "name": "ai_filter:str_str"
+      }
+    },
+    {
+      "extension_function": {
+        "extension_urn_reference": 1,
+        "function_anchor": 5,
+        "name": "ai_classify:str_str_list_list"
+      }
+    },
+    {
+      "extension_function": {
+        "extension_urn_reference": 2,
+        "function_anchor": 10,
+        "name": "lte:any_any"
+      }
+    },
+    {
+      "extension_function": {
+        "extension_urn_reference": 2,
+        "function_anchor": 12,
+        "name": "gte:any_any"
+      }
+    },
+    {
+      "extension_function": {
+        "extension_urn_reference": 1,
+        "function_anchor": 19,
+        "name": "ai_extract:str_str"
+      }
+    }
+  ],
+  "relations": [
+    {
+      "root": {
+        "input": {
+          "project": {
+            "common": {
+              "emit": {
+                "output_mapping": [
+                  7,
+                  8,
+                  9
+                ]
+              }
+            },
+            "expressions": [
+              {
+                "selection": {
+                  "direct_reference": {
+                    "struct_field": {}
+                  },
+                  "root_reference": {}
+                }
+              },
+              {
+                "selection": {
+                  "direct_reference": {
+                    "struct_field": {
+                      "field": 4
+                    }
+                  },
+                  "root_reference": {}
+                }
+              },
+              {
+                "nested": {
+                  "struct": {
+                    "fields": [
+                      {
+                        "selection": {
+                          "direct_reference": {
+                            "struct_field": {
+                              "field": 5
+                            }
+                          },
+                          "root_reference": {}
+                        }
+                      },
+                      {
+                        "selection": {
+                          "direct_reference": {
+                            "struct_field": {
+                              "field": 6
+                            }
+                          },
+                          "root_reference": {}
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            "input": {
+              "project": {
+                "common": {
+                  "direct": {},
+                  "hint": {
+                    "alias": "extract-2",
+                    "output_names": [
+                      "f.id",
+                      "f.text",
+                      "f.filing_month",
+                      "f.text_chars",
+                      "f.agreement_kind",
+                      "f.agreement_party",
+                      "f.agreement_amount"
+                    ]
+                  }
+                },
+                "expressions": [
+                  {
+                    "scalar_function": {
+                      "arguments": [
+                        {
+                          "value": {
+                            "literal": {
+                              "string": "What dollar amount does the filing state for the material agreement it reports? A material agreement is a contract outside the ordinary course of business, such as a credit agreement, a merger or purchase agreement, or an employment agreement. Agreements mentioned only as background do not count. If the filing reports several, use the one mentioned first. Copy the amount as written, with its unit."
+                            }
+                          }
+                        },
+                        {
+                          "value": {
+                            "selection": {
+                              "direct_reference": {
+                                "struct_field": {
+                                  "field": 1
+                                }
+                              },
+                              "root_reference": {}
+                            }
+                          }
+                        }
+                      ],
+                      "function_reference": 19,
+                      "output_type": {
+                        "string": {
+                          "nullability": "NULLABILITY_NULLABLE"
+                        }
+                      }
+                    }
+                  }
+                ],
+                "input": {
+                  "project": {
+                    "common": {
+                      "direct": {},
+                      "hint": {
+                        "alias": "extract-1",
+                        "output_names": [
+                          "f.id",
+                          "f.text",
+                          "f.filing_month",
+                          "f.text_chars",
+                          "f.agreement_kind",
+                          "f.agreement_party"
+                        ]
+                      }
+                    },
+                    "expressions": [
+                      {
+                        "scalar_function": {
+                          "arguments": [
+                            {
+                              "value": {
+                                "literal": {
+                                  "string": "Who is the other party to the material agreement this filing reports? A material agreement is a contract outside the ordinary course of business, such as a credit agreement, a merger or purchase agreement, or an employment agreement. Agreements mentioned only as background do not count. If the filing reports several, use the one mentioned first. Copy the name of one person or organization."
+                                }
+                              }
+                            },
+                            {
+                              "value": {
+                                "selection": {
+                                  "direct_reference": {
+                                    "struct_field": {
+                                      "field": 1
+                                    }
+                                  },
+                                  "root_reference": {}
+                                }
+                              }
+                            }
+                          ],
+                          "function_reference": 19,
+                          "output_type": {
+                            "string": {
+                              "nullability": "NULLABILITY_NULLABLE"
+                            }
+                          }
+                        }
+                      }
+                    ],
+                    "input": {
+                      "project": {
+                        "common": {
+                          "direct": {},
+                          "hint": {
+                            "alias": "classify-1",
+                            "output_names": [
+                              "f.id",
+                              "f.text",
+                              "f.filing_month",
+                              "f.text_chars",
+                              "f.agreement_kind"
+                            ]
+                          }
+                        },
+                        "expressions": [
+                          {
+                            "scalar_function": {
+                              "arguments": [
+                                {
+                                  "value": {
+                                    "literal": {
+                                      "string": "{0}\n\nWhat kind of material agreement does this filing report? A material agreement is a contract outside the ordinary course of business, such as a credit agreement, a merger or purchase agreement, or an employment agreement. Agreements mentioned only as background do not count. If the filing reports several, use the one mentioned first."
+                                    }
+                                  }
+                                },
+                                {
+                                  "value": {
+                                    "selection": {
+                                      "direct_reference": {
+                                        "struct_field": {
+                                          "field": 1
+                                        }
+                                      },
+                                      "root_reference": {}
+                                    }
+                                  }
+                                },
+                                {
+                                  "value": {
+                                    "literal": {
+                                      "list": {
+                                        "values": [
+                                          {
+                                            "string": "financing"
+                                          },
+                                          {
+                                            "string": "acquisition"
+                                          },
+                                          {
+                                            "string": "employment"
+                                          },
+                                          {
+                                            "string": "other"
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  }
+                                },
+                                {
+                                  "value": {
+                                    "literal": {
+                                      "list": {
+                                        "values": [
+                                          {
+                                            "string": "A loan, credit facility, note, or other borrowing."
+                                          },
+                                          {
+                                            "string": "A merger, an acquisition, or a sale of a business or of assets."
+                                          },
+                                          {
+                                            "string": "An employment, compensation, or severance agreement with a person."
+                                          },
+                                          {
+                                            "string": "Any other material agreement."
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  }
+                                }
+                              ],
+                              "function_reference": 5,
+                              "output_type": {
+                                "string": {
+                                  "nullability": "NULLABILITY_REQUIRED"
+                                }
+                              }
+                            }
+                          }
+                        ],
+                        "input": {
+                          "filter": {
+                            "common": {
+                              "direct": {},
+                              "hint": {
+                                "alias": "filter-2"
+                              }
+                            },
+                            "condition": {
+                              "scalar_function": {
+                                "arguments": [
+                                  {
+                                    "value": {
+                                      "literal": {
+                                        "string": "{0}\n\nDoes the filing state a dollar amount for the material agreement it reports, such as a loan amount, a purchase price, or a salary? A material agreement is a contract outside the ordinary course of business, such as a credit agreement, a merger or purchase agreement, or an employment agreement. Agreements mentioned only as background do not count. If the filing reports several, use the one mentioned first."
+                                      }
+                                    }
+                                  },
+                                  {
+                                    "value": {
+                                      "selection": {
+                                        "direct_reference": {
+                                          "struct_field": {
+                                            "field": 1
+                                          }
+                                        },
+                                        "root_reference": {}
+                                      }
+                                    }
+                                  }
+                                ],
+                                "function_reference": 1,
+                                "output_type": {
+                                  "bool": {
+                                    "nullability": "NULLABILITY_REQUIRED"
+                                  }
+                                }
+                              }
+                            },
+                            "input": {
+                              "filter": {
+                                "common": {
+                                  "direct": {},
+                                  "hint": {
+                                    "alias": "filter-1"
+                                  }
+                                },
+                                "condition": {
+                                  "scalar_function": {
+                                    "arguments": [
+                                      {
+                                        "value": {
+                                          "literal": {
+                                            "string": "{0}\n\nDoes this filing report that the filing company entered into, amended, or ended a material agreement? A material agreement is a contract outside the ordinary course of business, such as a credit agreement, a merger or purchase agreement, or an employment agreement. Agreements mentioned only as background do not count."
+                                          }
+                                        }
+                                      },
+                                      {
+                                        "value": {
+                                          "selection": {
+                                            "direct_reference": {
+                                              "struct_field": {
+                                                "field": 1
+                                              }
+                                            },
+                                            "root_reference": {}
+                                          }
+                                        }
+                                      }
+                                    ],
+                                    "function_reference": 1,
+                                    "output_type": {
+                                      "bool": {
+                                        "nullability": "NULLABILITY_REQUIRED"
+                                      }
+                                    }
+                                  }
+                                },
+                                "input": {
+                                  "filter": {
+                                    "common": {
+                                      "direct": {},
+                                      "hint": {
+                                        "alias": "where-3"
+                                      }
+                                    },
+                                    "condition": {
+                                      "scalar_function": {
+                                        "arguments": [
+                                          {
+                                            "value": {
+                                              "selection": {
+                                                "direct_reference": {
+                                                  "struct_field": {
+                                                    "field": 2
+                                                  }
+                                                },
+                                                "root_reference": {}
+                                              }
+                                            }
+                                          },
+                                          {
+                                            "value": {
+                                              "literal": {
+                                                "string": "2023-01"
+                                              }
+                                            }
+                                          }
+                                        ],
+                                        "function_reference": 12,
+                                        "output_type": {
+                                          "bool": {
+                                            "nullability": "NULLABILITY_REQUIRED"
+                                          }
+                                        }
+                                      }
+                                    },
+                                    "input": {
+                                      "filter": {
+                                        "common": {
+                                          "direct": {},
+                                          "hint": {
+                                            "alias": "where-2"
+                                          }
+                                        },
+                                        "condition": {
+                                          "scalar_function": {
+                                            "arguments": [
+                                              {
+                                                "value": {
+                                                  "selection": {
+                                                    "direct_reference": {
+                                                      "struct_field": {
+                                                        "field": 3
+                                                      }
+                                                    },
+                                                    "root_reference": {}
+                                                  }
+                                                }
+                                              },
+                                              {
+                                                "value": {
+                                                  "literal": {
+                                                    "i32": 90000
+                                                  }
+                                                }
+                                              }
+                                            ],
+                                            "function_reference": 10,
+                                            "output_type": {
+                                              "bool": {
+                                                "nullability": "NULLABILITY_REQUIRED"
+                                              }
+                                            }
+                                          }
+                                        },
+                                        "input": {
+                                          "filter": {
+                                            "common": {
+                                              "direct": {},
+                                              "hint": {
+                                                "alias": "where-1"
+                                              }
+                                            },
+                                            "condition": {
+                                              "scalar_function": {
+                                                "arguments": [
+                                                  {
+                                                    "value": {
+                                                      "selection": {
+                                                        "direct_reference": {
+                                                          "struct_field": {
+                                                            "field": 3
+                                                          }
+                                                        },
+                                                        "root_reference": {}
+                                                      }
+                                                    }
+                                                  },
+                                                  {
+                                                    "value": {
+                                                      "literal": {
+                                                        "i32": 9600
+                                                      }
+                                                    }
+                                                  }
+                                                ],
+                                                "function_reference": 12,
+                                                "output_type": {
+                                                  "bool": {
+                                                    "nullability": "NULLABILITY_REQUIRED"
+                                                  }
+                                                }
+                                              }
+                                            },
+                                            "input": {
+                                              "read": {
+                                                "base_schema": {
+                                                  "names": [
+                                                    "id",
+                                                    "text",
+                                                    "filing_month",
+                                                    "text_chars"
+                                                  ],
+                                                  "struct": {
+                                                    "nullability": "NULLABILITY_REQUIRED",
+                                                    "types": [
+                                                      {
+                                                        "string": {
+                                                          "nullability": "NULLABILITY_REQUIRED"
+                                                        }
+                                                      },
+                                                      {
+                                                        "string": {
+                                                          "nullability": "NULLABILITY_REQUIRED"
+                                                        }
+                                                      },
+                                                      {
+                                                        "string": {
+                                                          "nullability": "NULLABILITY_REQUIRED"
+                                                        }
+                                                      },
+                                                      {
+                                                        "i32": {
+                                                          "nullability": "NULLABILITY_REQUIRED"
+                                                        }
+                                                      }
+                                                    ]
+                                                  }
+                                                },
+                                                "common": {
+                                                  "direct": {},
+                                                  "hint": {
+                                                    "alias": "f"
+                                                  }
+                                                },
+                                                "named_table": {
+                                                  "names": [
+                                                    "sec_filings"
+                                                  ]
+                                                }
+                                              }
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "names": [
+          "f",
+          "agreement_kind",
+          "agreement",
+          "agreement_party",
+          "agreement_amount"
+        ]
+      }
+    }
+  ],
+  "version": {
+    "minor_number": 103,
+    "producer": "quail-b"
+  }
+}

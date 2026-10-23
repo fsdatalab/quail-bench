@@ -515,6 +515,12 @@
     "draft": true
   },
   {
+    "id": "SEC-10",
+    "description": "where: long, recent filing -> 2 filters: material agreement + dollar amount -> classify: agreement kind -> 2 extracts: party, amount",
+    "privacy": false,
+    "draft": true
+  },
+  {
     "id": "PRIV-1",
     "description": "2 filters: P_MSG + P_LOC",
     "privacy": true
