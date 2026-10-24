@@ -25,6 +25,7 @@ from quail_b.scoring import (
     output_columns,
     scores_from_answers,
     selected_extracts,
+    selected_features,
 )
 from quail_b.substrait import (
     Classify,
@@ -33,6 +34,7 @@ from quail_b.substrait import (
     Filter,
     InList,
     Join,
+    SaeFeatures,
     Score,
     output_name,
 )
@@ -121,6 +123,15 @@ def _query_hash(spec):
                 "prompt": operator.prompt,
                 "output": operator.output,
             })
+        elif isinstance(operator, SaeFeatures):
+            operators.append({
+                "kind": "sae_features",
+                "id": operator.id,
+                "relation": operator.relation,
+                "prompt": operator.prompt,
+                "pooling": operator.pooling,
+                "output": operator.output,
+            })
         else:
             assert isinstance(operator, Join)
             operators.append({
@@ -182,11 +193,14 @@ def _save_output(directory, output, spec):
         paths["scores"] = None
     if output.extract_answers is not None:
         paths["extracts"] = None
+    if output.features_answers is not None:
+        paths["features"] = None
     for kind, answers in (
             ("filters", output.filter_answers), ("joins", output.join_answers),
             ("classifications", output.classify_answers),
             ("scores", output.score_answers),
-            ("extracts", output.extract_answers)):
+            ("extracts", output.extract_answers),
+            ("features", output.features_answers)):
         if answers is None:
             continue
         paths[kind] = []
@@ -214,6 +228,7 @@ def _read_output(directory, record, rows=True):
     classifications = paths.get("classifications")
     scores = paths.get("scores")
     extracts = paths.get("extracts")
+    features = paths.get("features")
     pieces = paths.get("prompt_pieces")
     return RunOutput(
         None if filters is None else {
@@ -232,7 +247,10 @@ def _read_output(directory, record, rows=True):
             for item in scores},
         None if extracts is None else {
             item["key"]: pq.read_table(file(item["path"]))
-            for item in extracts})
+            for item in extracts},
+        None if features is None else {
+            item["key"]: pq.read_table(file(item["path"]))
+            for item in features})
 
 
 ROW_SAMPLE = 100_000    # rows of a traced result checked one by one
@@ -302,6 +320,43 @@ def _validate_output(spec, output, tables):
     returned = [name for name in columns if name in label_names]
     structs = {struct.name: struct for struct in spec.info.structs}
     returned_answers = selected_extracts(spec)
+    feature_columns = {
+        operator.output: operator for operator in spec.info.sae_features}
+    returned_features = selected_features(spec)
+
+    def validate_feature_lists(table, names):
+        for name in names:
+            column = table[name]
+            if column.null_count or not pa.types.is_list(column.type):
+                raise ValueError(
+                    f"{name} must be non-null lists of (feature, strength)")
+            value = column.type.value_type
+            if (not pa.types.is_struct(value) or value.num_fields != 2
+                    or value.field(0).name != "feature"
+                    or value.field(1).name != "strength"
+                    or not pa.types.is_int32(value.field(0).type)
+                    or not pa.types.is_float32(value.field(1).type)):
+                raise ValueError(
+                    f"{name} items must be "
+                    "struct<feature: int32, strength: float32>")
+
+    def rows_follow_features(rows):
+        # a returned feature list is the one the engine's answer table holds
+        for operator in returned_features:
+            table = (output.features_answers or {}).get(operator.id)
+            if table is None:
+                continue
+            alias = operator.relation
+            known = dict(zip(
+                pc.cast(table[alias], pa.string()).to_pylist(),
+                table["features"].to_pylist()))
+            ids = pc.cast(rows[alias], pa.string()).to_pylist()
+            values = rows[operator.output].to_pylist()
+            for row_id, value in zip(ids, values):
+                if row_id in known and value != known[row_id]:
+                    raise ValueError(
+                        f"a returned {operator.output} feature list differs "
+                        "from the engine's answer table")
 
     def validate_answers(table):
         for name, struct in structs.items():
@@ -354,6 +409,9 @@ def _validate_output(spec, output, tables):
         validate_ids(output.rows, selected)
         validate_answers(output.rows)
         rows_follow_extracts(output.rows)
+        validate_feature_lists(
+            output.rows, [name for name in columns if name in feature_columns])
+        rows_follow_features(output.rows)
     elif output.rows is None:
         # a saved run rescored from its answers: its rows were checked
         # when they were saved
@@ -368,6 +426,9 @@ def _validate_output(spec, output, tables):
             validate_labels(output.rows, returned)
         validate_answers(output.rows)
         rows_follow_extracts(output.rows)
+        validate_feature_lists(
+            output.rows, [name for name in columns if name in feature_columns])
+        rows_follow_features(output.rows)
     else:
         # a traced run's rows are implied by its answers: the count must
         # agree, and a sample of the rows must all be implied; the
@@ -382,13 +443,17 @@ def _validate_output(spec, output, tables):
         validate_ids(sample, selected)
         mask = implied_rows_mask(
             pa.table({name: sample[name].cast(pa.string())
-                      for name in columns if name not in structs}),
+                      for name in columns
+                      if name not in structs and name not in feature_columns}),
             survivors, relations, spec,
             answer_labels(spec, output.classify_answers))
         if not (pc.all(mask).as_py() if sample.num_rows else True):
             raise ValueError("a returned row is not implied by the answers")
         validate_answers(sample)
         rows_follow_extracts(sample)
+        validate_feature_lists(
+            sample, [name for name in columns if name in feature_columns])
+        rows_follow_features(sample)
     filters = {
         filter_spec.id: filter_spec for filter_spec in spec.info.filters
     }
@@ -432,6 +497,13 @@ def _validate_output(spec, output, tables):
         validate_ids(table, [extracts[operator_id].relation])
         if not pa.types.is_string(table["answer"].type):
             raise ValueError("extracted answers must be strings or null")
+    feature_calls = {
+        operator.id: operator for operator in spec.info.sae_features}
+    for operator_id, table in (output.features_answers or {}).items():
+        if operator_id not in feature_calls:
+            raise ValueError(f"unknown features operator {operator_id!r}")
+        validate_ids(table, [feature_calls[operator_id].relation])
+        validate_feature_lists(table, ["features"])
 
 
 def _score(spec, output, suite, gpu_count, gpu_hourly_rate_usd, tokens=None):

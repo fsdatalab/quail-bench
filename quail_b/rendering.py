@@ -169,6 +169,21 @@ def render_extract_prompt(question: str, document: str) -> str:
             + EXTRACT_PHRASE_FORMAT + EXTRACT_CUE)
 
 
+def render_sae_features_prompt(template: str, document: str) -> str:
+    """Return the complete text of one feature question over one document.
+
+    The text is the document after the shared preamble, then the
+    question. It carries no instruction and no answer cue: the engine
+    generates nothing and reads the prompt's SAE features instead.
+    """
+    _check_placeholders(template, 1)
+    _frame, canonical = split_frame(template)
+    preamble, tail = split_template(canonical)
+    if not tail.startswith("{0}"):
+        raise ValueError(f"unexpected features template layout: {template!r}")
+    return preamble + document + tail[len("{0}"):]
+
+
 def join_label(placeholder: int) -> str:
     return JOIN_DOC_LABEL.format(_marker(placeholder))
 

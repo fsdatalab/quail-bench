@@ -17,6 +17,8 @@ AI_CLASSIFY_NAME = "ai_classify:str_str_list_list"
 AI_CLASSIFY_JOINED_NAME = "ai_classify:str_str_str_list_list"
 AI_SCORE_NAME = "ai_score:str_str"
 AI_EXTRACT_NAME = "ai_extract:str_str"
+AI_SAE_FEATURES_NAME = "ai_sae_features:str_str_str"
+SAE_POOLINGS = ("last", "max")
 EQUAL_NAME = "equal:any_any"
 AND_NAME = "and:bool"
 AGGREGATE_GENERIC_EXTENSION_URN = (
@@ -41,6 +43,7 @@ _FUNCTION_URNS = {
     AI_CLASSIFY_JOINED_NAME: AI_EXTENSION_URN,
     AI_SCORE_NAME: AI_EXTENSION_URN,
     AI_EXTRACT_NAME: AI_EXTENSION_URN,
+    AI_SAE_FEATURES_NAME: AI_EXTENSION_URN,
     EQUAL_NAME: COMPARISON_EXTENSION_URN,
     AND_NAME: BOOLEAN_EXTENSION_URN,
     **{name: COMPARISON_EXTENSION_URN for name in COMPARISON_NAMES},
@@ -149,6 +152,32 @@ class Extract:
 
 
 @dataclass(frozen=True)
+class SaeFeatures:
+    """One ai_sae_features call that adds a feature list column to one relation.
+
+    The prompt is a question over the document; the engine returns the
+    sparse autoencoder features of the prompt as a
+    `list<struct<feature: int32, strength: float32>>`, the nonzero
+    features only.
+
+    Attributes:
+        id: The operator ID.
+        relation: The alias of the documents the features are read for.
+        prompt: The prompt template, with the document as `{0}`.
+        pooling: Which tokens become the row's list: `last` reads the
+            final token only; `max` takes each feature's largest
+            strength over every prompt token.
+        output: The name of the added feature list column.
+    """
+
+    id: str
+    relation: str
+    prompt: str
+    pooling: str
+    output: str
+
+
+@dataclass(frozen=True)
 class AnswerStruct:
     """A result column that holds the answers of extractions as a struct.
 
@@ -215,7 +244,7 @@ class Fetch:
 
 
 type Operator = (Filter | Join | Classify | InList | Score | ColumnTest
-                 | Extract)
+                 | Extract | SaeFeatures)
 type Step = Aggregate | Having | Sort | Fetch
 
 
@@ -274,7 +303,8 @@ class PlanInfo:
 
     @property
     def ai_operators(
-            self) -> tuple[Filter | Join | Classify | Score | Extract, ...]:
+            self) -> tuple[Filter | Join | Classify | Score | Extract
+                           | SaeFeatures, ...]:
         """The operators that ask the model, each with its prompt."""
         return tuple(
             operator
@@ -291,6 +321,11 @@ class PlanInfo:
     def extracts(self) -> tuple[Extract, ...]:
         return tuple(operator for operator in self.operators
                      if isinstance(operator, Extract))
+
+    @property
+    def sae_features(self) -> tuple[SaeFeatures, ...]:
+        return tuple(operator for operator in self.operators
+                     if isinstance(operator, SaeFeatures))
 
     @property
     def column_tests(self) -> tuple[ColumnTest, ...]:
@@ -705,6 +740,8 @@ def _decode_project(project: algebra_pb2.ProjectRel,
             return _decode_score(project, functions)
         if functions.get(reference) == AI_EXTRACT_NAME:
             return _decode_extract(project, functions)
+        if functions.get(reference) == AI_SAE_FEATURES_NAME:
+            return _decode_sae_features(project, functions)
     return _decode_classify(project, functions)
 
 
@@ -729,6 +766,43 @@ def _decode_extract(project: algebra_pb2.ProjectRel,
     if output == "id" or (alias, output) in child.fields:
         raise ValueError(f"answer column {output!r} is already a field")
     operator = Extract(project.common.hint.alias, alias, prompt, output)
+    return _Decoded(
+        (*child.fields, (alias, output)),
+        child.tables,
+        _with_text_column(child.text_columns, field),
+        (*child.operators, operator),
+    )
+
+
+def _decode_sae_features(project: algebra_pb2.ProjectRel,
+                         functions: dict[int, str]) -> _Decoded:
+    """Decode a ProjectRel that adds one ai_sae_features list column."""
+    child = _decode(project.input, functions)
+    if project.common.HasField("emit"):
+        raise ValueError("a features ProjectRel adds exactly one column")
+    arguments = _arguments(project.expressions[0])
+    if len(arguments) != 3:
+        raise ValueError(
+            "ai_sae_features needs a prompt, a document field, and a pooling")
+    prompt = _literal_string(arguments[0])
+    field = _selected(child.fields, arguments[1])
+    pooling = _literal_string(arguments[2])
+    if pooling not in SAE_POOLINGS:
+        raise ValueError(
+            f"ai_sae_features pooling must be one of {SAE_POOLINGS}, "
+            f"got {pooling!r}")
+    names = tuple(project.common.hint.output_names)
+    expected = tuple(".".join(name) for name in child.fields)
+    if len(names) != len(expected) + 1 or names[:-1] != expected:
+        raise ValueError("a features ProjectRel must name every output field")
+    alias, _, output = names[-1].partition(".")
+    if alias != field[0] or not output or "." in output:
+        raise ValueError(
+            "a feature list column must belong to the read relation")
+    if output == "id" or (alias, output) in child.fields:
+        raise ValueError(f"feature list column {output!r} is already a field")
+    operator = SaeFeatures(project.common.hint.alias, alias, prompt, pooling,
+                           output)
     return _Decoded(
         (*child.fields, (alias, output)),
         child.tables,
@@ -998,17 +1072,19 @@ def _validate_info(info: PlanInfo) -> None:
                     "join of its two relations")
         elif (
             isinstance(operator, (Filter, Classify, InList, ColumnTest,
-                                  Extract))
+                                  Extract, SaeFeatures))
             and index > first_join[operator.relation]
         ):
             raise ValueError(
                 f"filter {operator.id!r} must precede joins on its relation"
             )
     outputs = [operator.output for operator in (*info.classifies,
-                                                *info.extracts)]
+                                                *info.extracts,
+                                                *info.sae_features)]
     if len(set(outputs)) != len(outputs) or set(outputs) & set(aliases):
-        raise ValueError("label and answer column names must be distinct "
-                         "from each other and from relation aliases")
+        raise ValueError("label, answer, and feature list column names must "
+                         "be distinct from each other and from relation "
+                         "aliases")
     selected = {_field_alias(name) for name in info.select}
     if not selected or not selected <= set(aliases):
         raise ValueError("QUAIL-B projection uses an unknown relation")
@@ -1022,13 +1098,14 @@ def _validate_info(info: PlanInfo) -> None:
         if column == "id":
             continue
         operator = next(
-            (operator for operator in (*info.classifies, *info.extracts)
+            (operator for operator in (*info.classifies, *info.extracts,
+                                       *info.sae_features)
              if (operator.relation, operator.output) == (alias, column)),
             None)
         if operator is None:
             raise ValueError(f"QUAIL-B projection selects {name!r}; only ids, "
-                             "label columns, and answer columns can be "
-                             "selected")
+                             "label columns, answer columns, and feature "
+                             "list columns can be selected")
         if isinstance(operator, Classify) and not (
                 set(operator.relations) <= selected_ids):
             raise ValueError(f"a query selecting the joined-row label {name!r} must "
@@ -1043,6 +1120,10 @@ def _validate_info(info: PlanInfo) -> None:
         if operator.output not in used:
             raise ValueError(
                 f"answer column {operator.output!r} is never used")
+    for operator in info.sae_features:
+        if operator.output not in used:
+            raise ValueError(
+                f"feature list column {operator.output!r} is never used")
 
 
 def inspect_plan(plan: plan_pb2.Plan) -> PlanInfo:

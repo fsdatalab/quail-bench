@@ -41,6 +41,9 @@ class PredicateSpec:
     source_policy: str = "qwen3_32b"
     labels: tuple[str, ...] = ()
     descriptions: tuple[str, ...] = ()
+    # sae_features only: which tokens become the row's feature list,
+    # 'last' or 'max'; the pooling changes the returned features
+    pooling: str | None = None
     # a join labeled only over the pairs whose (left column, right
     # column) values are equal, as the query's equality condition keeps
     pair_columns: tuple[str, str] | None = None
@@ -363,6 +366,40 @@ WRENCH_EXTRACT_PREDICATES = (
                              ("cheat_command", prompts.WRENCH_CHEAT_COMMAND))),
 )
 
+# SAE feature questions, defined before their reference features are
+# published. The pooling is part of the predicate: the same question
+# with another pooling returns other features.
+SAE_FEATURES_PREDICATES = (
+    PredicateSpec(
+        "quailb.imdb.review.topic_features_last", "imdb",
+        "topic_features_last", "sae_features", prompts.IMDB_TOPIC_FEATURES,
+        "review", "reviews", "body", source_policy="unpublished",
+        pooling="last"),
+    PredicateSpec(
+        "quailb.imdb.review.topic_features_max", "imdb",
+        "topic_features_max", "sae_features", prompts.IMDB_TOPIC_FEATURES,
+        "review", "reviews", "body", source_policy="unpublished",
+        pooling="max"),
+    PredicateSpec(
+        "quailb.biodex.report.reaction_features_max", "biodex",
+        "reaction_features_max", "sae_features",
+        prompts.BIO_REACTION_FEATURES, "report", "reports", "report",
+        source_policy="unpublished", pooling="max"),
+    PredicateSpec(
+        "quailb.wrench.step.step_features_last", "wrench",
+        "step_features_last", "sae_features", prompts.WRENCH_STEP_FEATURES,
+        "agent_step", "wrench_steps", "text", source_policy="unpublished",
+        pooling="last"),
+    *(PredicateSpec(
+        f"quailb.support.trace.{slug}_max", "support", f"{slug}_max",
+        "sae_features", template, "support_trace", "support_traces",
+        "transcript", source_policy="unpublished", pooling="max")
+      for slug, template in (
+          ("request_features", prompts.SUPPORT_REQUEST_FEATURES),
+          ("policy_features", prompts.SUPPORT_POLICY_FEATURES),
+          ("tone_features", prompts.SUPPORT_TONE_FEATURES))),
+)
+
 # SEC definitions are available to labelers without changing published sets.
 SEC_PREDICATES = (
     PredicateSpec(
@@ -401,7 +438,8 @@ SEC_PREDICATES = (
 
 PREDICATE_BY_KEY = {p.key: p for p in (
     PREDICATES + CLASSIFY_PREDICATES + EXTRACT_PREDICATES
-    + IMDB_EXTRACT_PREDICATES + WRENCH_EXTRACT_PREDICATES + SEC_PREDICATES)}
+    + IMDB_EXTRACT_PREDICATES + WRENCH_EXTRACT_PREDICATES
+    + SAE_FEATURES_PREDICATES + SEC_PREDICATES)}
 
 WORKLOADS = tuple(dict.fromkeys(spec.workload for spec in PREDICATES))
 
@@ -442,6 +480,7 @@ def predicate_payload(spec: PredicateSpec) -> dict:
         "join": "join_arg0_anchor_then_arg1_v1",
         "classify": "classify_document_then_categories_v1",
         "extract": "extract_document_then_question_v1",
+        "sae_features": "sae_features_document_then_question_v1",
     }[spec.kind]
     if is_joined_classify(spec):
         # stored in the published label sets' identities; keep as is
@@ -491,6 +530,9 @@ def predicate_payload(spec: PredicateSpec) -> dict:
     if is_joined_classify(spec):
         payload.update(anchor_note=JOIN_ANCHOR_NOTE,
                        partner_label=JOIN_DOC_LABEL)
+    if spec.kind == "sae_features":
+        payload.pop("task_instruction", None)
+        payload["pooling"] = spec.pooling
     # published label sets predate this field, so it is left out when unset
     if spec.pair_columns is not None:
         payload["pair_columns"] = list(spec.pair_columns)
@@ -663,3 +705,9 @@ def render_extract_prompt(spec: PredicateSpec, document: str) -> str:
     if spec.kind != "extract":
         raise ValueError(f"{spec.key} is not an extraction")
     return rendering.render_extract_prompt(spec.template, document)
+
+
+def render_sae_features_prompt(spec: PredicateSpec, document: str) -> str:
+    if spec.kind != "sae_features":
+        raise ValueError(f"{spec.key} is not a feature question")
+    return rendering.render_sae_features_prompt(spec.template, document)

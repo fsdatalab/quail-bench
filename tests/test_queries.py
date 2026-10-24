@@ -243,9 +243,11 @@ def test_ai_extension_definition_is_packaged():
     assert "name: ai_classify" in extension
     assert "name: ai_score" in extension
     assert "name: ai_extract" in extension
-    # a filter, a score, an extraction, a one-document classification,
-    # and a pair: prompt, two documents, labels, descriptions
-    assert extension.count("- name: document") == 6
+    assert "name: ai_sae_features" in extension
+    # a filter, a score, an extraction, a feature call, a one-document
+    # classification, and a pair: prompt, two documents, labels,
+    # descriptions
+    assert extension.count("- name: document") == 7
 
 
 def test_substrait_plans_are_packaged():
@@ -253,7 +255,7 @@ def test_substrait_plans_are_packaged():
     catalog = package.joinpath("plans", "catalog.json")
     entries = json.loads(catalog.read_text())
 
-    assert len(entries) == 103
+    assert len(entries) == 108
     assert all(
         package.joinpath("plans", f"{entry['id']}.json").is_file()
         for entry in entries

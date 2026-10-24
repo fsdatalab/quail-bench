@@ -201,6 +201,14 @@ IMDB_COMPLAINT_LABELS = (
 IMDB_ACTOR = "Which actor does the reviewer name?"
 IMDB_ACTING = "What does the reviewer say about the acting?"
 
+# SAE feature question over every review. Its reference features are
+# not published yet.
+IMDB_TOPIC_FEATURES = "{0}\n\nWhat is this review about?"
+
+# SAE feature question over every report. Its reference features are
+# not published yet.
+BIO_REACTION_FEATURES = "{0}\n\nWhat adverse reactions does this report describe?"
+
 # MedDRA's system organ classes, less "product issues", which a
 # reaction term does not describe.
 BIO_ORGAN_CLASS = (
@@ -405,6 +413,16 @@ SUPPORT_OUTCOME_DESCRIPTIONS = (
     "the conversation ended with the request neither handled nor refused",
 )
 
+# SAE feature questions over every conversation, three over the same
+# rows. Their reference features are not published yet.
+SUPPORT_REQUEST_FEATURES = "{0}\n\nWhat is the customer asking for?"
+SUPPORT_POLICY_FEATURES = (
+    "{0}\n\nDoes the agent follow its policies in this conversation?"
+)
+SUPPORT_TONE_FEATURES = (
+    "{0}\n\nHow does the customer's tone change over this conversation?"
+)
+
 # SWE-rebench issue runs: filters over one run and over one step, a
 # classification of each run's change, and a join of a successful run
 # to a failed run of the same issue, with a classification of the pair.
@@ -507,6 +525,10 @@ WRENCH_EXPLOIT_TARGET = (
 # Their reference answers are not published yet.
 WRENCH_CHEAT_PLAN = "Which thought indicates that the agent plans to cheat?"
 WRENCH_CHEAT_COMMAND = "Which command peeks at the tests or their answers?"
+
+# SAE feature question over every step. Its reference features are not
+# published yet.
+WRENCH_STEP_FEATURES = "{0}\n\nWhat is the agent doing in this step?"
 
 # CRMArena-Pro sales calls: filters over one call, a classification of
 # one call, and a join of a call to the next call of the same deal. The

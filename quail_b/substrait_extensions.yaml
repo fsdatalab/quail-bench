@@ -49,6 +49,25 @@ scalar_functions:
           - name: document
             value: string
         return: string?
+  - name: ai_sae_features
+    description: >-
+      Return the sparse autoencoder (SAE) features of a prompt over a
+      document as a list of (feature, strength) pairs, the nonzero
+      features only. The pooling says which tokens become the list:
+      'last' reads the final prompt token; 'max' takes each feature's
+      largest strength over every prompt token.
+    impls:
+      - args:
+          - name: prompt
+            value: string
+            constant: true
+          - name: document
+            value: string
+          - name: pooling
+            description: "'last' or 'max'."
+            value: string
+            constant: true
+        return: list<struct<i32,fp32>>
   - name: ai_classify
     description: >-
       Return the label the model scores highest for a document, or for a
