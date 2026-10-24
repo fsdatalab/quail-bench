@@ -506,6 +506,14 @@ def _fresh_tokens(measurements) -> int | None:
     return fresh
 
 
+def _restored_tokens(measurements) -> int:
+    """Positions read from KV the engine kept from an earlier query; 0 if none."""
+    restored = measurements.get("restored_tokens", 0)
+    if isinstance(restored, bool) or not isinstance(restored, int) or restored < 0:
+        raise ValueError("restored_tokens must be a nonnegative integer")
+    return restored
+
+
 def _reported_input_tokens(measurements) -> int | None:
     if "input_tokens" not in measurements:
         return None
@@ -584,6 +592,9 @@ def token_metrics(spec, output, corpus_rows, stores=None) -> dict:
 
     - With prompt pieces, derive input and minimum tokens from the answer
       tables. Fresh tokens are required. Regret is fresh minus minimum.
+      Positions the engine read from KV it kept from an earlier query
+      (`restored_tokens`) were computed before this query, so they come
+      off the minimum first.
     - With prompt pieces and an engine input-token total, the engine
       tokenized each full prompt itself, so its tokens can differ from the
       pieces where two pieces meet. The minimum is scaled by the engine
@@ -602,9 +613,11 @@ def token_metrics(spec, output, corpus_rows, stores=None) -> dict:
             queries of one run so each document is tokenized once.
     """
     fresh = _fresh_tokens(output.measurements)
+    restored = _restored_tokens(output.measurements)
     reported_input = _reported_input_tokens(output.measurements)
     if output.prompt_pieces is None:
         return {"input_tokens": reported_input, "fresh_tokens": fresh,
+                "restored_tokens": restored,
                 "minimum_tokens": None, "regret_tokens": None,
                 "regret_approximate": False}
     if fresh is None:
@@ -631,15 +644,17 @@ def token_metrics(spec, output, corpus_rows, stores=None) -> dict:
         if piece_input:
             minimum = round(minimum * reported_input / piece_input)
         return {"input_tokens": reported_input, "fresh_tokens": fresh,
+                "restored_tokens": restored,
                 "minimum_tokens": minimum,
-                "regret_tokens": max(fresh - minimum, 0),
+                "regret_tokens": max(fresh + restored - minimum, 0),
                 "regret_approximate": True}
-    if fresh < minimum:
+    if fresh + restored < minimum:
         raise ValueError(
-            f"fresh_tokens ({fresh}) is below the minimum the requests need "
-            f"({minimum})")
+            f"fresh_tokens ({fresh}) plus restored_tokens ({restored}) is "
+            f"below the minimum the requests need ({minimum})")
     return {
         "input_tokens": piece_input,
-        "fresh_tokens": fresh, "minimum_tokens": minimum,
-        "regret_tokens": fresh - minimum, "regret_approximate": False,
+        "fresh_tokens": fresh, "restored_tokens": restored,
+        "minimum_tokens": minimum,
+        "regret_tokens": fresh + restored - minimum, "regret_approximate": False,
     }
