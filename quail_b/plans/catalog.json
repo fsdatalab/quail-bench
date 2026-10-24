@@ -87,6 +87,18 @@
     "draft": true
   },
   {
+    "id": "IMDB-18",
+    "description": "SAE features, pooling 'last': what each review is about",
+    "privacy": false,
+    "draft": true
+  },
+  {
+    "id": "IMDB-19",
+    "description": "SAE features, pooling 'max': the same question, each feature's largest strength over every prompt token",
+    "privacy": false,
+    "draft": true
+  },
+  {
     "id": "BIO-1",
     "description": "filter: serious adverse event",
     "privacy": false
@@ -115,6 +127,12 @@
     "id": "BIO-6",
     "description": "serious adverse event reports x their cardiac or vascular reactions",
     "privacy": false
+  },
+  {
+    "id": "BIO-7",
+    "description": "SAE features, pooling 'max': the adverse reactions each report describes",
+    "privacy": false,
+    "draft": true
   },
   {
     "id": "FEV-1",
@@ -292,6 +310,12 @@
     "privacy": false
   },
   {
+    "id": "SUPPORT-7",
+    "description": "3 SAE feature calls, pooling 'max', over the same conversations: the request, policy adherence, and the customer's tone",
+    "privacy": false,
+    "draft": true
+  },
+  {
     "id": "RUNS-1",
     "description": "filter: reproduced the issue before changing the code",
     "privacy": false
@@ -351,6 +375,12 @@
   {
     "id": "WRENCH-8",
     "description": "agent steps -> extract: the thought that plans to cheat and the command that peeks at the tests",
+    "privacy": false,
+    "draft": true
+  },
+  {
+    "id": "WRENCH-9",
+    "description": "SAE features, pooling 'last': what the agent is doing in each step",
     "privacy": false,
     "draft": true
   },

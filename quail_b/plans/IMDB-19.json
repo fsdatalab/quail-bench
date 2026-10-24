@@ -1,0 +1,171 @@
+{
+  "extension_urns": [
+    {
+      "extension_urn_anchor": 1,
+      "urn": "extension:org.fsdatalab.quail_b:functions_ai"
+    }
+  ],
+  "extensions": [
+    {
+      "extension_function": {
+        "extension_urn_reference": 1,
+        "function_anchor": 20,
+        "name": "ai_sae_features:str_str_str"
+      }
+    }
+  ],
+  "relations": [
+    {
+      "root": {
+        "input": {
+          "project": {
+            "common": {
+              "emit": {
+                "output_mapping": [
+                  3,
+                  4
+                ]
+              }
+            },
+            "expressions": [
+              {
+                "selection": {
+                  "direct_reference": {
+                    "struct_field": {}
+                  },
+                  "root_reference": {}
+                }
+              },
+              {
+                "selection": {
+                  "direct_reference": {
+                    "struct_field": {
+                      "field": 2
+                    }
+                  },
+                  "root_reference": {}
+                }
+              }
+            ],
+            "input": {
+              "project": {
+                "common": {
+                  "direct": {},
+                  "hint": {
+                    "alias": "sae-features-1",
+                    "output_names": [
+                      "r.id",
+                      "r.body",
+                      "r.features"
+                    ]
+                  }
+                },
+                "expressions": [
+                  {
+                    "scalar_function": {
+                      "arguments": [
+                        {
+                          "value": {
+                            "literal": {
+                              "string": "{0}\n\nWhat is this review about?"
+                            }
+                          }
+                        },
+                        {
+                          "value": {
+                            "selection": {
+                              "direct_reference": {
+                                "struct_field": {
+                                  "field": 1
+                                }
+                              },
+                              "root_reference": {}
+                            }
+                          }
+                        },
+                        {
+                          "value": {
+                            "literal": {
+                              "string": "max"
+                            }
+                          }
+                        }
+                      ],
+                      "function_reference": 20,
+                      "output_type": {
+                        "list": {
+                          "nullability": "NULLABILITY_REQUIRED",
+                          "type": {
+                            "struct": {
+                              "nullability": "NULLABILITY_REQUIRED",
+                              "types": [
+                                {
+                                  "i32": {
+                                    "nullability": "NULLABILITY_REQUIRED"
+                                  }
+                                },
+                                {
+                                  "fp32": {
+                                    "nullability": "NULLABILITY_REQUIRED"
+                                  }
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                ],
+                "input": {
+                  "read": {
+                    "base_schema": {
+                      "names": [
+                        "id",
+                        "body"
+                      ],
+                      "struct": {
+                        "nullability": "NULLABILITY_REQUIRED",
+                        "types": [
+                          {
+                            "string": {
+                              "nullability": "NULLABILITY_REQUIRED"
+                            }
+                          },
+                          {
+                            "string": {
+                              "nullability": "NULLABILITY_REQUIRED"
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    "common": {
+                      "direct": {},
+                      "hint": {
+                        "alias": "r"
+                      }
+                    },
+                    "named_table": {
+                      "names": [
+                        "reviews"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "names": [
+          "r",
+          "features"
+        ]
+      }
+    }
+  ],
+  "version": {
+    "minor_number": 103,
+    "producer": "quail-b"
+  }
+}

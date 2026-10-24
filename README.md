@@ -173,7 +173,7 @@ print(reviews.num_rows)   # 5000
 
 ## Queries
 
-The queries use five AI functions, declared as Substrait extensions in
+The queries use six AI functions, declared as Substrait extensions in
 [`quail_b/substrait_extensions.yaml`](quail_b/substrait_extensions.yaml):
 
 ```text
@@ -183,6 +183,7 @@ ai_classify(prompt, document, labels, descriptions) -> string
 ai_classify(prompt, anchor, partner, labels, descriptions) -> string
 ai_score(prompt, document) -> fp64
 ai_extract(question, document) -> string or null
+ai_sae_features(prompt, document, pooling) -> list<struct<feature, strength>>
 ```
 
 The plans combine them with scans, equality conditions, conjunction,
@@ -369,6 +370,30 @@ the field of one struct column, `review`.
 
 IMDB-16 and IMDB-17 have no reference answers yet, so they are not part of
 the default 85 queries. Load them by ID with `accuracy=False`.
+
+### SAE feature queries
+
+`ai_sae_features` is an AI function that returns the sparse autoencoder
+(SAE) features of a prompt. Each feature has an ID and a strength. The
+function returns only the features with a nonzero strength. It does not
+generate text. There are five draft queries with `ai_sae_features`.
+
+The `pooling` argument selects the tokens:
+
+- `last` uses the last token of the prompt. The question follows the
+  document, so the question changes these features.
+- `max` uses the largest strength of each feature over all prompt tokens.
+
+| Query | Question | Operators |
+| --- | --- | --- |
+| IMDB-18 | What is this review about? | `ai_sae_features` with `last` |
+| IMDB-19 | What is this review about? | `ai_sae_features` with `max` |
+| BIO-7 | What adverse reactions does this report describe? | `ai_sae_features` with `max` |
+| SUPPORT-7 | What is the customer asking for? Does the agent follow its policies? How does the customer's tone change? | Three `ai_sae_features` with `max` over the same conversations |
+| WRENCH-9 | What is the agent doing in this step? | `ai_sae_features` with `last` |
+
+The queries have no reference features yet, so they are not part of the
+default 85 queries. Load them by ID with `accuracy=False`.
 
 ### Relational queries
 

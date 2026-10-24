@@ -73,6 +73,7 @@ from quail_b.substrait import (
     AI_EXTRACT_NAME,
     AI_FILTER_NAME,
     AI_JOIN_NAME,
+    AI_SAE_FEATURES_NAME,
     AI_SCORE_NAME,
     AND_NAME,
     ARITHMETIC_EXTENSION_URN,
@@ -114,6 +115,7 @@ _FUNCTIONS = {
     "min:i32": (17, ARITHMETIC_EXTENSION_URN),
     "max:i32": (18, ARITHMETIC_EXTENSION_URN),
     AI_EXTRACT_NAME: (19, AI_EXTENSION_URN),
+    AI_SAE_FEATURES_NAME: (20, AI_EXTENSION_URN),
 }
 _COMPARISONS = {
     "=": EQUAL_NAME, "<>": "not_equal:any_any", "<": "lt:any_any",
@@ -180,6 +182,25 @@ class Extract:
 
     input: "Scan | Where | Filter | Classify | InList | Extract"
     question: str
+    output: str
+
+
+@dataclass(frozen=True)
+class SaeFeatures:
+    """Add one feature list column to one relation: the prompt's SAE features.
+
+    Attributes:
+        input: The relation's scan, filters, classifications,
+            extractions, or feature calls.
+        prompt: The question over the document.
+        pooling: `last` for the final prompt token, `max` for each
+            feature's largest strength over every prompt token.
+        output: The name of the feature list column.
+    """
+
+    input: "Scan | Where | Filter | Classify | InList | SaeFeatures"
+    prompt: str
+    pooling: str
     output: str
 
 
@@ -357,6 +378,24 @@ def _fp64_type():
     )
 
 
+def _fp32_type():
+    return type_pb2.Type(
+        fp32=type_pb2.Type.FP32(nullability=type_pb2.Type.NULLABILITY_REQUIRED)
+    )
+
+
+def _feature_list_type():
+    """The ai_sae_features return type: list<struct<i32,fp32>>."""
+    return type_pb2.Type(
+        list=type_pb2.Type.List(
+            type=type_pb2.Type(struct=type_pb2.Type.Struct(
+                types=[_i32_type(), _fp32_type()],
+                nullability=type_pb2.Type.NULLABILITY_REQUIRED)),
+            nullability=type_pb2.Type.NULLABILITY_REQUIRED,
+        )
+    )
+
+
 def _number(value):
     """Return a literal for a Python int, float, or string."""
     if isinstance(value, bool):
@@ -436,6 +475,7 @@ class _Emitter:
     def __init__(self):
         self.counts = {"filter": 0, "join": 0, "classify": 0,
                        "in-list": 0, "where": 0, "score": 0, "extract": 0,
+                       "sae-features": 0,
                        "aggregate": 0, "having": 0, "sort": 0, "fetch": 0}
         self.functions = set()
 
@@ -493,6 +533,25 @@ class _Emitter:
                     _literal(node.prompt),
                     _field(fields.index((alias, text[alias]))),
                 ], _fp64_type())],
+            )
+            return algebra.Rel(project=relation), output_fields, text
+
+        if isinstance(node, SaeFeatures):
+            rel, fields, text = self.emit(node.input)
+            (alias,) = text
+            self.functions.add(AI_SAE_FEATURES_NAME)
+            output_fields = (*fields, (alias, node.output))
+            common = _common(self._operator_id("sae-features"))
+            common.hint.output_names.extend(
+                ".".join(field) for field in output_fields)
+            relation = algebra.ProjectRel(
+                common=common,
+                input=rel,
+                expressions=[_call(AI_SAE_FEATURES_NAME, [
+                    _literal(node.prompt),
+                    _field(fields.index((alias, text[alias]))),
+                    _literal(node.pooling),
+                ], _feature_list_type())],
             )
             return algebra.Rel(project=relation), output_fields, text
 
@@ -1067,6 +1126,16 @@ QUERIES = (
     Query("IMDB-17", "extract: what each review says about the acting",
           Extract(_reviews(), prompts.IMDB_ACTING, "acting"),
           select=("r", Struct("review", ("r.acting",))), draft=True),
+    Query("IMDB-18", "SAE features, pooling 'last': what each review is "
+          "about",
+          SaeFeatures(_reviews(), prompts.IMDB_TOPIC_FEATURES, "last",
+                      "features"),
+          select=("r", "r.features"), draft=True),
+    Query("IMDB-19", "SAE features, pooling 'max': the same question, each "
+          "feature's largest strength over every prompt token",
+          SaeFeatures(_reviews(), prompts.IMDB_TOPIC_FEATURES, "max",
+                      "features"),
+          select=("r", "r.features"), draft=True),
 
     Query("BIO-1", "filter: serious adverse event",
           _filters(_reports(), SERIOUS_ADVERSE_EVENT)),
@@ -1091,6 +1160,11 @@ QUERIES = (
                InList(_organ_class(_terms()), "organ_class",
                       ("cardiac disorders", "vascular disorders")),
                ("r", "m"), REACTION)),
+    Query("BIO-7", "SAE features, pooling 'max': the adverse reactions "
+          "each report describes",
+          SaeFeatures(_reports(), prompts.BIO_REACTION_FEATURES, "max",
+                      "features"),
+          select=("r", "r.features"), draft=True),
 
     Query("FEV-1", "filter: F11 (about a person)", _filters(_claims(), F11)),
     Query("FEV-2", "join: J3 (claims x evidence)",
@@ -1274,6 +1348,16 @@ QUERIES = (
               (("n", ">=", 5),)),
                (("mean_reward", True), ("t.outcome", False))),
           select=("t.outcome", "n", "mean_reward")),
+    Query("SUPPORT-7", "3 SAE feature calls, pooling 'max', over the same "
+          "conversations: the request, policy adherence, and the "
+          "customer's tone",
+          SaeFeatures(SaeFeatures(SaeFeatures(
+              _support_traces("t"), prompts.SUPPORT_REQUEST_FEATURES, "max",
+              "request_features"),
+              prompts.SUPPORT_POLICY_FEATURES, "max", "policy_features"),
+              prompts.SUPPORT_TONE_FEATURES, "max", "tone_features"),
+          select=("t", "t.request_features", "t.policy_features",
+                  "t.tone_features"), draft=True),
     Query("RUNS-1", "filter: reproduced the issue before changing the code",
           _filters(_issue_runs("r"), RUNS_REPRODUCED)),
     Query("RUNS-2", "classify each run: the kind of change -> per kind: runs "
@@ -1350,6 +1434,11 @@ QUERIES = (
           Extract(Extract(_wrench_steps(), prompts.WRENCH_CHEAT_PLAN, "plan"),
                   prompts.WRENCH_CHEAT_COMMAND, "command"),
           select=("s", Struct("cheat", ("s.plan", "s.command"))), draft=True),
+    Query("WRENCH-9", "SAE features, pooling 'last': what the agent is "
+          "doing in each step",
+          SaeFeatures(_wrench_steps(), prompts.WRENCH_STEP_FEATURES, "last",
+                      "features"),
+          select=("s", "s.features"), draft=True),
 
     # CRMArena-Pro sales calls. Their reference labels are not published
     # yet.
