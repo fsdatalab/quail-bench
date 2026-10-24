@@ -173,7 +173,7 @@ print(reviews.num_rows)   # 5000
 
 ## Queries
 
-The queries use five AI functions, declared as Substrait extensions in
+The queries use six AI functions, declared as Substrait extensions in
 [`quail_b/substrait_extensions.yaml`](quail_b/substrait_extensions.yaml):
 
 ```text
@@ -183,6 +183,7 @@ ai_classify(prompt, document, labels, descriptions) -> string
 ai_classify(prompt, anchor, partner, labels, descriptions) -> string
 ai_score(prompt, document) -> fp64
 ai_extract(question, document) -> string or null
+ai_sae_features(prompt, document, reading) -> list<struct<feature, strength>>
 ```
 
 The plans combine them with scans, equality conditions, conjunction,
@@ -369,6 +370,46 @@ the field of one struct column, `review`.
 
 IMDB-16 and IMDB-17 have no reference answers yet, so they are not part of
 the default 85 queries. Load them by ID with `accuracy=False`.
+
+### SAE feature queries
+
+Five draft queries call `ai_sae_features(prompt, document, reading)`. A
+sparse autoencoder (SAE) rewrites one model layer's hidden state for one
+token as tens of thousands of numbers, almost all zero; each position is
+a feature, and its value for a token is the feature's strength. The call
+generates no text: the engine runs the prompt and returns the prompt's
+nonzero features as a `list<struct<feature: int32, strength: float32>>`
+column, one list per document. The `reading` argument says which tokens
+become the list:
+
+- `last`: the final prompt token only. The question comes after the
+  document, so the question steers it.
+- `max`: each feature's largest strength over every prompt token. The
+  document comes first in every prompt, so the document tokens'
+  features are the same for every question over the same rows.
+
+| Query | Question | Reading |
+| --- | --- | --- |
+| IMDB-18 | What is this review about? | `last` |
+| IMDB-19 | The same question over every token | `max` |
+| BIO-7 | What adverse reactions does this report describe? | `max` |
+| SUPPORT-7 | Three questions over the same conversations: the request, policy adherence, and the customer's tone | `max`, three calls |
+| WRENCH-9 | What is the agent doing in each step? | `last` |
+
+SUPPORT-7 asks three questions over the same rows, so an engine that
+keeps each document's per-feature maxima recomputes no document tokens
+for the second and third calls; `minimum_tokens` counts each document
+once accordingly. The queries have no reference features yet, so they
+are not part of the default 85 queries. Load them by ID with
+`accuracy=False`. Reference features are planned from `transformers`
+hidden states with the Qwen-Scope SAE
+`Qwen/SAE-Res-Qwen3.5-2B-Base-W32K-L0_100` at layer 11; agreement is the
+share of rows whose feature sets match. There is no accuracy metric in
+the usual sense, and token metrics apply unchanged. One caveat for
+cross-query comparisons: an engine may run these prompts through part of
+the model only (the SAE reads layer 11), so a fresh token here can cost
+about half a fresh token of a full-depth query; report that beside
+`regret_tokens`.
 
 ### Relational queries
 

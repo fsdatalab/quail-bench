@@ -68,6 +68,11 @@ class RunOutput:
             where the engine found no answer, one row per document the
             engine read. Answer accuracy and token metrics need it for
             a query with an extraction.
+        features_answers: SAE features operator ID to a table with the
+            relation's alias column and a `features` column, a
+            `list<struct<feature: int32, strength: float32>>` holding
+            the nonzero features, one row per document the engine read.
+            Token metrics need it for a query with a feature call.
     """
 
     filter_answers: dict[str, pa.Table] | None
@@ -79,6 +84,7 @@ class RunOutput:
     classify_answers: dict[str, pa.Table] | None = None
     score_answers: dict[str, pa.Table] | None = None
     extract_answers: dict[str, pa.Table] | None = None
+    features_answers: dict[str, pa.Table] | None = None
 
 
 def output_columns(spec: QuerySpec) -> list[str]:
@@ -90,9 +96,11 @@ def scored_columns(spec: QuerySpec) -> list[str]:
     """Return the result columns the rows are compared on: not an answer.
 
     An extracted answer is scored against its reference spans from the
-    answer table, not as part of a result row.
+    answer table, not as part of a result row. A feature list is read
+    from its answer table the same way.
     """
     answers = {struct.name for struct in spec.info.structs}
+    answers.update(operator.output for operator in spec.info.sae_features)
     return [name for name in output_columns(spec) if name not in answers]
 
 
@@ -107,6 +115,13 @@ def selected_extracts(spec: QuerySpec):
     """Return the extract operators whose answer the query returns."""
     selected = set(spec.info.select)
     return [operator for operator in spec.info.extracts
+            if f"{operator.relation}.{operator.output}" in selected]
+
+
+def selected_features(spec: QuerySpec):
+    """Return the SAE features operators whose list the query returns."""
+    selected = set(spec.info.select)
+    return [operator for operator in spec.info.sae_features
             if f"{operator.relation}.{operator.output}" in selected]
 
 @dataclass
@@ -460,7 +475,7 @@ def _apply_joined_labels(spec: QuerySpec, join, pairs: pa.Table,
 
 def answer_relations(spec: QuerySpec, filter_answers, join_answers,
                      corpus_rows=None, classify_answers=None,
-                     extract_answers=None):
+                     extract_answers=None, features_answers=None):
     """Return (survivors, relations) an engine's own answers imply.
 
     survivors maps each alias to the string ids that passed every filter
@@ -478,6 +493,8 @@ def answer_relations(spec: QuerySpec, filter_answers, join_answers,
     if labels is None:
         return None
     if spec.info.extracts and extract_answers is None:
+        return None
+    if spec.info.sae_features and features_answers is None:
         return None
     survivors = {
         relation.alias: None for relation in spec.info.relations
@@ -499,6 +516,13 @@ def answer_relations(spec: QuerySpec, filter_answers, join_answers,
     # a document with no answer row cannot appear with its answer column
     for operator in selected_extracts(spec):
         table = extract_answers.get(operator.id)
+        if table is None:
+            return None
+        _narrow(survivors, operator.relation,
+                pc.cast(table.column(operator.relation), pa.string()).to_pylist())
+    # a document with no features row cannot appear with its feature list
+    for operator in selected_features(spec):
+        table = features_answers.get(operator.id)
         if table is None:
             return None
         _narrow(survivors, operator.relation,
@@ -530,7 +554,7 @@ def _with_labels(rows: pa.Table, spec: QuerySpec, labels: dict) -> pa.Table:
 
 def rows_from_answers(spec: QuerySpec, filter_answers, join_answers,
                       corpus_rows=None, classify_answers=None,
-                      extract_answers=None) -> pa.Table:
+                      extract_answers=None, features_answers=None) -> pa.Table:
     """Return the final rows an engine's own answers imply.
 
     For a run that saved its predicate answers but not its rows: a row
@@ -541,7 +565,7 @@ def rows_from_answers(spec: QuerySpec, filter_answers, join_answers,
     """
     survivors, relations = answer_relations(
         spec, filter_answers, join_answers, corpus_rows, classify_answers,
-        extract_answers)
+        extract_answers, features_answers)
     if relations:
         rows = _join_all(relations)
     else:
@@ -638,7 +662,8 @@ def scores_from_answers(spec: QuerySpec, output: RunOutput, corpus_rows):
     """
     answers = answer_relations(
         spec, output.filter_answers, output.join_answers, corpus_rows,
-        output.classify_answers, output.extract_answers)
+        output.classify_answers, output.extract_answers,
+        output.features_answers)
     if answers is None:
         return None
     selected = {name.split(".")[0] for name in spec.info.select}

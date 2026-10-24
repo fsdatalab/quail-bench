@@ -173,6 +173,7 @@ the labels.
 | `classify_answers` | `dict[str, pa.Table] \| None` | Label accuracy and token metrics |
 | `score_answers` | `dict[str, pa.Table] \| None` | Token metrics of a query with a score |
 | `extract_answers` | `dict[str, pa.Table] \| None` | Span accuracy and token metrics of a query with an extraction |
+| `features_answers` | `dict[str, pa.Table] \| None` | Token metrics of a query with an SAE feature call |
 
 ### Result rows
 
@@ -557,6 +558,18 @@ rows = pa.table({
 A null answer does not remove its row: `ct42` stays in `rows` with a null
 `governing_law` field.
 
+`features_answers` maps each SAE features operator ID to a table with two
+columns:
+
+- the relation's alias column, with one row per document the engine read;
+- a `features` column of type
+  `list<struct<feature: int32, strength: float32>>`, holding the nonzero
+  features. The lists are non-null; a document with no nonzero feature
+  holds an empty list.
+
+The query returns the same lists in its feature list column, and the harness
+checks that a returned list equals the answer table's.
+
 - `rows` carries the same answers in the struct's fields. The harness checks
   that the struct's fields are strings named by their answer columns, and that
   they agree with the answer tables.
@@ -645,6 +658,7 @@ must compute.
 | `classifies` | `list[dict]` | One description per classification |
 | `scores` | `list[dict]` | One `id` and `tail` token list per score, as for a filter |
 | `extracts` | `list[dict]` | One `id` and `tail` token list per extraction, as for a filter. The tail holds the question, the instruction, and the answer format, through the answer cue |
+| `features` | `list[dict]` | One `id` and `tail` token list per SAE feature call, as for a filter. The tail is the question alone: the call generates no text and has no answer cue |
 
 Each filter description has:
 

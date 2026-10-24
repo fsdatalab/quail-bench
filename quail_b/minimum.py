@@ -111,7 +111,10 @@ def validate_prompt_pieces(spec, pieces) -> dict:
             read as for a filter, and one with extractions `extracts`,
             a list of `{"id", "tail"}` read the same way: the question,
             the instruction, and the answer template through the cue
-            that opens the answer.
+            that opens the answer. A query with SAE feature calls also
+            needs `features`: a list of `{"id", "tail"}`, read as for a
+            filter; the tail is the question alone, with no answer cue,
+            since the engine generates nothing.
 
     Returns:
         The pieces as plain lists, with every stage of the query named.
@@ -122,7 +125,7 @@ def validate_prompt_pieces(spec, pieces) -> dict:
     checked = {"tokenizer": pieces["tokenizer"],
                "preamble": _token_list(pieces.get("preamble", ()), "preamble"),
                "filters": [], "joins": [], "classifies": [], "scores": [],
-               "extracts": []}
+               "extracts": [], "features": []}
     stages = {filter_spec.id for filter_spec in spec.info.filters}
     for item in pieces.get("filters", ()):
         operator_id = item.get("id")
@@ -198,6 +201,19 @@ def validate_prompt_pieces(spec, pieces) -> dict:
     if operator_ids:
         raise ValueError(
             f"prompt pieces: missing extract operators {sorted(operator_ids)}")
+    operator_ids = {operator.id for operator in spec.info.sae_features}
+    for item in pieces.get("features", ()):
+        operator_id = item.get("id")
+        if operator_id not in operator_ids:
+            raise ValueError(
+                f"prompt pieces: unknown features operator {operator_id!r}")
+        operator_ids.remove(operator_id)
+        checked["features"].append({
+            "id": operator_id,
+            "tail": _token_list(item.get("tail", ()), "features tail")})
+    if operator_ids:
+        raise ValueError(
+            f"prompt pieces: missing features operators {sorted(operator_ids)}")
     return checked
 
 
@@ -338,7 +354,7 @@ def _encoded(column) -> tuple[np.ndarray, pa.Array]:
 def minimum_input_tokens(spec, pieces, filter_answers, join_answers,
                          documents: DocumentTokens,
                          classify_answers=None, score_answers=None,
-                         extract_answers=None) -> int:
+                         extract_answers=None, features_answers=None) -> int:
     """Return the fewest input tokens the run's requests need.
 
     Rows with the same text are one document, whatever their ids or
@@ -359,6 +375,8 @@ def minimum_input_tokens(spec, pieces, filter_answers, join_answers,
         score_answers: Score operator ID to a table with the relation's
             alias column, one row per document scored.
         extract_answers: Extract operator ID to a table with the
+            relation's alias column, one row per document read.
+        features_answers: SAE features operator ID to a table with the
             relation's alias column, one row per document read.
 
     Returns:
@@ -407,6 +425,20 @@ def minimum_input_tokens(spec, pieces, filter_answers, join_answers,
         if table is None:
             continue
         alias = extracts[piece["id"]].relation
+        ids = pc.unique(pc.cast(table.column(alias), pa.string()))
+        for row_id in ids.to_pylist():
+            record(alias, row_id).suffixes.add(tuple(piece["tail"]))
+    # a feature call asks a question and reads no answer, so it is a
+    # suffix of the document like a filter; with each document's 'max'
+    # kept, a later prompt over the same rows needs no document tokens,
+    # which is exactly what one suffix per question already counts
+    feature_calls = {operator.id: operator
+                     for operator in spec.info.sae_features}
+    for piece in pieces["features"]:
+        table = (features_answers or {}).get(piece["id"])
+        if table is None:
+            continue
+        alias = feature_calls[piece["id"]].relation
         ids = pc.unique(pc.cast(table.column(alias), pa.string()))
         for row_id in ids.to_pylist():
             record(alias, row_id).suffixes.add(tuple(piece["tail"]))
@@ -518,7 +550,7 @@ def _reported_input_tokens(measurements) -> int | None:
 def input_tokens(spec, pieces, filter_answers, join_answers,
                  documents: DocumentTokens,
                  classify_answers=None, score_answers=None,
-                 extract_answers=None) -> int | None:
+                 extract_answers=None, features_answers=None) -> int | None:
     """Count full prompt inputs, or return None for missing answer tables."""
     sets = {
         relation.alias: (relation.table, relation.text_column)
@@ -576,6 +608,14 @@ def input_tokens(spec, pieces, filter_answers, join_answers,
             return None
         total += len(table) * (preamble + len(piece["tail"]))
         total += document_tokens(table, extracts[piece["id"]].relation)
+    feature_calls = {operator.id: operator
+                     for operator in spec.info.sae_features}
+    for piece in pieces["features"]:
+        table = (features_answers or {}).get(piece["id"])
+        if table is None:
+            return None
+        total += len(table) * (preamble + len(piece["tail"]))
+        total += document_tokens(table, feature_calls[piece["id"]].relation)
     return total
 
 
@@ -617,6 +657,8 @@ def token_metrics(spec, output, corpus_rows, stores=None) -> dict:
         raise ValueError("prompt pieces need score answers")
     if spec.info.extracts and output.extract_answers is None:
         raise ValueError("prompt pieces need extract answers")
+    if spec.info.sae_features and output.features_answers is None:
+        raise ValueError("prompt pieces need features answers")
     pieces = validate_prompt_pieces(spec, output.prompt_pieces)
     stores = {} if stores is None else stores
     name = pieces["tokenizer"]
@@ -624,7 +666,7 @@ def token_metrics(spec, output, corpus_rows, stores=None) -> dict:
         stores[name] = DocumentTokens(corpus_rows, load_tokenizer(name))
     answers = (output.filter_answers, output.join_answers, stores[name],
                output.classify_answers, output.score_answers,
-               output.extract_answers)
+               output.extract_answers, output.features_answers)
     minimum = minimum_input_tokens(spec, pieces, *answers)
     piece_input = input_tokens(spec, pieces, *answers)
     if reported_input is not None:
