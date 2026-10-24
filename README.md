@@ -373,11 +373,10 @@ the default 85 queries. Load them by ID with `accuracy=False`.
 
 ### SAE feature queries
 
-Five draft queries call `ai_sae_features`. A sparse autoencoder (SAE)
-changes the hidden state of a model for one token into a long vector. Most
-values in this vector are zero. Each position in the vector is a feature,
-and its value is the strength of that feature. The call returns the
-nonzero features of the prompt. It does not generate text.
+`ai_sae_features` is an AI function that returns the sparse autoencoder
+(SAE) features of a prompt. Each feature has an ID and a strength. The
+function returns only the features with a nonzero strength. It does not
+generate text. Five draft queries call it.
 
 The `pooling` argument selects the tokens:
 
