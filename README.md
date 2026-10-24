@@ -376,7 +376,7 @@ the default 85 queries. Load them by ID with `accuracy=False`.
 `ai_sae_features` is an AI function that returns the sparse autoencoder
 (SAE) features of a prompt. Each feature has an ID and a strength. The
 function returns only the features with a nonzero strength. It does not
-generate text. Five draft queries call it.
+generate text. There are five draft queries with `ai_sae_features`.
 
 The `pooling` argument selects the tokens:
 
