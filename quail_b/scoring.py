@@ -47,6 +47,10 @@ class RunOutput:
             - `input_tokens` counts the complete inputs of all evaluated
               prompts, including positions read from KV. Report it when
               `prompt_pieces` is unavailable.
+            - `restored_tokens` counts positions read from KV the engine
+              kept from an earlier query instead of computing them. They
+              count toward the minimum beside `fresh_tokens`. Optional;
+              0 when absent.
             - Other values are optional.
         prompt_pieces: The prompt token ids around each document, as
             `quail_b.minimum.validate_prompt_pieces` describes, or None.
