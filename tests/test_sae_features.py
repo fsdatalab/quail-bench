@@ -28,10 +28,10 @@ def test_sae_feature_queries_are_drafts_over_their_corpora():
     drafts = queries(include_draft=True)
     assert all(query_id not in published for query_id in FEATURE_QUERIES)
     assert all(query_id in drafts for query_id in FEATURE_QUERIES)
-    readings = {query_id: [operator.reading for operator in
+    poolings = {query_id: [operator.pooling for operator in
                            drafts[query_id].info.sae_features]
                 for query_id in FEATURE_QUERIES}
-    assert readings == {
+    assert poolings == {
         "IMDB-18": ["last"], "IMDB-19": ["max"], "BIO-7": ["max"],
         "SUPPORT-7": ["max", "max", "max"], "WRENCH-9": ["last"]}
     tables = {query_id: drafts[query_id].info.relations[0].table
@@ -41,7 +41,7 @@ def test_sae_feature_queries_are_drafts_over_their_corpora():
         "SUPPORT-7": "support_traces", "WRENCH-9": "wrench_steps"}
 
 
-def test_sae_features_plan_names_the_prompt_reading_and_output():
+def test_sae_features_plan_names_the_prompt_pooling_and_output():
     info = quail_b.get_query("IMDB-18").info
     (operator,) = info.sae_features
     assert operator == SaeFeatures("sae-features-1", "r",
@@ -50,10 +50,10 @@ def test_sae_features_plan_names_the_prompt_reading_and_output():
     assert info.select == ("r.id", "r.features")
     assert info.columns == ("r", "features")
     assert info.ai_operators == (operator,)
-    # the two IMDB feature queries ask the same question with another reading
+    # the two IMDB feature queries ask the same question with another pooling
     other = quail_b.get_query("IMDB-19").info.sae_features[0]
     assert other.prompt == operator.prompt
-    assert other.reading == "max"
+    assert other.pooling == "max"
     # three feature calls over the same conversations
     support = quail_b.get_query("SUPPORT-7").info
     assert [operator.output for operator in support.sae_features] == [
@@ -65,7 +65,7 @@ def test_sae_features_plan_names_the_prompt_reading_and_output():
 def test_invalid_sae_features_uses_are_rejected():
     reviews = Scan("reviews", "r", "body")
     question = prompts.IMDB_TOPIC_FEATURES
-    with pytest.raises(ValueError, match="reading must be one of"):
+    with pytest.raises(ValueError, match="pooling must be one of"):
         _spec(SaeFeaturesNode(reviews, question, "mean", "features"),
               ("r", "r.features"))
     with pytest.raises(ValueError, match="never used"):
@@ -91,21 +91,21 @@ def test_sae_features_prompt_text():
         rendering.render_sae_features_prompt("no placeholder", "document")
 
 
-def test_each_feature_call_has_one_predicate_with_the_reading_in_identity():
-    by_question = {(spec.template, spec.reading): spec
+def test_each_feature_call_has_one_predicate_with_the_pooling_in_identity():
+    by_question = {(spec.template, spec.pooling): spec
                    for spec in SAE_FEATURES_PREDICATES}
     drafts = queries(include_draft=True)
     for query_id in FEATURE_QUERIES:
         for operator in drafts[query_id].info.sae_features:
-            spec = by_question[(operator.prompt, operator.reading)]
+            spec = by_question[(operator.prompt, operator.pooling)]
             assert spec.kind == "sae_features"
             assert spec.source_policy == "unpublished"
             assert spec.left_table == drafts[
                 query_id].info.relations[0].table
-    # the same question with another reading is another predicate
-    last, max_reading = (by_question[(prompts.IMDB_TOPIC_FEATURES, reading)]
-                         for reading in ("last", "max"))
-    assert predicate_version(last) != predicate_version(max_reading)
+    # the same question with another pooling is another predicate
+    last, max_pooling = (by_question[(prompts.IMDB_TOPIC_FEATURES, pooling)]
+                         for pooling in ("last", "max"))
+    assert predicate_version(last) != predicate_version(max_pooling)
     with pytest.raises(ValueError, match="not defined"):
         predicates.label_sources(last)
 

@@ -183,7 +183,7 @@ ai_classify(prompt, document, labels, descriptions) -> string
 ai_classify(prompt, anchor, partner, labels, descriptions) -> string
 ai_score(prompt, document) -> fp64
 ai_extract(question, document) -> string or null
-ai_sae_features(prompt, document, reading) -> list<struct<feature, strength>>
+ai_sae_features(prompt, document, pooling) -> list<struct<feature, strength>>
 ```
 
 The plans combine them with scans, equality conditions, conjunction,
@@ -373,13 +373,13 @@ the default 85 queries. Load them by ID with `accuracy=False`.
 
 ### SAE feature queries
 
-Five draft queries call `ai_sae_features(prompt, document, reading)`. A
+Five draft queries call `ai_sae_features(prompt, document, pooling)`. A
 sparse autoencoder (SAE) rewrites one model layer's hidden state for one
 token as tens of thousands of numbers, almost all zero; each position is
 a feature, and its value for a token is the feature's strength. The call
 generates no text: the engine runs the prompt and returns the prompt's
 nonzero features as a `list<struct<feature: int32, strength: float32>>`
-column, one list per document. The `reading` argument says which tokens
+column, one list per document. The `pooling` argument says which tokens
 become the list:
 
 - `last`: the final prompt token only. The question comes after the
@@ -388,7 +388,7 @@ become the list:
   document comes first in every prompt, so the document tokens'
   features are the same for every question over the same rows.
 
-| Query | Question | Reading |
+| Query | Question | Pooling |
 | --- | --- | --- |
 | IMDB-18 | What is this review about? | `last` |
 | IMDB-19 | The same question over every token | `max` |

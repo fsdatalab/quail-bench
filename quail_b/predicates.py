@@ -42,8 +42,8 @@ class PredicateSpec:
     labels: tuple[str, ...] = ()
     descriptions: tuple[str, ...] = ()
     # sae_features only: which tokens become the row's feature list,
-    # 'last' or 'max'; the reading changes the returned features
-    reading: str | None = None
+    # 'last' or 'max'; the pooling changes the returned features
+    pooling: str | None = None
     # a join labeled only over the pairs whose (left column, right
     # column) values are equal, as the query's equality condition keeps
     pair_columns: tuple[str, str] | None = None
@@ -367,33 +367,33 @@ WRENCH_EXTRACT_PREDICATES = (
 )
 
 # SAE feature questions, defined before their reference features are
-# published. The reading is part of the predicate: the same question
-# with another reading returns other features.
+# published. The pooling is part of the predicate: the same question
+# with another pooling returns other features.
 SAE_FEATURES_PREDICATES = (
     PredicateSpec(
         "quailb.imdb.review.topic_features_last", "imdb",
         "topic_features_last", "sae_features", prompts.IMDB_TOPIC_FEATURES,
         "review", "reviews", "body", source_policy="unpublished",
-        reading="last"),
+        pooling="last"),
     PredicateSpec(
         "quailb.imdb.review.topic_features_max", "imdb",
         "topic_features_max", "sae_features", prompts.IMDB_TOPIC_FEATURES,
         "review", "reviews", "body", source_policy="unpublished",
-        reading="max"),
+        pooling="max"),
     PredicateSpec(
         "quailb.biodex.report.reaction_features_max", "biodex",
         "reaction_features_max", "sae_features",
         prompts.BIO_REACTION_FEATURES, "report", "reports", "report",
-        source_policy="unpublished", reading="max"),
+        source_policy="unpublished", pooling="max"),
     PredicateSpec(
         "quailb.wrench.step.step_features_last", "wrench",
         "step_features_last", "sae_features", prompts.WRENCH_STEP_FEATURES,
         "agent_step", "wrench_steps", "text", source_policy="unpublished",
-        reading="last"),
+        pooling="last"),
     *(PredicateSpec(
         f"quailb.support.trace.{slug}_max", "support", f"{slug}_max",
         "sae_features", template, "support_trace", "support_traces",
-        "transcript", source_policy="unpublished", reading="max")
+        "transcript", source_policy="unpublished", pooling="max")
       for slug, template in (
           ("request_features", prompts.SUPPORT_REQUEST_FEATURES),
           ("policy_features", prompts.SUPPORT_POLICY_FEATURES),
@@ -532,7 +532,7 @@ def predicate_payload(spec: PredicateSpec) -> dict:
                        partner_label=JOIN_DOC_LABEL)
     if spec.kind == "sae_features":
         payload.pop("task_instruction", None)
-        payload["reading"] = spec.reading
+        payload["pooling"] = spec.pooling
     # published label sets predate this field, so it is left out when unset
     if spec.pair_columns is not None:
         payload["pair_columns"] = list(spec.pair_columns)

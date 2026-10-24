@@ -18,7 +18,7 @@ AI_CLASSIFY_JOINED_NAME = "ai_classify:str_str_str_list_list"
 AI_SCORE_NAME = "ai_score:str_str"
 AI_EXTRACT_NAME = "ai_extract:str_str"
 AI_SAE_FEATURES_NAME = "ai_sae_features:str_str_str"
-SAE_READINGS = ("last", "max")
+SAE_POOLINGS = ("last", "max")
 EQUAL_NAME = "equal:any_any"
 AND_NAME = "and:bool"
 AGGREGATE_GENERIC_EXTENSION_URN = (
@@ -164,7 +164,7 @@ class SaeFeatures:
         id: The operator ID.
         relation: The alias of the documents the features are read for.
         prompt: The prompt template, with the document as `{0}`.
-        reading: Which tokens become the row's list: `last` reads the
+        pooling: Which tokens become the row's list: `last` reads the
             final token only; `max` takes each feature's largest
             strength over every prompt token.
         output: The name of the added feature list column.
@@ -173,7 +173,7 @@ class SaeFeatures:
     id: str
     relation: str
     prompt: str
-    reading: str
+    pooling: str
     output: str
 
 
@@ -783,14 +783,14 @@ def _decode_sae_features(project: algebra_pb2.ProjectRel,
     arguments = _arguments(project.expressions[0])
     if len(arguments) != 3:
         raise ValueError(
-            "ai_sae_features needs a prompt, a document field, and a reading")
+            "ai_sae_features needs a prompt, a document field, and a pooling")
     prompt = _literal_string(arguments[0])
     field = _selected(child.fields, arguments[1])
-    reading = _literal_string(arguments[2])
-    if reading not in SAE_READINGS:
+    pooling = _literal_string(arguments[2])
+    if pooling not in SAE_POOLINGS:
         raise ValueError(
-            f"ai_sae_features reading must be one of {SAE_READINGS}, "
-            f"got {reading!r}")
+            f"ai_sae_features pooling must be one of {SAE_POOLINGS}, "
+            f"got {pooling!r}")
     names = tuple(project.common.hint.output_names)
     expected = tuple(".".join(name) for name in child.fields)
     if len(names) != len(expected) + 1 or names[:-1] != expected:
@@ -801,7 +801,7 @@ def _decode_sae_features(project: algebra_pb2.ProjectRel,
             "a feature list column must belong to the read relation")
     if output == "id" or (alias, output) in child.fields:
         raise ValueError(f"feature list column {output!r} is already a field")
-    operator = SaeFeatures(project.common.hint.alias, alias, prompt, reading,
+    operator = SaeFeatures(project.common.hint.alias, alias, prompt, pooling,
                            output)
     return _Decoded(
         (*child.fields, (alias, output)),

@@ -193,14 +193,14 @@ class SaeFeatures:
         input: The relation's scan, filters, classifications,
             extractions, or feature calls.
         prompt: The question over the document.
-        reading: `last` for the final prompt token, `max` for each
+        pooling: `last` for the final prompt token, `max` for each
             feature's largest strength over every prompt token.
         output: The name of the feature list column.
     """
 
     input: "Scan | Where | Filter | Classify | InList | SaeFeatures"
     prompt: str
-    reading: str
+    pooling: str
     output: str
 
 
@@ -550,7 +550,7 @@ class _Emitter:
                 expressions=[_call(AI_SAE_FEATURES_NAME, [
                     _literal(node.prompt),
                     _field(fields.index((alias, text[alias]))),
-                    _literal(node.reading),
+                    _literal(node.pooling),
                 ], _feature_list_type())],
             )
             return algebra.Rel(project=relation), output_fields, text
@@ -1126,12 +1126,12 @@ QUERIES = (
     Query("IMDB-17", "extract: what each review says about the acting",
           Extract(_reviews(), prompts.IMDB_ACTING, "acting"),
           select=("r", Struct("review", ("r.acting",))), draft=True),
-    Query("IMDB-18", "SAE features, reading 'last': what each review is "
+    Query("IMDB-18", "SAE features, pooling 'last': what each review is "
           "about",
           SaeFeatures(_reviews(), prompts.IMDB_TOPIC_FEATURES, "last",
                       "features"),
           select=("r", "r.features"), draft=True),
-    Query("IMDB-19", "SAE features, reading 'max': the same question, each "
+    Query("IMDB-19", "SAE features, pooling 'max': the same question, each "
           "feature's largest strength over every prompt token",
           SaeFeatures(_reviews(), prompts.IMDB_TOPIC_FEATURES, "max",
                       "features"),
@@ -1160,7 +1160,7 @@ QUERIES = (
                InList(_organ_class(_terms()), "organ_class",
                       ("cardiac disorders", "vascular disorders")),
                ("r", "m"), REACTION)),
-    Query("BIO-7", "SAE features, reading 'max': the adverse reactions "
+    Query("BIO-7", "SAE features, pooling 'max': the adverse reactions "
           "each report describes",
           SaeFeatures(_reports(), prompts.BIO_REACTION_FEATURES, "max",
                       "features"),
@@ -1348,7 +1348,7 @@ QUERIES = (
               (("n", ">=", 5),)),
                (("mean_reward", True), ("t.outcome", False))),
           select=("t.outcome", "n", "mean_reward")),
-    Query("SUPPORT-7", "3 SAE feature calls, reading 'max', over the same "
+    Query("SUPPORT-7", "3 SAE feature calls, pooling 'max', over the same "
           "conversations: the request, policy adherence, and the "
           "customer's tone",
           SaeFeatures(SaeFeatures(SaeFeatures(
@@ -1434,7 +1434,7 @@ QUERIES = (
           Extract(Extract(_wrench_steps(), prompts.WRENCH_CHEAT_PLAN, "plan"),
                   prompts.WRENCH_CHEAT_COMMAND, "command"),
           select=("s", Struct("cheat", ("s.plan", "s.command"))), draft=True),
-    Query("WRENCH-9", "SAE features, reading 'last': what the agent is "
+    Query("WRENCH-9", "SAE features, pooling 'last': what the agent is "
           "doing in each step",
           SaeFeatures(_wrench_steps(), prompts.WRENCH_STEP_FEATURES, "last",
                       "features"),

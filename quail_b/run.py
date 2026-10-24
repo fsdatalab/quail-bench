@@ -129,7 +129,7 @@ def _query_hash(spec):
                 "id": operator.id,
                 "relation": operator.relation,
                 "prompt": operator.prompt,
-                "reading": operator.reading,
+                "pooling": operator.pooling,
                 "output": operator.output,
             })
         else:

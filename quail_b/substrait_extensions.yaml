@@ -53,7 +53,7 @@ scalar_functions:
     description: >-
       Return the sparse autoencoder (SAE) features of a prompt over a
       document as a list of (feature, strength) pairs, the nonzero
-      features only. The reading says which tokens become the list:
+      features only. The pooling says which tokens become the list:
       'last' reads the final prompt token; 'max' takes each feature's
       largest strength over every prompt token.
     impls:
@@ -63,7 +63,7 @@ scalar_functions:
             constant: true
           - name: document
             value: string
-          - name: reading
+          - name: pooling
             description: "'last' or 'max'."
             value: string
             constant: true
