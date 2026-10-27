@@ -18,7 +18,11 @@ from quail_b.data import (
     load_table,
 )
 from quail_b.labels import GroundTruthCollection, _read_json, load_ground_truth
-from quail_b.predicates import PREDICATE_BY_KEY, predicate_payload
+from quail_b.predicates import (
+    PREDICATE_BY_KEY,
+    labels_unpublished,
+    predicate_payload,
+)
 from quail_b.queries import QuerySpec, queries
 from quail_b.rendering import PROMPT_FORMAT
 
@@ -131,7 +135,8 @@ def _load_truth(specs, scale_factor, corpus_id,
             raise ValueError("ground truth does not match the input corpus")
         for spec in specs:
             for operator in spec.info.ai_operators:
-                if operator in spec.info.maps:
+                if (operator in spec.info.maps
+                        or labels_unpublished(operator.prompt)):
                     continue
                 try:
                     truth.key_for_template(operator.prompt)

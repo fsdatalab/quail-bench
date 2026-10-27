@@ -4,8 +4,11 @@ QUAIL-B is an academic benchmark of 85 AI SQL queries over document tables.
 It publishes Substrait query plans, input tables, reference labels, and a
 scoring harness. It does not include an execution engine.
 
-Drafts are excluded from the default 85 queries. Load them by ID with
-`accuracy=False`:
+Drafts are excluded from the default 85 queries. Load them by ID.
+Operators whose predicates have `source_policy="unpublished"` do not need
+reference labels and have no accuracy score unless the collection supplies
+labels. Published predicates still require labels. Use `accuracy=False` to
+load inputs without any labels:
 
 - Extraction and SEC drafts: IMDB-16, IMDB-17, WRENCH-6 to WRENCH-8, CUAD-16,
   and SEC-1 to SEC-10 lack reference answers.

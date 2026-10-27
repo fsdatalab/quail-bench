@@ -100,7 +100,7 @@ def measurement_rows(record) -> list[dict]:
         answers = metrics["accuracy"]["answer_accuracy"] or {}
         labels = metrics["accuracy"].get("label_accuracy") or {}
         spans = metrics["accuracy"].get("span_accuracy") or {}
-        output = metrics["accuracy"]["output_accuracy"]
+        output = metrics["accuracy"]["output_accuracy"] or {}
         rows.append({
             "query": item["id"],
             "runtime_s": item["runtime_s"],
@@ -183,7 +183,7 @@ def _write_report(directory, record):
         answers = accuracy.get("answer_accuracy") or {}
         labels = accuracy.get("label_accuracy") or {}
         spans = accuracy.get("span_accuracy") or {}
-        output = accuracy.get("output_accuracy", {})
+        output = accuracy.get("output_accuracy") or {}
         lines.append(
             f"| {item['id']} | {_number(answers.get('accuracy'))} | "
             f"{_number(answers.get('evaluated'))} | "

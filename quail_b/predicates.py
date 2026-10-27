@@ -476,6 +476,12 @@ PREDICATE_BY_KEY = {p.key: p for p in (
 WORKLOADS = tuple(dict.fromkeys(spec.workload for spec in PREDICATES))
 
 
+def labels_unpublished(template: str) -> bool:
+    """Return whether a known predicate explicitly has no published labels."""
+    return any(spec.template == template and spec.source_policy == "unpublished"
+               for spec in PREDICATE_BY_KEY.values())
+
+
 def workload_specs(workload: str) -> tuple:
     return tuple(p for p in PREDICATES if p.workload == workload)
 

@@ -13,12 +13,12 @@ from test_classify import (
 )
 
 import quail_b
-from quail_b import minimum, predicates, prompts, rendering
+from quail_b import benchmark, minimum, predicates, prompts, rendering
 from quail_b.queries import queries
 from quail_b.run import _query_hash, _read_output, _save_output, _validate_output
 from quail_b.substrait import Map
+from tools.make_substrait_plans import Classify, Filter, Scan, Struct, build_plan
 from tools.make_substrait_plans import Map as MapNode
-from tools.make_substrait_plans import Scan, Struct, build_plan
 
 MAP_QUERIES = (*(f"IMDB-MAP-{i}" for i in range(1, 6)),
                *(f"CUAD-MAP-{i}" for i in range(1, 4)))
@@ -440,6 +440,86 @@ def test_map_text_is_not_scored_but_accompanying_filter_and_sorted_ids_are(tmp_p
     assert [item["op"] for item in accuracy["per_predicate"]] == ["filter"]
     assert accuracy["output_accuracy"]["matching_rows"] == 2
     assert accuracy["output_accuracy"]["ordered_match"]
+
+
+@pytest.mark.parametrize("with_labels", [False, True])
+def test_unpublished_filter_loads_runs_and_rescores_with_token_metrics(
+        tmp_path, monkeypatch, with_labels):
+    tables = _token_tables(monkeypatch)
+    label_sets = [
+        ({"kind": "filter", "template": prompts.IMDB_NEGATIVE,
+          "left_table": "reviews", "left_column": "body"},
+         [("r0", False), ("r1", True)])] if with_labels else []
+    _collection(tmp_path, tables, label_sets)
+    suite = quail_b.load_benchmark("IMDB-MAP-4", root=tmp_path)
+    (spec,) = suite.queries
+    assert bool(suite.ground_truth.predicates) == with_labels
+    output = quail_b.RunOutput(
+        {"filter-1": pa.table({"r": ["r0", "r1"], "answer": [False, True]})},
+        {}, pa.table({"r": ["r1"], spec.info.maps[0].output: ["Summary."]}),
+        runtime_s=2.0, measurements={"fresh_tokens": 20},
+        prompt_pieces={"tokenizer": "test", "preamble": [1],
+                       "filters": [{"id": "filter-1", "tail": [4, 5]}],
+                       "maps": [{"id": "map-1", "tail": [6, 7, 8]}]},
+        map_answers={"map-1": pa.table({"r": ["r1"], "answer": ["Summary."]})})
+    directory = tmp_path / "run"
+    record = quail_b.run(lambda query, tables: output, queries=[spec.id],
+                         output_dir=directory, root=tmp_path)
+    metrics = record["queries"][0]["metrics"]
+    accuracy = metrics["accuracy"]
+    if with_labels:
+        assert accuracy["answer_accuracy"]["correct"] == 2
+        assert accuracy["output_accuracy"]["exact_match"]
+        assert [item["op"] for item in accuracy["per_predicate"]] == ["filter"]
+    else:
+        assert accuracy["answer_accuracy"] is None
+        assert accuracy["output_accuracy"] is None
+        assert accuracy["per_predicate"] == []
+    assert metrics["runtime_s"] == 2.0
+    assert metrics["input_tokens"] == 18
+    assert metrics["minimum_tokens"] == 13
+    assert metrics["fresh_tokens"] == 20
+    assert metrics["regret_tokens"] == 7
+    assert metrics["input_tokens_per_second"] == 9.0
+    measurements = pq.read_table(directory / "measurements.parquet").to_pylist()[0]
+    assert measurements["answers_evaluated"] == (2 if with_labels else None)
+    assert measurements["expected_rows"] == (1 if with_labels else None)
+    assert measurements["input_tokens"] == 18
+    quail_b.report(directory, root=tmp_path)
+    rescored = json.loads((directory / "run.json").read_text())
+    assert rescored["queries"][0]["metrics"] == metrics
+
+
+def test_unpublished_filter_keeps_labeled_operator_accuracy(tmp_path, monkeypatch):
+    _collection(tmp_path, IMDB_TABLES, [
+        (_classify_predicate(SENTIMENT), [("r0", "positive"), ("r1", "negative"),
+                                         ("r2", "neutral")])])
+    spec = _spec(Classify(
+        Filter(Scan("reviews", "r", "body"), prompts.IMDB_NEGATIVE),
+        SENTIMENT.template, SENTIMENT.labels, "tone",
+        descriptions=SENTIMENT.descriptions), ("r", "r.tone"))
+    monkeypatch.setattr(benchmark, "select_queries", lambda *a, **kw: (spec,))
+    output = quail_b.RunOutput(
+        {"filter-1": pa.table({"r": ["r0", "r1", "r2"],
+                                "answer": [False, True, True]})}, {},
+        pa.table({"r": ["r1", "r2"], "tone": ["negative", "positive"]}),
+        runtime_s=1.0, classify_answers={"classify-1": pa.table({
+            "r": ["r1", "r2"], "label": ["negative", "positive"]})})
+    record = quail_b.run(lambda query, tables: output, queries=[spec.id],
+                         output_dir=tmp_path / "run", root=tmp_path)
+    accuracy = record["queries"][0]["metrics"]["accuracy"]
+    assert accuracy["answer_accuracy"] is None
+    assert accuracy["output_accuracy"] is None
+    assert accuracy["label_accuracy"] == {
+        "correct": 1, "evaluated": 2, "unlabeled": 0, "accuracy": 0.5}
+    assert [item["op"] for item in accuracy["per_predicate"]] == ["classify"]
+
+
+def test_map_query_still_requires_published_classification_labels(tmp_path):
+    _collection(tmp_path, IMDB_TABLES, [])
+    with pytest.raises(ValueError, match=(
+            "IMDB-MAP-5 has no reference labels for classify-1")):
+        quail_b.load_benchmark("IMDB-MAP-5", root=tmp_path)
 
 
 def test_map_drafts_load_inputs_without_reference_labels(tmp_path):

@@ -701,7 +701,14 @@ IMDB-MAP-5 reuses IMDB-11's sentiment labels, but IMDB-MAP-4's new negative-revi
 filter has no reference labels yet.
 
 The eight [map drafts](../README.md#map-queries) are excluded from the default
-85 queries. Load them by ID with `accuracy=False`.
+85 queries. Load or run them by ID. Operators with predicates marked
+`source_policy="unpublished"` and no labels in the selected collection are
+omitted from `per_predicate` and aggregate answer, label, and span accuracy.
+Labeled operators are still scored, including unpublished predicates with
+supplied labels. A missing label set for a published predicate still raises.
+When an unpublished operator other than a map or extraction prevents
+constructing reference rows,
+`output_accuracy` is null. Runtime and token metrics are still reported.
 
 ### Token accounting
 

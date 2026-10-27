@@ -401,16 +401,24 @@ There are eight map drafts. Numbers below are answer token limits per call:
 - **CUAD-MAP-3:** Use the existing CUAD non-compete filter, then summarize the
   obligations and bound parties (256), with `ORDER BY c.id LIMIT 10`.
 
-These drafts are excluded from the default 85 queries. Load them by ID with
-`accuracy=False` and call your adapter directly:
+These drafts are excluded from the default 85 queries. Run them by ID:
 
 ```python
-suite = quail_b.load_benchmark(
-    ["IMDB-MAP-1", "CUAD-MAP-2"], scale_factor=0.1, accuracy=False,
+quail_b.run(
+    my_engine_adapter,
+    queries=["IMDB-MAP-4", "CUAD-MAP-2"],
+    scale_factor=0.1,
+    output_dir="results/maps",
 )
-for query in suite.queries:
-    output = my_engine_adapter(query, suite.tables)
 ```
+
+Predicates marked `source_policy="unpublished"`, including IMDB-MAP-4's
+filter, are skipped for accuracy when the collection has no labels for them.
+Labeled operators in the same query still receive their usual accuracy scores.
+Output-row accuracy is unavailable if an unlabeled operator determines the
+reference rows or labels. Missing labels
+for published predicates still fail loading. Runtime and token metrics are
+unaffected.
 
 Scale factor 0.1 supplies 5,000 reviews and 45 contracts. There are no reference
 map answers, and generated text is not accuracy-scored. IDs, filters, and
