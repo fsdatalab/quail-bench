@@ -304,18 +304,24 @@ def test_map_hash_includes_prompt_limit_and_output_but_not_wire_metadata():
 def _token_tables(monkeypatch):
     tables = {"reviews": pa.table({
         "id": ["r0", "r1"], "body": ["alpha beta", "gamma delta epsilon"]})}
-    ids = {"alpha beta": [11, 12], "gamma delta epsilon": [21, 22, 23]}
-    monkeypatch.setattr(minimum, "load_tokenizer",
-                        lambda name: lambda texts: [ids[text] for text in texts])
+    ids = {"alpha beta": [11, 12], "gamma delta epsilon": [21, 22, 23],
+           "short": [31], "long " * 5: [32] * 5, "": [],
+           "generated": [41, 42, 43]}
+
+    def tokenizer(name):
+        assert name == "test"
+        return lambda texts: [ids[text] for text in texts]
+
+    monkeypatch.setattr(minimum, "load_tokenizer", tokenizer)
     return tables
 
 
-def test_multiple_maps_share_document_tokens_and_exclude_decoded_text(monkeypatch):
+def test_multiple_maps_share_prompts_but_count_each_answer_decode(monkeypatch):
     spec = quail_b.get_query("IMDB-MAP-3")
     tables = _token_tables(monkeypatch)
-    answers = pa.table({"r": ["r0", "r1"], "answer": ["short", "long " * 200]})
+    answers = pa.table({"r": ["r0", "r1"], "answer": ["short", "long " * 5]})
     output = quail_b.RunOutput(
-        {}, {}, None, runtime_s=1.0, measurements={"fresh_tokens": 20},
+        {}, {}, None, runtime_s=1.0, measurements={"fresh_tokens": 40},
         prompt_pieces={
             "tokenizer": "test", "preamble": [1],
             "maps": [{"id": "map-1", "tail": [4, 5]},
@@ -323,19 +329,64 @@ def test_multiple_maps_share_document_tokens_and_exclude_decoded_text(monkeypatc
                      {"id": "map-3", "tail": [7, 8, 9]}]},
         map_answers={f"map-{i}": answers for i in (1, 2, 3)})
     metrics = minimum.token_metrics(spec, output, tables)
-    assert metrics["minimum_tokens"] == 1 + (2 + 3) + 2 * (2 + 1 + 3)
+    prompt_minimum = 1 + (2 + 3) + 2 * (2 + 1 + 3)
+    decode = 3 * (5 - 1)
+    assert metrics["minimum_tokens"] == prompt_minimum + decode
     assert metrics["input_tokens"] == (
         2 * (1 + 2) + 5) + (2 * (1 + 1) + 5) + (2 * (1 + 3) + 5)
-    assert metrics["regret_tokens"] == 20 - metrics["minimum_tokens"]
+    assert metrics["regret_tokens"] == 40 - metrics["minimum_tokens"]
     short = pa.table({"r": ["r0", "r1"], "answer": ["", ""]})
     output.map_answers = {f"map-{i}": short for i in (1, 2, 3)}
-    assert minimum.token_metrics(spec, output, tables) == metrics
+    assert minimum.token_metrics(spec, output, tables) == {
+        **metrics, "minimum_tokens": prompt_minimum,
+        "regret_tokens": metrics["regret_tokens"] + decode}
     with pytest.raises(ValueError, match="missing map operators"):
         minimum.validate_prompt_pieces(spec, {"tokenizer": "test", "maps": [
             {"id": "map-1", "tail": []}]})
     output.map_answers = None
     with pytest.raises(ValueError, match="need map answers"):
         minimum.token_metrics(spec, output, tables)
+
+
+@pytest.mark.parametrize("answer,decode", [("", 0), ("short", 0), ("generated", 2)])
+@pytest.mark.parametrize("extra", [0, 7])
+@pytest.mark.parametrize("reported_input", [None, 4, 8])
+def test_map_regret_excludes_required_decode_inputs(
+        monkeypatch, answer, decode, extra, reported_input):
+    spec = quail_b.get_query("IMDB-MAP-2")
+    tables = _token_tables(monkeypatch)
+    # One prompt has no shared KV: preamble + document + tail = 5 tokens.
+    prompt = 5 if reported_input is None else reported_input
+    output = quail_b.RunOutput(
+        {}, {}, None, runtime_s=1.0,
+        measurements={"fresh_tokens": prompt + decode + extra},
+        prompt_pieces={"tokenizer": "test", "preamble": [1],
+                       "maps": [{"id": "map-1", "tail": [4, 5]}]},
+        map_answers={"map-1": pa.table({"r": ["r0"], "answer": [answer]})})
+    if reported_input is not None:
+        output.measurements["input_tokens"] = reported_input
+    assert minimum.token_metrics(spec, output, tables) == {
+        "input_tokens": prompt, "fresh_tokens": prompt + decode + extra,
+        "minimum_tokens": prompt + decode, "regret_tokens": extra,
+        "regret_approximate": reported_input is not None}
+    pieces = minimum.validate_prompt_pieces(spec, output.prompt_pieces)
+    documents = minimum.DocumentTokens(tables, minimum.load_tokenizer("test"))
+    assert minimum.minimum_input_tokens(
+        spec, pieces, {}, {}, documents, map_answers=output.map_answers) == 5 + decode
+
+
+def test_empty_map_answer_table_needs_no_tokens(monkeypatch):
+    spec = quail_b.get_query("IMDB-MAP-2")
+    tables = _token_tables(monkeypatch)
+    output = quail_b.RunOutput(
+        {}, {}, None, runtime_s=1.0, measurements={"fresh_tokens": 0},
+        prompt_pieces={"tokenizer": "test", "preamble": [1],
+                       "maps": [{"id": "map-1", "tail": [4, 5]}]},
+        map_answers={"map-1": pa.table({"r": [], "answer": []}, schema=pa.schema([
+            ("r", pa.string()), ("answer", pa.string())]))})
+    assert minimum.token_metrics(spec, output, tables) == {
+        "input_tokens": 0, "fresh_tokens": 0, "minimum_tokens": 0,
+        "regret_tokens": 0, "regret_approximate": False}
 
 
 @pytest.mark.parametrize("ids", [("map-99",), ("map-1", "map-1")])
@@ -356,9 +407,9 @@ def test_filtered_map_counts_only_documents_actually_mapped(monkeypatch):
         prompt_pieces={"tokenizer": "test", "preamble": [1],
                        "filters": [{"id": "filter-1", "tail": [4, 5]}],
                        "maps": [{"id": "map-1", "tail": [6, 7, 8]}]},
-        map_answers={"map-1": pa.table({"r": ["r1"], "answer": ["Summary."]})})
+        map_answers={"map-1": pa.table({"r": ["r1"], "answer": ["generated"]})})
     metrics = minimum.token_metrics(spec, output, tables)
-    assert metrics["minimum_tokens"] == 1 + (2 + 3) + 2 * 2 + 3
+    assert metrics["minimum_tokens"] == 1 + (2 + 3) + 2 * 2 + 3 + (3 - 1)
     assert metrics["input_tokens"] == 2 * (1 + 2) + 5 + (1 + 3 + 3)
 
 
