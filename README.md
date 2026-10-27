@@ -1,8 +1,9 @@
 # QUAIL-B
 
 QUAIL-B is a benchmark for AI functions in SQL, or AI-SQL. It is actively being
-developed. **The queries use AI-powered filters, joins, and classification;
-we will expand to AI-powered extract, map, and groupby.**
+developed. **The queries use AI-powered filters, joins, classification,
+scoring, and extraction, plus relational grouping. Draft queries also generate
+text with maps and return sparse autoencoder features.**
 
 For example, query IMDB-4 finds the movie aspects that each review discusses,
 for reviews that praise the movie and discuss its ending:
@@ -173,7 +174,7 @@ print(reviews.num_rows)   # 5000
 
 ## Queries
 
-The queries use six AI functions, declared as Substrait extensions in
+The queries use seven AI functions, declared as Substrait extensions in
 [`quail_b/substrait_extensions.yaml`](quail_b/substrait_extensions.yaml):
 
 ```text
@@ -183,6 +184,7 @@ ai_classify(prompt, document, labels, descriptions) -> string
 ai_classify(prompt, anchor, partner, labels, descriptions) -> string
 ai_score(prompt, document) -> fp64
 ai_extract(question, document) -> string or null
+ai_map(prompt, document, max_tokens) -> nonnull string
 ai_sae_features(prompt, document, pooling) -> list<struct<feature, strength>>
 ```
 
@@ -370,6 +372,51 @@ the field of one struct column, `review`.
 
 IMDB-16 and IMDB-17 have no reference answers yet, so they are not part of
 the default 85 queries. Load them by ID with `accuracy=False`.
+
+### Map queries
+
+`ai_map(prompt, document, max_tokens)` generates a nonnull string for each
+input document. Unlike extraction, its answer need not be copied from the
+source. It decodes greedily until the model ends the turn or reaches the
+positive, constant answer token limit. The prompt is a constant template,
+`"{0}\n\n<instruction>"`; the document comes first so several maps can reuse
+its KV. The [reference](docs/reference.md#maps) defines the exact rendering,
+answer tables, and token accounting.
+
+There are eight map drafts. Numbers below are answer token limits per call:
+
+- **IMDB-MAP-1:** Summarize the review's negative arguments in one sentence
+  (64).
+- **IMDB-MAP-2:** Give a detailed summary covering people, main points, and
+  unresolved issues (256).
+- **IMDB-MAP-3:** Return the negative arguments (64), detailed summary (256),
+  and main topic (32), using three maps of the same review.
+- **IMDB-MAP-4:** Filter with the new question "Is this review negative?", then
+  give the detailed summary (256). This filter has no reference labels yet.
+- **IMDB-MAP-5:** Return overall sentiment using IMDB-11's classification
+  (`positive`, `negative`, `neutral`, `mixed`) and the detailed summary (256).
+- **CUAD-MAP-1:** Summarize the parties and their roles (256).
+- **CUAD-MAP-2:** Separately summarize parties and roles, term and termination,
+  and governing law and venue (128 each).
+- **CUAD-MAP-3:** Use the existing CUAD non-compete filter, then summarize the
+  obligations and bound parties (256), with `ORDER BY c.id LIMIT 10`.
+
+These drafts are excluded from the default 85 queries. Load them by ID with
+`accuracy=False` and call your adapter directly:
+
+```python
+suite = quail_b.load_benchmark(
+    ["IMDB-MAP-1", "CUAD-MAP-2"], scale_factor=0.1, accuracy=False,
+)
+for query in suite.queries:
+    output = my_engine_adapter(query, suite.tables)
+```
+
+Scale factor 0.1 supplies 5,000 reviews and 45 contracts. There are no reference
+map answers, and generated text is not accuracy-scored. IDs, filters, and
+classifications still follow the usual scoring rules when reference labels
+are available. Return maps as flat string columns, with matching answers in
+`map_answers`. Prompt token metrics count the input, not generated answers.
 
 ### SAE feature queries
 

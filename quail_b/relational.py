@@ -51,7 +51,7 @@ def reference_table(spec: QuerySpec, ground_truth, corpus_rows) -> pd.DataFrame:
         table = table[_COMPARE[test.comparison](column, test.value).fillna(False)]
         ids = table[f"{relation.alias}.id"]
     for operator in info.operators:
-        if operator in info.column_tests or operator in info.extracts:
+        if operator in (*info.column_tests, *info.extracts, *info.maps):
             continue
         if operator in info.in_lists:
             column = table[f"{operator.relation}.{operator.output}"]
@@ -131,7 +131,7 @@ def apply_tail(table: pd.DataFrame, spec: QuerySpec,
 def scored_fields(spec: QuerySpec) -> list[str]:
     """Return the selected fields the rows are compared on: not an answer."""
     answers = {f"{operator.relation}.{operator.output}"
-               for operator in spec.info.extracts}
+               for operator in (*spec.info.extracts, *spec.info.maps)}
     return [name for name in spec.info.select if name not in answers]
 
 

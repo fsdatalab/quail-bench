@@ -49,6 +49,23 @@ scalar_functions:
           - name: document
             value: string
         return: string?
+  - name: ai_map
+    description: >-
+      Generate one free-form string answer to the prompt per document.
+      Decode greedily until the model ends its turn or reaches max_tokens.
+    impls:
+      - args:
+          - name: prompt
+            description: A template with the document as {0} before the instruction.
+            value: string
+            constant: true
+          - name: document
+            value: string
+          - name: max_tokens
+            description: Positive answer-token limit, identical for every engine.
+            value: i32
+            constant: true
+        return: string
   - name: ai_sae_features
     description: >-
       Return the sparse autoencoder (SAE) features of a prompt over a

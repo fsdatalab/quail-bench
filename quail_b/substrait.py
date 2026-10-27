@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from substrait import algebra_pb2, plan_pb2
+from substrait import algebra_pb2, plan_pb2, type_pb2
 
 SUBSTRAIT_VERSION = (0, 103, 0)
 AI_EXTENSION_URN = "extension:org.fsdatalab.quail_b:functions_ai"
@@ -17,6 +17,7 @@ AI_CLASSIFY_NAME = "ai_classify:str_str_list_list"
 AI_CLASSIFY_JOINED_NAME = "ai_classify:str_str_str_list_list"
 AI_SCORE_NAME = "ai_score:str_str"
 AI_EXTRACT_NAME = "ai_extract:str_str"
+AI_MAP_NAME = "ai_map:str_str_i32"
 AI_SAE_FEATURES_NAME = "ai_sae_features:str_str_str"
 SAE_POOLINGS = ("last", "max")
 EQUAL_NAME = "equal:any_any"
@@ -44,6 +45,7 @@ _FUNCTION_URNS = {
     AI_SCORE_NAME: AI_EXTENSION_URN,
     AI_EXTRACT_NAME: AI_EXTENSION_URN,
     AI_SAE_FEATURES_NAME: AI_EXTENSION_URN,
+    AI_MAP_NAME: AI_EXTENSION_URN,
     EQUAL_NAME: COMPARISON_EXTENSION_URN,
     AND_NAME: BOOLEAN_EXTENSION_URN,
     **{name: COMPARISON_EXTENSION_URN for name in COMPARISON_NAMES},
@@ -152,6 +154,21 @@ class Extract:
 
 
 @dataclass(frozen=True)
+class Map:
+    """Generate one free-form string per document, greedily.
+
+    The prompt names the document as `{0}`. Decoding stops at the end
+    of the model's turn or after `max_tokens` answer tokens.
+    """
+
+    id: str
+    relation: str
+    prompt: str
+    max_tokens: int
+    output: str
+
+
+@dataclass(frozen=True)
 class SaeFeatures:
     """One ai_sae_features call that adds a feature list column to one relation.
 
@@ -244,7 +261,7 @@ class Fetch:
 
 
 type Operator = (Filter | Join | Classify | InList | Score | ColumnTest
-                 | Extract | SaeFeatures)
+                 | Extract | SaeFeatures | Map)
 type Step = Aggregate | Having | Sort | Fetch
 
 
@@ -304,7 +321,7 @@ class PlanInfo:
     @property
     def ai_operators(
             self) -> tuple[Filter | Join | Classify | Score | Extract
-                           | SaeFeatures, ...]:
+                           | SaeFeatures | Map, ...]:
         """The operators that ask the model, each with its prompt."""
         return tuple(
             operator
@@ -321,6 +338,11 @@ class PlanInfo:
     def extracts(self) -> tuple[Extract, ...]:
         return tuple(operator for operator in self.operators
                      if isinstance(operator, Extract))
+
+    @property
+    def maps(self) -> tuple[Map, ...]:
+        return tuple(operator for operator in self.operators
+                     if isinstance(operator, Map))
 
     @property
     def sae_features(self) -> tuple[SaeFeatures, ...]:
@@ -742,6 +764,8 @@ def _decode_project(project: algebra_pb2.ProjectRel,
             return _decode_extract(project, functions)
         if functions.get(reference) == AI_SAE_FEATURES_NAME:
             return _decode_sae_features(project, functions)
+        if functions.get(reference) == AI_MAP_NAME:
+            return _decode_map(project, functions)
     return _decode_classify(project, functions)
 
 
@@ -766,6 +790,49 @@ def _decode_extract(project: algebra_pb2.ProjectRel,
     if output == "id" or (alias, output) in child.fields:
         raise ValueError(f"answer column {output!r} is already a field")
     operator = Extract(project.common.hint.alias, alias, prompt, output)
+    return _Decoded(
+        (*child.fields, (alias, output)),
+        child.tables,
+        _with_text_column(child.text_columns, field),
+        (*child.operators, operator),
+    )
+
+
+def _decode_map(project: algebra_pb2.ProjectRel,
+                functions: dict[int, str]) -> _Decoded:
+    """Decode a ProjectRel that adds one ai_map string column."""
+    from quail_b.rendering import map_frame
+
+    child = _decode(project.input, functions)
+    if project.common.HasField("emit"):
+        raise ValueError("a map ProjectRel adds exactly one column")
+    expression = project.expressions[0]
+    arguments = _arguments(expression)
+    if len(arguments) != 3:
+        raise ValueError("ai_map needs a prompt, a document field, and max_tokens")
+    prompt = _literal_string(arguments[0])
+    map_frame(prompt)
+    field = _selected(child.fields, arguments[1])
+    limit = arguments[2]
+    if (not limit.HasField("literal")
+            or limit.literal.WhichOneof("literal_type") != "i32"
+            or limit.literal.i32 <= 0):
+        raise ValueError("ai_map max_tokens must be a positive constant i32")
+    output_type = expression.scalar_function.output_type
+    if (not output_type.HasField("string")
+            or output_type.string.nullability != type_pb2.Type.NULLABILITY_REQUIRED):
+        raise ValueError("ai_map must return a required string")
+    names = tuple(project.common.hint.output_names)
+    expected = tuple(".".join(name) for name in child.fields)
+    if len(names) != len(expected) + 1 or names[:-1] != expected:
+        raise ValueError("a map ProjectRel must name every output field")
+    alias, _, output = names[-1].partition(".")
+    if alias != field[0] or not output or "." in output:
+        raise ValueError("a map answer column must belong to the read relation")
+    if output == "id" or (alias, output) in child.fields:
+        raise ValueError(f"map answer column {output!r} is already a field")
+    operator = Map(project.common.hint.alias, alias, prompt,
+                   limit.literal.i32, output)
     return _Decoded(
         (*child.fields, (alias, output)),
         child.tables,
@@ -1029,7 +1096,7 @@ def _validate_relational(info: PlanInfo) -> None:
         if info.fetch is None and info.aggregate is None and (
                 f"{score.relation}.{score.output}" not in info.select):
             raise ValueError(f"score column {score.output!r} is never used")
-    for extract in info.extracts:
+    for extract in (*info.extracts, *info.maps):
         if f"{extract.relation}.{extract.output}" not in info.select:
             raise ValueError(
                 f"answer column {extract.output!r} is never used")
@@ -1072,7 +1139,7 @@ def _validate_info(info: PlanInfo) -> None:
                     "join of its two relations")
         elif (
             isinstance(operator, (Filter, Classify, InList, ColumnTest,
-                                  Extract, SaeFeatures))
+                                  Extract, SaeFeatures, Map))
             and index > first_join[operator.relation]
         ):
             raise ValueError(
@@ -1080,7 +1147,7 @@ def _validate_info(info: PlanInfo) -> None:
             )
     outputs = [operator.output for operator in (*info.classifies,
                                                 *info.extracts,
-                                                *info.sae_features)]
+                                                *info.sae_features, *info.maps)]
     if len(set(outputs)) != len(outputs) or set(outputs) & set(aliases):
         raise ValueError("label, answer, and feature list column names must "
                          "be distinct from each other and from relation "
@@ -1099,7 +1166,7 @@ def _validate_info(info: PlanInfo) -> None:
             continue
         operator = next(
             (operator for operator in (*info.classifies, *info.extracts,
-                                       *info.sae_features)
+                                       *info.sae_features, *info.maps)
              if (operator.relation, operator.output) == (alias, column)),
             None)
         if operator is None:
@@ -1116,7 +1183,7 @@ def _validate_info(info: PlanInfo) -> None:
         if operator.output not in used:
             raise ValueError(
                 f"label column {operator.output!r} is never used")
-    for operator in info.extracts:
+    for operator in (*info.extracts, *info.maps):
         if operator.output not in used:
             raise ValueError(
                 f"answer column {operator.output!r} is never used")

@@ -4,8 +4,16 @@ QUAIL-B is an academic benchmark of 85 AI SQL queries over document tables.
 It publishes Substrait query plans, input tables, reference labels, and a
 scoring harness. It does not include an execution engine.
 
-IMDB-16, IMDB-17, WRENCH-6 to WRENCH-8, CUAD-16, and SEC-1 to SEC-10 are drafts: they
-have no reference answers yet and are not part of the default 85 queries.
+Drafts are excluded from the default 85 queries. Load them by ID with
+`accuracy=False`:
+
+- Extraction and SEC drafts: IMDB-16, IMDB-17, WRENCH-6 to WRENCH-8, CUAD-16,
+  and SEC-1 to SEC-10 lack reference answers.
+- SAE drafts: IMDB-18, IMDB-19, BIO-7, SUPPORT-7, and WRENCH-9 lack reference
+  features.
+- Map drafts: IMDB-MAP-1 to IMDB-MAP-5 and CUAD-MAP-1 to CUAD-MAP-3 generate
+  text without reference map answers. IDs, filters, and classifications still
+  use the usual scoring rules when reference labels are available.
 
 Read `README.md` for the public benchmark contract and metric definitions.
 
@@ -29,11 +37,13 @@ Read `README.md` for the public benchmark contract and metric definitions.
 - Do not add engine runtime code, GPU infrastructure, or experiment reports
   here.
 - The AI operators are `ai_filter`, `ai_join`, `ai_classify`, `ai_score`,
-  and `ai_extract`. Relational operators appear in the `REL-` queries,
-  the agent trace queries (`SUPPORT-`, `RUNS-`, `WRENCH-`), the sales
-  call queries (`SALES-`), and the contract queries (`CUAD-`). Do not
-  add maps, speculation, or forking unless the task changes the
-  benchmark scope.
+  `ai_extract`, `ai_sae_features`, and `ai_map`. Relational operators appear in
+  the `REL-` queries, the agent trace queries (`SUPPORT-`, `RUNS-`, `WRENCH-`),
+  the sales call queries (`SALES-`), and the contract queries (`CUAD-`). Do not
+  add speculation or forking unless the task changes the benchmark scope.
+- `ai_map` greedily generates nonnull text under a positive constant answer
+  token limit. Preserve its `raw-v1` prompt layout and keep generated answer
+  tokens out of prompt-piece accounting. Map text has no accuracy score.
 - Preserve query IDs, operator IDs, prompt text, corpus identities, scale
   factors, and label identities unless the task explicitly changes that
   public contract.

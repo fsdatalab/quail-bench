@@ -51,6 +51,8 @@ class PredicateSpec:
     # equal, as the query's WHERE conditions keep
     left_where: tuple[str, object] | None = None
     right_where: tuple[str, object] | None = None
+    # map only: the answer limit changes the generated string
+    max_tokens: int | None = None
 
 
 PREDICATES = (
@@ -400,6 +402,35 @@ SAE_FEATURES_PREDICATES = (
           ("tone_features", prompts.SUPPORT_TONE_FEATURES))),
 )
 
+# Map answers have no reference labels. Limits distinguish otherwise
+# identical instructions, including the two parties maps.
+MAP_PREDICATES = (
+    *(PredicateSpec(
+        f"quailb.imdb.review.map_{slug}", "imdb", f"map_{slug}", "map",
+        template, "review", "reviews", "body", source_policy="unpublished",
+        max_tokens=limit)
+      for slug, template, limit in (
+          ("negatives", prompts.IMDB_MAP_NEGATIVES, 64),
+          ("summary", prompts.IMDB_MAP_SUMMARY, 256),
+          ("topic", prompts.IMDB_MAP_TOPIC, 32))),
+    *(PredicateSpec(
+        f"quailb.cuad.contract.map_{slug}", "cuad", f"map_{slug}", "map",
+        template, "contract", "contracts", "text", source_policy="unpublished",
+        max_tokens=limit)
+      for slug, template, limit in (
+          ("parties_256", prompts.CUAD_MAP_PARTIES, 256),
+          ("parties_128", prompts.CUAD_MAP_PARTIES, 128),
+          ("term", prompts.CUAD_MAP_TERM, 128),
+          ("governing_law", prompts.CUAD_MAP_GOVERNING_LAW, 128),
+          ("non_compete", prompts.CUAD_MAP_NON_COMPETE, 256))),
+)
+IMDB_MAP_FILTER_PREDICATES = (
+    PredicateSpec(
+        "quailb.imdb.review.is_negative", "imdb", "review_is_negative",
+        "filter", prompts.IMDB_NEGATIVE, "review", "reviews", "body",
+        source_policy="unpublished"),
+)
+
 # SEC definitions are available to labelers without changing published sets.
 SEC_PREDICATES = (
     PredicateSpec(
@@ -439,7 +470,8 @@ SEC_PREDICATES = (
 PREDICATE_BY_KEY = {p.key: p for p in (
     PREDICATES + CLASSIFY_PREDICATES + EXTRACT_PREDICATES
     + IMDB_EXTRACT_PREDICATES + WRENCH_EXTRACT_PREDICATES
-    + SAE_FEATURES_PREDICATES + SEC_PREDICATES)}
+    + SAE_FEATURES_PREDICATES + MAP_PREDICATES
+    + IMDB_MAP_FILTER_PREDICATES + SEC_PREDICATES)}
 
 WORKLOADS = tuple(dict.fromkeys(spec.workload for spec in PREDICATES))
 
@@ -481,6 +513,7 @@ def predicate_payload(spec: PredicateSpec) -> dict:
         "classify": "classify_document_then_categories_v1",
         "extract": "extract_document_then_question_v1",
         "sae_features": "sae_features_document_then_question_v1",
+        "map": "map_document_then_instruction_v1",
     }[spec.kind]
     if is_joined_classify(spec):
         # stored in the published label sets' identities; keep as is
@@ -530,6 +563,11 @@ def predicate_payload(spec: PredicateSpec) -> dict:
     if is_joined_classify(spec):
         payload.update(anchor_note=JOIN_ANCHOR_NOTE,
                        partner_label=JOIN_DOC_LABEL)
+    if spec.kind == "map":
+        payload.pop("task_instruction", None)
+        payload.update(max_tokens=spec.max_tokens,
+                       answer_cue=rendering.ANSWER_CUE,
+                       decoding="greedy_until_end_of_turn_or_limit")
     if spec.kind == "sae_features":
         payload.pop("task_instruction", None)
         payload["pooling"] = spec.pooling
@@ -705,6 +743,12 @@ def render_extract_prompt(spec: PredicateSpec, document: str) -> str:
     if spec.kind != "extract":
         raise ValueError(f"{spec.key} is not an extraction")
     return rendering.render_extract_prompt(spec.template, document)
+
+
+def render_map_prompt(spec: PredicateSpec, document: str) -> str:
+    if spec.kind != "map":
+        raise ValueError("a map prompt needs a map predicate")
+    return rendering.render_map_prompt(spec.template, document)
 
 
 def render_sae_features_prompt(spec: PredicateSpec, document: str) -> str:
