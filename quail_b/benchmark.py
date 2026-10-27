@@ -123,13 +123,16 @@ def _load_truth(specs, scale_factor, corpus_id,
             root, scale_factor=scale_factor, corpus_id=corpus_id,
             collection_id=collection_id, prompt_format=PROMPT_FORMAT, templates={
                 operator.prompt for spec in specs
-                for operator in spec.info.ai_operators})
+                for operator in spec.info.ai_operators
+                if operator not in spec.info.maps})
         if collection_id is not None and truth.collection_id != collection_id:
             raise ValueError("ground truth has the wrong collection ID")
         if truth.corpus_id != corpus_id or truth.scale_factor != scale_factor:
             raise ValueError("ground truth does not match the input corpus")
         for spec in specs:
             for operator in spec.info.ai_operators:
+                if operator in spec.info.maps:
+                    continue
                 try:
                     truth.key_for_template(operator.prompt)
                 except KeyError as error:

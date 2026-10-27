@@ -10,6 +10,9 @@ running the benchmark, the queries, and the results.
 - [Prompt rendering](#prompt-rendering)
 - [`RunOutput`](#runoutput)
 - [Predicate answers](#predicate-answers)
+- [Classification](#classification)
+- [Extraction](#extraction)
+- [Maps](#maps)
 - [Measurements](#measurements)
 - [Prompt pieces](#prompt-pieces)
 - [Metric requirements](#metric-requirements)
@@ -60,9 +63,15 @@ ai_classify(prompt: string, document: string,
             labels: list<string>, descriptions: list<string>) -> string
 ai_classify(prompt: string, anchor: string, partner: string,
             labels: list<string>, descriptions: list<string>) -> string
+ai_score(prompt: string, document: string) -> fp64
+ai_extract(question: string, document: string) -> string or null
+ai_map(prompt: string, document: string, max_tokens: i32) -> nonnull string
+ai_sae_features(prompt: string, document: string, pooling: string)
+    -> list<struct<feature: i32, strength: fp32>>
 ```
 
-The prompt, labels, and descriptions are constants. The functions are declared
+The prompt, question, labels, descriptions, pooling, and max_tokens arguments
+are constants. `max_tokens` must be positive. The functions are declared
 in [`quail_b/substrait_extensions.yaml`](../quail_b/substrait_extensions.yaml)
 under the URN `extension:org.fsdatalab.quail_b:functions_ai`.
 
@@ -77,6 +86,10 @@ A plan reader matches on these names:
 | `ai_join` | `ai_join:str_str_str` |
 | `ai_classify`, one document | `ai_classify:str_str_list_list` |
 | `ai_classify`, joined rows | `ai_classify:str_str_str_list_list` |
+| `ai_score` | `ai_score:str_str` |
+| `ai_extract` | `ai_extract:str_str` |
+| `ai_map` | `ai_map:str_str_i32` |
+| `ai_sae_features` | `ai_sae_features:str_str_str` |
 
 Each operator that asks the model, and each IN-list filter, has an operator
 ID as its hint alias:
@@ -86,6 +99,10 @@ ID as its hint alias:
 | AI filter | `FilterRel` calling `ai_filter` | `filter-N` |
 | AI join | `JoinRel` calling `ai_join` | `join-N` |
 | Classification | `ProjectRel` calling `ai_classify` | `classify-N` |
+| Score | `ProjectRel` calling `ai_score` | `score-N` |
+| Extraction | `ProjectRel` calling `ai_extract` | `extract-N` |
+| Map | `ProjectRel` calling `ai_map` | `map-N` |
+| SAE features | `ProjectRel` calling `ai_sae_features` | `sae-features-N` |
 | IN-list filter | `FilterRel` with a `SingularOrList` condition | `in-list-N` |
 
 A classification adds one label column to its relation. Its hint output
@@ -129,10 +146,10 @@ filter_text = render_filter_prompt(template, document)
 join_text = render_join_prompt(template, documents, anchor=0)
 ```
 
-Every prompt starts with a document. The question follows it and begins
-"Evaluate TRUE or FALSE for the following question:". Because the document
-comes first, an engine can compute a document's KV once and reuse it across
-every question asked of that document.
+Filter and join prompts start with a document. The question follows it and
+begins "Evaluate TRUE or FALSE for the following question:". Because the
+document comes first, an engine can compute a document's KV once and reuse it
+across questions asked of that document.
 
 For joins, `documents` follows template placeholder order. `anchor` selects the
 document placed first. Both renderers end with `ANSWER:`, and the model answer
@@ -156,6 +173,9 @@ from quail_b.rendering import render_extract_prompt
 extract_text = render_extract_prompt(question, document)
 ```
 
+Maps use the `raw-v1` layout described under [Maps](#maps), without extraction's
+phrase format. They have no reference text answers.
+
 The published labels use these templates and this rendering. A different
 prompt defines a different predicate, and its results are incomparable with
 the labels.
@@ -174,6 +194,7 @@ the labels.
 | `score_answers` | `dict[str, pa.Table] \| None` | Token metrics of a query with a score |
 | `extract_answers` | `dict[str, pa.Table] \| None` | Span accuracy and token metrics of a query with an extraction |
 | `features_answers` | `dict[str, pa.Table] \| None` | Token metrics of a query with an SAE feature call |
+| `map_answers` | `dict[str, pa.Table] \| None` | Map validation and token metrics |
 
 ### Result rows
 
@@ -616,6 +637,82 @@ An extraction label set stores `left_id`, a null `right_id`, and an `answers`
 column. `answers` lists the text of each reference span. The list is empty
 where the document does not answer the question.
 
+## Maps
+
+`ai_map(prompt, document, max_tokens)` returns generated text, not an extracted
+span or a label from a fixed list. Its Substrait signature is
+`ai_map:str_str_i32`.
+
+- `prompt` is a constant string of the form `"{0}\n\n<instruction>"`.
+- `max_tokens` is a positive constant `i32`, limiting generated answer tokens,
+  not input tokens.
+- Decode greedily until the model ends the turn or reaches that limit.
+- The call's `ProjectRel`, with hint alias `map-N`, adds a nonnull string
+  column. Its output name is `alias.column`, as for a classification.
+- Selected map columns are flat strings, not extraction's struct fields.
+
+### Prompt rendering
+
+The `raw-v1` layout is exactly:
+
+```text
+DOCUMENT:
+<document>
+
+<instruction>
+ANSWER:
+```
+
+The shared preamble is `"DOCUMENT:\n"`. The tail is
+`"\n\n<instruction>\nANSWER:"`, with no trailing newline. The layout adds no
+phrase-format instruction or model-specific turn markers. As with extraction,
+an adapter may wrap this text in the model's chat turn; wrapping is separate
+from the raw layout and must be reflected in the reported token pieces.
+
+### Answers and scoring
+
+`map_answers` maps each map operator ID to a table with two columns:
+
+- the relation's alias column, holding document IDs;
+- a nonnull string `answer` column, with one row per evaluated document.
+
+IDs must exist in the input table and occur at most once per map answer table.
+A selected map column has the part of the plan output name after the alias as
+its name. Its values must match the corresponding map answer table. For a map
+returning `r.summary`:
+
+```python
+map_answers = {
+    "map-1": pa.table({
+        "r": ["rv17", "rv42"],
+        "answer": ["A positive review.", "A mixed review."],
+    }),
+}
+rows = pa.table({
+    "r": ["rv17", "rv42"],
+    "summary": ["A positive review.", "A mixed review."],
+})
+```
+
+There are no reference map answers and no accuracy score for generated text.
+Output scoring ignores map text, while IDs, filters, and classifications keep
+their usual scoring rules when reference labels are available. For example,
+IMDB-MAP-5 reuses IMDB-11's sentiment labels, but IMDB-MAP-4's new negative-review
+filter has no reference labels yet.
+
+The eight [map drafts](../README.md#map-queries) are excluded from the default
+85 queries. Load them by ID with `accuracy=False`.
+
+### Token accounting
+
+In `prompt_pieces`, `maps` is a list of `{"id": "map-N", "tail": [...]}` entries,
+one per map operator. Each evaluated document contributes the token lengths
+of the shared preamble, the document, and that map's tail. The minimum uses
+the same prefix-sharing rules as filters: repeated maps of one document can
+reuse its prefix. Both input and minimum tokens stop at the answer cue and
+exclude generated answer tokens. Report fresh input tokens separately from
+any decode-token measurements.
+
 ## Measurements
 
 `measurements` holds numbers the engine reports. QUAIL-B recognizes three keys:
@@ -657,6 +754,7 @@ must compute.
 | `joins` | `list[dict]` | One join description per join |
 | `classifies` | `list[dict]` | One description per classification |
 | `scores` | `list[dict]` | One `id` and `tail` token list per score, as for a filter |
+| `maps` | `list[dict]` | One `id` and `tail` per map, through `ANSWER:` |
 | `extracts` | `list[dict]` | One `id` and `tail` token list per extraction, as for a filter. The tail holds the question, the instruction, and the answer format, through the answer cue |
 | `features` | `list[dict]` | One `id` and `tail` token list per SAE feature call, as for a filter. The tail is the question alone: the call generates no text and has no answer cue |
 
@@ -690,10 +788,9 @@ that uses one tokenizer.
 
 Prompt pieces require:
 
-- an answer table for every filter, join, classification, score, and
-  extraction;
-- every filter, join, classification, score, and extraction listed exactly
-  once;
+- an answer table for every filter, join, classification, score, extraction,
+  SAE feature call, and map;
+- every such operator listed exactly once;
 - `measurements["fresh_tokens"]`;
 - the same tokenizer and token layout used during execution, or a reported
   `input_tokens` total when the engine tokenized full prompts itself.
@@ -714,7 +811,7 @@ minimum tokens, recomputed tokens, and KV regret.
 | Span accuracy | Extraction answers |
 | Fresh tokens | `measurements["fresh_tokens"]` |
 | Input tokens and their throughput | Prompt pieces, or reported input tokens |
-| Minimum tokens and KV regret | All answer tables, score and extract answers included, prompt pieces, and fresh tokens |
+| Minimum tokens and KV regret | All answer tables, prompt pieces, and fresh tokens |
 | GPU cost | `gpu_count` and `gpu_hourly_rate_usd` |
 | Cost per million input tokens | GPU cost and a positive input token count |
 

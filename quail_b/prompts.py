@@ -162,6 +162,23 @@ SCENARIO_MATCH = ("Based on the privacy policy in DOCUMENT {0}, could "
 # one-document template takes the document as `{0}`; a pair template
 # takes the anchor as `{0}` and its partner as `{1}`.
 
+# Free-form maps put the document before the instruction.
+IMDB_MAP_NEGATIVES = (
+    "{0}\n\nSummarize the negative arguments the writer makes, in one sentence.")
+IMDB_MAP_SUMMARY = (
+    "{0}\n\nWrite a detailed summary of the document: the people involved, "
+    "the main points they make, and anything unresolved.")
+IMDB_MAP_TOPIC = "{0}\n\nName the main topic of the document in a few words."
+IMDB_NEGATIVE = "Is this review negative?\n\n{0}"
+CUAD_MAP_PARTIES = "{0}\n\nList the parties to this contract and the role of each."
+CUAD_MAP_TERM = (
+    "{0}\n\nState how long the contract runs and how either party can end it.")
+CUAD_MAP_GOVERNING_LAW = (
+    "{0}\n\nName the governing law and the venue for disputes.")
+CUAD_MAP_NON_COMPETE = (
+    "{0}\n\nSummarize the non-compete obligations and who they bind.")
+
+
 IMDB_SENTIMENT = (
     "Judge strictly from the review above which category best describes "
     "the overall sentiment it expresses about the movie.\n\n{0}"

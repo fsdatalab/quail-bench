@@ -26,6 +26,7 @@ from quail_b.scoring import (
     scores_from_answers,
     selected_extracts,
     selected_features,
+    selected_maps,
 )
 from quail_b.substrait import (
     Classify,
@@ -34,6 +35,7 @@ from quail_b.substrait import (
     Filter,
     InList,
     Join,
+    Map,
     SaeFeatures,
     Score,
     output_name,
@@ -123,6 +125,15 @@ def _query_hash(spec):
                 "prompt": operator.prompt,
                 "output": operator.output,
             })
+        elif isinstance(operator, Map):
+            operators.append({
+                "kind": "map",
+                "id": operator.id,
+                "relation": operator.relation,
+                "prompt": operator.prompt,
+                "max_tokens": operator.max_tokens,
+                "output": operator.output,
+            })
         elif isinstance(operator, SaeFeatures):
             operators.append({
                 "kind": "sae_features",
@@ -195,12 +206,15 @@ def _save_output(directory, output, spec):
         paths["extracts"] = None
     if output.features_answers is not None:
         paths["features"] = None
+    if output.map_answers is not None:
+        paths["maps"] = None
     for kind, answers in (
             ("filters", output.filter_answers), ("joins", output.join_answers),
             ("classifications", output.classify_answers),
             ("scores", output.score_answers),
             ("extracts", output.extract_answers),
-            ("features", output.features_answers)):
+            ("features", output.features_answers),
+            ("maps", output.map_answers)):
         if answers is None:
             continue
         paths[kind] = []
@@ -229,6 +243,7 @@ def _read_output(directory, record, rows=True):
     scores = paths.get("scores")
     extracts = paths.get("extracts")
     features = paths.get("features")
+    maps = paths.get("maps")
     pieces = paths.get("prompt_pieces")
     return RunOutput(
         None if filters is None else {
@@ -250,7 +265,10 @@ def _read_output(directory, record, rows=True):
             for item in extracts},
         None if features is None else {
             item["key"]: pq.read_table(file(item["path"]))
-            for item in features})
+            for item in features},
+        None if maps is None else {
+            item["key"]: pq.read_table(file(item["path"]))
+            for item in maps})
 
 
 ROW_SAMPLE = 100_000    # rows of a traced result checked one by one
@@ -323,6 +341,43 @@ def _validate_output(spec, output, tables):
     feature_columns = {
         operator.output: operator for operator in spec.info.sae_features}
     returned_features = selected_features(spec)
+    map_columns = {operator.output: operator for operator in spec.info.maps}
+    returned_maps = selected_maps(spec)
+
+    def validate_map_strings(table, names):
+        for name in names:
+            column = table[name]
+            if column.null_count or not pa.types.is_string(column.type):
+                raise ValueError("map answers must be non-null strings")
+
+    maps = {operator.id: operator for operator in spec.info.maps}
+    for operator_id, table in (output.map_answers or {}).items():
+        if operator_id not in maps:
+            raise ValueError(f"unknown map operator {operator_id!r}")
+        alias = maps[operator_id].relation
+        if set(table.column_names) != {alias, "answer"}:
+            raise ValueError("a map answer table needs its alias and answer columns")
+        validate_ids(table, [alias])
+        validate_map_strings(table, ["answer"])
+
+    def rows_follow_maps(rows):
+        for operator in returned_maps:
+            table = (output.map_answers or {}).get(operator.id)
+            if table is None:
+                continue
+            alias = operator.relation
+            known = pa.table({
+                alias: table[alias].cast(pa.string()),
+                "known": table["answer"]})
+            joined = pa.table({
+                alias: rows[alias].cast(pa.string()),
+                "returned": rows[operator.output],
+            }).join(known, keys=[alias], join_type="left outer")
+            same = pc.equal(joined["returned"], joined["known"]).fill_null(False)
+            if joined.num_rows and not pc.all(same).as_py():
+                raise ValueError(
+                    f"a returned {operator.output} answer differs from the engine's "
+                    "answer table or has no map answer")
 
     def validate_feature_lists(table, names):
         for name in names:
@@ -444,7 +499,8 @@ def _validate_output(spec, output, tables):
         mask = implied_rows_mask(
             pa.table({name: sample[name].cast(pa.string())
                       for name in columns
-                      if name not in structs and name not in feature_columns}),
+                      if name not in structs and name not in feature_columns
+                      and name not in map_columns}),
             survivors, relations, spec,
             answer_labels(spec, output.classify_answers))
         if not (pc.all(mask).as_py() if sample.num_rows else True):
@@ -454,6 +510,10 @@ def _validate_output(spec, output, tables):
         validate_feature_lists(
             sample, [name for name in columns if name in feature_columns])
         rows_follow_features(sample)
+    if output.rows is not None:
+        validate_map_strings(
+            output.rows, [name for name in columns if name in map_columns])
+        rows_follow_maps(output.rows)
     filters = {
         filter_spec.id: filter_spec for filter_spec in spec.info.filters
     }

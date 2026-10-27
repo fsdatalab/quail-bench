@@ -73,6 +73,7 @@ from quail_b.substrait import (
     AI_EXTRACT_NAME,
     AI_FILTER_NAME,
     AI_JOIN_NAME,
+    AI_MAP_NAME,
     AI_SAE_FEATURES_NAME,
     AI_SCORE_NAME,
     AND_NAME,
@@ -116,6 +117,7 @@ _FUNCTIONS = {
     "max:i32": (18, ARITHMETIC_EXTENSION_URN),
     AI_EXTRACT_NAME: (19, AI_EXTENSION_URN),
     AI_SAE_FEATURES_NAME: (20, AI_EXTENSION_URN),
+    AI_MAP_NAME: (21, AI_EXTENSION_URN),
 }
 _COMPARISONS = {
     "=": EQUAL_NAME, "<>": "not_equal:any_any", "<": "lt:any_any",
@@ -182,6 +184,16 @@ class Extract:
 
     input: "Scan | Where | Filter | Classify | InList | Extract"
     question: str
+    output: str
+
+
+@dataclass(frozen=True)
+class Map:
+    """Add one free-form answer column with a fixed answer-token limit."""
+
+    input: "Scan | Where | Filter | Classify | InList | Map"
+    prompt: str
+    max_tokens: int
     output: str
 
 
@@ -475,7 +487,7 @@ class _Emitter:
     def __init__(self):
         self.counts = {"filter": 0, "join": 0, "classify": 0,
                        "in-list": 0, "where": 0, "score": 0, "extract": 0,
-                       "sae-features": 0,
+                       "sae-features": 0, "map": 0,
                        "aggregate": 0, "having": 0, "sort": 0, "fetch": 0}
         self.functions = set()
 
@@ -533,6 +545,25 @@ class _Emitter:
                     _literal(node.prompt),
                     _field(fields.index((alias, text[alias]))),
                 ], _fp64_type())],
+            )
+            return algebra.Rel(project=relation), output_fields, text
+
+        if isinstance(node, Map):
+            rel, fields, text = self.emit(node.input)
+            (alias,) = text
+            self.functions.add(AI_MAP_NAME)
+            output_fields = (*fields, (alias, node.output))
+            common = _common(self._operator_id("map"))
+            common.hint.output_names.extend(
+                ".".join(field) for field in output_fields)
+            relation = algebra.ProjectRel(
+                common=common,
+                input=rel,
+                expressions=[_call(AI_MAP_NAME, [
+                    _literal(node.prompt),
+                    _field(fields.index((alias, text[alias]))),
+                    _number(node.max_tokens),
+                ], _string_type())],
             )
             return algebra.Rel(project=relation), output_fields, text
 
@@ -1137,6 +1168,27 @@ QUERIES = (
                       "features"),
           select=("r", "r.features"), draft=True),
 
+    Query("IMDB-MAP-1", "map: negative arguments in one sentence",
+          Map(_reviews(), prompts.IMDB_MAP_NEGATIVES, 64, "negatives"),
+          select=("r", "r.negatives"), draft=True),
+    Query("IMDB-MAP-2", "map: detailed summary of every review",
+          Map(_reviews(), prompts.IMDB_MAP_SUMMARY, 256, "summary"),
+          select=("r", "r.summary"), draft=True),
+    Query("IMDB-MAP-3", "3 maps: negatives, detailed summary, and topic",
+          Map(Map(Map(_reviews(), prompts.IMDB_MAP_NEGATIVES, 64, "negatives"),
+                  prompts.IMDB_MAP_SUMMARY, 256, "summary"),
+              prompts.IMDB_MAP_TOPIC, 32, "topic"),
+          select=("r", "r.negatives", "r.summary", "r.topic"), draft=True),
+    Query("IMDB-MAP-4", "negative reviews -> map: detailed summary",
+          Map(_filters(_reviews(), prompts.IMDB_NEGATIVE),
+              prompts.IMDB_MAP_SUMMARY, 256, "summary"),
+          select=("r", "r.summary"), draft=True),
+    Query("IMDB-MAP-5", "classify sentiment and map: detailed summary",
+          Map(_classify(_reviews(), prompts.IMDB_SENTIMENT,
+                        prompts.IMDB_SENTIMENT_LABELS, "tone"),
+              prompts.IMDB_MAP_SUMMARY, 256, "summary"),
+          select=("r", "r.tone", "r.summary"), draft=True),
+
     Query("BIO-1", "filter: serious adverse event",
           _filters(_reports(), SERIOUS_ADVERSE_EVENT)),
     Query("BIO-2", "join: J1 (reports x terms)",
@@ -1537,6 +1589,20 @@ QUERIES = (
           draft=True),
 
     # SEC inputs are built locally until reference labels are published.
+    Query("CUAD-MAP-1", "map: contract parties and their roles",
+          Map(_contracts(), prompts.CUAD_MAP_PARTIES, 256, "parties"),
+          select=("c", "c.parties"), draft=True),
+    Query("CUAD-MAP-2", "3 maps: parties, term, and governing law",
+          Map(Map(Map(_contracts(), prompts.CUAD_MAP_PARTIES, 128, "parties"),
+                  prompts.CUAD_MAP_TERM, 128, "term"),
+              prompts.CUAD_MAP_GOVERNING_LAW, 128, "governing_law"),
+          select=("c", "c.parties", "c.term", "c.governing_law"), draft=True),
+    Query("CUAD-MAP-3", "non-compete contracts -> map obligations -> first 10 ids",
+          Fetch(Sort(Map(_filters(_contracts(), cuad_filter("Non-Compete")),
+                         prompts.CUAD_MAP_NON_COMPETE, 256, "non_compete"),
+                     (("c.id", False),)), 10),
+          select=("c", "c.non_compete"), draft=True),
+
     Query("SEC-1", "filter: announced CEO departure", _sec_departures(),
           draft=True),
     Query("SEC-2", "where: long, recent filing -> extract: party in the reported event",

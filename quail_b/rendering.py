@@ -154,6 +154,27 @@ EXTRACT_CUE = '\nPhrase: "'
 EXTRACT_NONE = "none"
 
 
+def map_frame(template: str) -> tuple[str, str]:
+    """Return the shared preamble and instruction tail of a map prompt."""
+    _check_placeholders(template, 1)
+    prefix = "{0}\n\n"
+    instruction = template[len(prefix):]
+    if (not template.startswith(prefix) or not instruction.strip()
+            or "{" in instruction or "}" in instruction):
+        raise ValueError("a map template must be '{0}\\n\\n<instruction>'")
+    return SHARED_PRE, "\n\n" + instruction + ANSWER_CUE
+
+
+def render_map_prompt(template: str, document: str) -> str:
+    """Return a map prompt ending where the free-form answer begins.
+
+    Like extraction, this is raw text that an engine may wrap in its
+    model's chat turn. It has no phrase format or copying instruction.
+    """
+    preamble, tail = map_frame(template)
+    return preamble + document + tail
+
+
 def render_extract_prompt(question: str, document: str) -> str:
     """Return the complete text of one extraction question over one document.
 
