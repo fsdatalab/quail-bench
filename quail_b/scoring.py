@@ -1170,13 +1170,32 @@ def row_counts(spec: QuerySpec, output: RunOutput, ground_truth,
         return predicted_count, expected_count, matched_count
 
 
+def unlabeled_operators(spec: QuerySpec, ground_truth) -> set[str]:
+    """Return the IDs of a query's scored operators without reference labels.
+
+    Only a draft query can have them; map text is never scored.
+    """
+    unlabeled = set()
+    for operator in spec.info.ai_operators:
+        if operator in spec.info.maps:
+            continue
+        try:
+            ground_truth.key_for_template(operator.prompt)
+        except KeyError:
+            unlabeled.add(operator.id)
+    return unlabeled
+
+
 def evaluate(spec: QuerySpec, output: RunOutput, ground_truth, corpus_rows) -> dict:
+    unlabeled = unlabeled_operators(spec, ground_truth)
     per_predicate = []
     total = BinaryCounts()
     filters = {
         filter_spec.id: filter_spec for filter_spec in spec.info.filters
     }
     for operator_id, table in (output.filter_answers or {}).items():
+        if operator_id in unlabeled:
+            continue
         filter_spec = filters[operator_id]
         labels = _labels(ground_truth, filter_spec.prompt)
         item = _PredicateCount(labels.key, "filter", filter_spec.relation)
@@ -1185,6 +1204,8 @@ def evaluate(spec: QuerySpec, output: RunOutput, ground_truth, corpus_rows) -> d
         per_predicate.append(item.as_dict())
     joins = {join.id: join for join in spec.info.joins}
     for operator_id, table in (output.join_answers or {}).items():
+        if operator_id in unlabeled:
+            continue
         join = joins[operator_id]
         labels = _labels(ground_truth, join.prompt)
         item = _PredicateCount(labels.key, "join")
@@ -1194,6 +1215,8 @@ def evaluate(spec: QuerySpec, output: RunOutput, ground_truth, corpus_rows) -> d
     classifies = {operator.id: operator for operator in spec.info.classifies}
     label_total = LabelCounts()
     for operator_id, table in (output.classify_answers or {}).items():
+        if operator_id in unlabeled:
+            continue
         operator = classifies[operator_id]
         labels = _classify_labels(ground_truth, operator)
         counts = label_agreement(table, operator.relations, labels)
@@ -1204,6 +1227,8 @@ def evaluate(spec: QuerySpec, output: RunOutput, ground_truth, corpus_rows) -> d
     extracts = {operator.id: operator for operator in spec.info.extracts}
     span_total = SpanCounts()
     for operator_id, table in (output.extract_answers or {}).items():
+        if operator_id in unlabeled:
+            continue
         operator = extracts[operator_id]
         labels = _extract_labels(ground_truth, operator)
         counts = span_agreement(table, operator.relation, labels)
@@ -1212,7 +1237,10 @@ def evaluate(spec: QuerySpec, output: RunOutput, ground_truth, corpus_rows) -> d
             "predicate_key": labels.key, "op": "extract",
             "alias": operator.relation, **counts.as_dict()})
 
-    if spec.info.relational:
+    if unlabeled:
+        # the reference rows follow every predicate's labels
+        output_accuracy = None
+    elif spec.info.relational:
         if output.rows is None:
             raise ValueError("a relational query is scored from its rows")
         output_accuracy = relational_accuracy(
@@ -1240,6 +1268,7 @@ def evaluate(spec: QuerySpec, output: RunOutput, ground_truth, corpus_rows) -> d
             span_total.as_dict() if span_total.evaluated else None),
         "output_accuracy": output_accuracy,
         "per_predicate": per_predicate,
+        "unlabeled_operators": sorted(unlabeled),
         "input_document_rows": input_document_rows,
         "unique_input_documents": len(unique_documents),
     }

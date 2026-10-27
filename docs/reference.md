@@ -700,6 +700,11 @@ their usual scoring rules when reference labels are available. For example,
 IMDB-MAP-5 reuses IMDB-11's sentiment labels, but IMDB-MAP-4's new negative-review
 filter has no reference labels yet.
 
+`quail_b.run` still runs a draft whose predicates lack reference labels. Its
+record lists them under `accuracy.unlabeled_operators`, scores the predicates
+that have labels, and leaves `output_accuracy` null, since the reference rows
+depend on every predicate. A published query still needs all of its labels.
+
 The eight [map drafts](../README.md#map-queries) are excluded from the default
 85 queries. Load them by ID with `accuracy=False`.
 
