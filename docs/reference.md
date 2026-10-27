@@ -709,9 +709,16 @@ In `prompt_pieces`, `maps` is a list of `{"id": "map-N", "tail": [...]}` entries
 one per map operator. Each evaluated document contributes the token lengths
 of the shared preamble, the document, and that map's tail. The minimum uses
 the same prefix-sharing rules as filters: repeated maps of one document can
-reuse its prefix. Both input and minimum tokens stop at the answer cue and
-exclude generated answer tokens. Report fresh input tokens separately from
-any decode-token measurements.
+reuse its prefix. Prompt pieces and `input_tokens` stop at the answer cue and
+exclude generated answers, so input token throughput remains prompt-only.
+
+For each row in each map answer table, the minimum also adds
+`max(answer_tokens - 1, 0)`. QUAIL-B tokenizes the `answer` text with
+`prompt_pieces["tokenizer"]`, without special tokens. Every answer token except
+the last must be fed back once as a decode input. Empty and single-token answers
+add zero. Count these decode inputs in `fresh_tokens` too: required generation
+is not KV waste. The decode contribution is per answered document and map;
+prompt prefixes still share KV as above.
 
 ## Measurements
 
@@ -735,8 +742,10 @@ tokens and KV regret require `prompt_pieces`.
 prompt as one string. Their token count can differ slightly from the count the
 pieces give, since a tokenizer can merge text across a piece boundary. Such an
 engine reports `input_tokens` along with `prompt_pieces`. QUAIL-B then uses
-the reported count, scales the minimum to match it, and marks KV regret as
-approximate with `regret_approximate`.
+the reported count, scales the prompt minimum by reported input tokens divided
+by piece-derived input tokens, and then adds required map decode inputs without
+scaling them. KV regret is floored at zero and marked approximate with
+`regret_approximate`.
 
 QUAIL-B saves other JSON serializable measurements as engine metadata.
 
@@ -892,12 +901,13 @@ made.
 Input tokens are the full length of every prompt that the plan evaluates. They
 include tokens that the engine serves from KV. Thus input tokens depend on
 which prompts the plan evaluates, not on how the engine computes them.
+Generated map answers are excluded from input tokens and input token throughput.
 
 #### Fresh tokens
 
 Fresh tokens are the input positions that model forward passes process. They
-measure model computation. Two engines can have the same input tokens and
-different fresh tokens.
+measure model computation, including generated answer tokens fed back as decode
+inputs. Two engines can have the same input tokens and different fresh tokens.
 
 #### Minimum tokens
 
@@ -932,6 +942,12 @@ then classifies each review. The minimum counts:
 - the tokens of each review, one time;
 - for each review, the filter question and the classification tail, less the
   tokens that they share at their start.
+
+Maps share prompt prefixes by the same rules. In addition, each answered row of
+each map contributes `max(answer_tokens - 1, 0)` required decode inputs, using
+the answer table and the query's tokenizer without special tokens. This is
+necessary generation, not KV regret; it does not change the prompt-only
+`input_tokens` metric.
 
 #### Recomputed tokens
 

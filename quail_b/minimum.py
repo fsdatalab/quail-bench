@@ -28,6 +28,12 @@ after the cue. An engine that lists the labels under letters, or feeds
 label tokens after the cue to score them, computes more than the
 minimum, and the difference is regret.
 
+A map also needs decode inputs: every generated answer token except the last
+must be fed back once. These tokens count once per answered document and map,
+using the answer table and the same tokenizer as the documents. Empty and
+single-token answers add no decode inputs. Prompt-piece accounting stays
+prompt-only.
+
 The engine reports the prompt pieces it used as token ids (see
 `validate_prompt_pieces`); the documents are tokenized here with the
 tokenizer the pieces name, after the run, so nothing is tracked while
@@ -371,7 +377,30 @@ def minimum_input_tokens(spec, pieces, filter_answers, join_answers,
                          classify_answers=None, score_answers=None,
                          extract_answers=None, features_answers=None,
                          map_answers=None) -> int:
-    """Return the fewest input tokens the run's requests need.
+    """Count prompt prefixes and required map decode inputs.
+
+    Map answers use the document tokenizer without special tokens. Each answer
+    contributes all but its last token, floored at zero, once per answered row.
+    """
+    return _minimum_prompt_tokens(
+        spec, pieces, filter_answers, join_answers, documents,
+        classify_answers, score_answers, extract_answers, features_answers,
+        map_answers) + _map_decode_tokens(map_answers, documents)
+
+
+def _map_decode_tokens(map_answers, documents) -> int:
+    """Count answer tokens that must be fed back to generate each map answer."""
+    return sum(max(len(tokens) - 1, 0)
+               for table in (map_answers or {}).values()
+               for tokens in documents.tokenizer(table.column("answer").to_pylist()))
+
+
+def _minimum_prompt_tokens(spec, pieces, filter_answers, join_answers,
+                           documents: DocumentTokens,
+                           classify_answers=None, score_answers=None,
+                           extract_answers=None, features_answers=None,
+                           map_answers=None) -> int:
+    """Return the fewest prompt tokens the run's requests need.
 
     Rows with the same text are one document, whatever their ids or
     tables. A join can hold tens of millions of pairs, so the pairs are
@@ -661,8 +690,9 @@ def token_metrics(spec, output, corpus_rows, stores=None) -> dict:
       tables. Fresh tokens are required. Regret is fresh minus minimum.
     - With prompt pieces and an engine input-token total, the engine
       tokenized each full prompt itself, so its tokens can differ from the
-      pieces where two pieces meet. The minimum is scaled by the engine
-      total over the piece total, regret is floored at zero, and
+      pieces where two pieces meet. The prompt minimum is scaled by the
+      engine total over the piece total; map decode inputs are not scaled.
+      Regret is floored at zero, and
       `regret_approximate` is True.
     - Without prompt pieces, use the engine's input-token total. Minimum
       and regret are unavailable because a total does not describe prefixes.
@@ -705,11 +735,14 @@ def token_metrics(spec, output, corpus_rows, stores=None) -> dict:
                output.classify_answers, output.score_answers,
                output.extract_answers, output.features_answers,
                output.map_answers)
-    minimum = minimum_input_tokens(spec, pieces, *answers)
+    prompt_minimum = _minimum_prompt_tokens(spec, pieces, *answers)
+    decode_tokens = _map_decode_tokens(output.map_answers, stores[name])
     piece_input = input_tokens(spec, pieces, *answers)
+    minimum = prompt_minimum + decode_tokens
     if reported_input is not None:
         if piece_input:
-            minimum = round(minimum * reported_input / piece_input)
+            minimum = round(prompt_minimum * reported_input / piece_input)
+            minimum += decode_tokens
         return {"input_tokens": reported_input, "fresh_tokens": fresh,
                 "minimum_tokens": minimum,
                 "regret_tokens": max(fresh - minimum, 0),

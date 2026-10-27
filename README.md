@@ -416,7 +416,9 @@ Scale factor 0.1 supplies 5,000 reviews and 45 contracts. There are no reference
 map answers, and generated text is not accuracy-scored. IDs, filters, and
 classifications still follow the usual scoring rules when reference labels
 are available. Return maps as flat string columns, with matching answers in
-`map_answers`. Prompt token metrics count the input, not generated answers.
+`map_answers`. Input tokens count only prompts. Minimum tokens also include
+required decode inputs: each map answer's token count minus one, floored at
+zero. Generating an answer is not KV regret.
 
 ### SAE feature queries
 
@@ -725,10 +727,17 @@ reports it as zero.
 | GPU cost | `runtime_s / 3600 * gpu_count * gpu_hourly_rate_usd` |
 | Input tokens | Full length of every evaluated prompt, including KV hits |
 | Fresh tokens | Positions processed by model forward passes |
-| Minimum tokens | Positions needed with an unlimited prefix KV cache |
+| Minimum tokens | Unlimited-prefix-KV prompt minimum plus map decode inputs |
 | KV regret | Fresh tokens above the minimum, as a percentage of fresh tokens |
 | Input token throughput | Input tokens per second |
 | Cost per million input tokens | GPU cost divided by input tokens, times one million |
+
+For each map answer, the minimum adds `max(answer_tokens - 1, 0)` to the
+prefix-shared prompt minimum. QUAIL-B tokenizes the `map_answers` text with the
+query's `prompt_pieces["tokenizer"]`, without special tokens. Every answer token
+except the last must be fed back as a decode input; fresh tokens include those
+positions. A run that computes only the minimum has zero KV regret. Input
+tokens and their throughput remain prompt-only.
 
 ## Results
 
