@@ -129,7 +129,10 @@ def _load_truth(specs, scale_factor, corpus_id,
             raise ValueError("ground truth has the wrong collection ID")
         if truth.corpus_id != corpus_id or truth.scale_factor != scale_factor:
             raise ValueError("ground truth does not match the input corpus")
+        published = queries(include_privacy=True)
         for spec in specs:
+            if spec.id not in published:
+                continue    # a draft runs; its unlabeled predicates go unscored
             for operator in spec.info.ai_operators:
                 if operator in spec.info.maps:
                     continue

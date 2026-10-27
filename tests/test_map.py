@@ -442,6 +442,34 @@ def test_map_text_is_not_scored_but_accompanying_filter_and_sorted_ids_are(tmp_p
     assert accuracy["output_accuracy"]["ordered_match"]
 
 
+def test_a_draft_with_an_unlabeled_filter_runs_and_scores_no_rows(tmp_path):
+    _collection(tmp_path, IMDB_TABLES, [])
+    spec = quail_b.get_query("IMDB-MAP-4")
+    name = spec.info.maps[0].output
+    output = quail_b.RunOutput(
+        {"filter-1": pa.table({"r": ["r0", "r1", "r2"],
+                                "answer": [True, False, True]})}, {},
+        pa.table({"r": ["r0", "r2"], name: ["One summary.", "Another."]}),
+        runtime_s=1.0, map_answers={"map-1": pa.table({
+            "r": ["r0", "r2"], "answer": ["One summary.", "Another."]})})
+    directory = tmp_path / "run"
+    record = quail_b.run(lambda query, tables: output, queries=[spec.id],
+                         output_dir=directory, root=tmp_path)
+    accuracy = record["queries"][0]["metrics"]["accuracy"]
+    assert accuracy["unlabeled_operators"] == ["filter-1"]
+    assert accuracy["answer_accuracy"] is None
+    assert accuracy["per_predicate"] == []
+    # the reference rows need the filter's labels
+    assert accuracy["output_accuracy"] is None
+    quail_b.report(directory, root=tmp_path)
+
+
+def test_a_published_query_still_needs_its_labels(tmp_path):
+    _collection(tmp_path, IMDB_TABLES, [])
+    with pytest.raises(ValueError, match="no reference labels"):
+        quail_b.load_benchmark(["IMDB-1"], root=tmp_path)
+
+
 def test_map_drafts_load_inputs_without_reference_labels(tmp_path):
     _collection(tmp_path, IMDB_TABLES, [])
     suite = quail_b.load_benchmark(
