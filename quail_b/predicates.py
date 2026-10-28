@@ -425,7 +425,8 @@ MAP_PREDICATES = (
           ("parties_128", prompts.CUAD_MAP_PARTIES, 128),
           ("term", prompts.CUAD_MAP_TERM, 128),
           ("governing_law", prompts.CUAD_MAP_GOVERNING_LAW, 128),
-          ("non_compete", prompts.CUAD_MAP_NON_COMPETE, 256))),
+          ("non_compete", prompts.CUAD_MAP_NON_COMPETE, 256),
+          ("summary", prompts.CUAD_MAP_SUMMARY, 256))),
 )
 IMDB_MAP_FILTER_PREDICATES = (
     PredicateSpec(

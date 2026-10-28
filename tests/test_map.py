@@ -21,7 +21,7 @@ from tools.make_substrait_plans import Map as MapNode
 from tools.make_substrait_plans import Scan, Struct, build_plan
 
 MAP_QUERIES = (*(f"IMDB-{i}" for i in range(20, 29)),
-               *(f"CUAD-{i}" for i in range(17, 21)))
+               *(f"CUAD-{i}" for i in range(17, 22)))
 REVIEWS = IMDB_TABLES["reviews"]
 
 
@@ -57,6 +57,7 @@ def test_map_queries_are_drafts_over_their_corpora():
                     (prompts.IMDB_MAP_SUMMARY, 256),
                     (prompts.IMDB_MAP_TOPIC, 32)],
         "IMDB-28": [(prompts.IMDB_MAP_SUMMARY, 256)],
+        "CUAD-21": [(prompts.CUAD_MAP_SUMMARY, 256)],
         "CUAD-20": [(prompts.CUAD_MAP_PARTIES, 128),
                     (prompts.CUAD_MAP_TERM, 128),
                     (prompts.CUAD_MAP_GOVERNING_LAW, 128)],
@@ -74,7 +75,9 @@ def test_map_queries_are_drafts_over_their_corpora():
         assert [(rel.table, rel.alias) for rel in info.relations] == [(table, alias)]
         assert [op.id for op in info.maps] == [
             f"map-{i}" for i in range(1, len(calls) + 1)]
-        assert not info.structs
+        # only CUAD-21's extractions return a struct; maps never do
+        assert all(op.output not in field for struct in info.structs
+                   for field in struct.fields for op in info.maps)
         assert all(f"{alias}.{op.output}" in info.select for op in info.maps)
 
 

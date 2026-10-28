@@ -185,6 +185,9 @@ CUAD_MAP_TERM = (
     "{0}\n\nState how long the contract runs and how either party can end it.")
 CUAD_MAP_GOVERNING_LAW = (
     "{0}\n\nName the governing law and the venue for disputes.")
+CUAD_MAP_SUMMARY = (
+    "{0}\n\nSummarize the contract: who the parties are, what each must do, "
+    "and how long it runs.")
 CUAD_MAP_NON_COMPETE = (
     "{0}\n\nSummarize the non-compete obligations and who they bind.")
 

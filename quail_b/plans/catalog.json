@@ -563,6 +563,12 @@
     "draft": true
   },
   {
+    "id": "CUAD-21",
+    "description": "3 clause extracts and a map: non-compete, exclusivity, and cap on liability clauses, and a summary",
+    "privacy": false,
+    "draft": true
+  },
+  {
     "id": "CUAD-20",
     "description": "non-compete contracts -> 3 maps: parties, term, and governing law",
     "privacy": false,

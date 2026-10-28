@@ -1621,6 +1621,16 @@ QUERIES = (
                          prompts.CUAD_MAP_NON_COMPETE, 256, "non_compete"),
                      (("c.id", False),)), 10),
           select=("c", "c.non_compete"), draft=True),
+    Query("CUAD-21", "3 clause extracts and a map: non-compete, exclusivity, "
+          "and cap on liability clauses, and a summary",
+          Map(_cuad_extract(_cuad_extract(_cuad_extract(
+              _contracts(), "Non-Compete", "non_compete"),
+              "Exclusivity", "exclusivity"),
+              "Cap On Liability", "cap_on_liability"),
+              prompts.CUAD_MAP_SUMMARY, 256, "summary"),
+          select=("c", Struct("contract", (
+              "c.non_compete", "c.exclusivity", "c.cap_on_liability")),
+                  "c.summary"), draft=True),
     Query("CUAD-20", "non-compete contracts -> 3 maps: parties, term, and "
           "governing law",
           Map(Map(Map(_filters(_contracts(), cuad_filter("Non-Compete")),
