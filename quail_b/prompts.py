@@ -169,6 +169,16 @@ IMDB_MAP_SUMMARY = (
     "{0}\n\nWrite a detailed summary of the document: the people involved, "
     "the main points they make, and anything unresolved.")
 IMDB_MAP_TOPIC = "{0}\n\nName the main topic of the document in a few words."
+# Long maps whose answers vary well below their 1,024-token limit
+IMDB_MAP_PLOT = (
+    "{0}\n\nRetell the plot of the film as the review describes it, in order, "
+    "with every character and event the review mentions.")
+IMDB_MAP_BALANCED = (
+    "{0}\n\nRewrite the review as a balanced one that gives both the strengths "
+    "and the weaknesses of the film, keeping every point the writer makes.")
+IMDB_MAP_NAMES = (
+    "{0}\n\nList every film, actor, director, and character the review names, "
+    "with what the writer says about each.")
 IMDB_NEGATIVE = "Is this review negative?\n\n{0}"
 CUAD_MAP_PARTIES = "{0}\n\nList the parties to this contract and the role of each."
 CUAD_MAP_TERM = (

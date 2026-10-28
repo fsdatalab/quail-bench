@@ -412,7 +412,10 @@ MAP_PREDICATES = (
       for slug, template, limit in (
           ("negatives", prompts.IMDB_MAP_NEGATIVES, 64),
           ("summary", prompts.IMDB_MAP_SUMMARY, 256),
-          ("topic", prompts.IMDB_MAP_TOPIC, 32))),
+          ("topic", prompts.IMDB_MAP_TOPIC, 32),
+          ("plot", prompts.IMDB_MAP_PLOT, 1024),
+          ("balanced", prompts.IMDB_MAP_BALANCED, 1024),
+          ("names", prompts.IMDB_MAP_NAMES, 1024))),
     *(PredicateSpec(
         f"quailb.cuad.contract.map_{slug}", "cuad", f"map_{slug}", "map",
         template, "contract", "contracts", "text", source_policy="unpublished",

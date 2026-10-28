@@ -700,7 +700,7 @@ their usual scoring rules when reference labels are available. For example,
 IMDB-MAP-5 reuses IMDB-11's sentiment labels, but IMDB-MAP-4's new negative-review
 filter has no reference labels yet.
 
-The eight [map drafts](../README.md#map-queries) are excluded from the default
+The ten [map drafts](../README.md#map-queries) are excluded from the default
 85 queries. Load them by ID with `accuracy=False`.
 
 ### Token accounting

@@ -383,7 +383,7 @@ positive, constant answer token limit. The prompt is a constant template,
 its KV. The [reference](docs/reference.md#maps) defines the exact rendering,
 answer tables, and token accounting.
 
-There are eight map drafts. Numbers below are answer token limits per call:
+There are ten map drafts. Numbers below are answer token limits per call:
 
 - **IMDB-MAP-1:** Summarize the review's negative arguments in one sentence
   (64).
@@ -395,6 +395,11 @@ There are eight map drafts. Numbers below are answer token limits per call:
   give the detailed summary (256). This filter has no reference labels yet.
 - **IMDB-MAP-5:** Return overall sentiment using IMDB-11's classification
   (`positive`, `negative`, `neutral`, `mixed`) and the detailed summary (256).
+- **IMDB-MAP-6:** Retell the plot as the review describes it (1,024). Answers
+  vary with the review, mostly far below the limit.
+- **IMDB-MAP-7:** Retell the plot, rewrite the review as a balanced one, and
+  list the films and people it names (1,024 each), using three maps of the same
+  review.
 - **CUAD-MAP-1:** Summarize the parties and their roles (256).
 - **CUAD-MAP-2:** Separately summarize parties and roles, term and termination,
   and governing law and venue (128 each).
