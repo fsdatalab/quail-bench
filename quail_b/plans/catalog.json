@@ -99,44 +99,56 @@
     "draft": true
   },
   {
-    "id": "IMDB-MAP-1",
+    "id": "IMDB-20",
     "description": "map: negative arguments in one sentence",
     "privacy": false,
     "draft": true
   },
   {
-    "id": "IMDB-MAP-2",
+    "id": "IMDB-21",
     "description": "map: detailed summary of every review",
     "privacy": false,
     "draft": true
   },
   {
-    "id": "IMDB-MAP-3",
+    "id": "IMDB-22",
     "description": "3 maps: negatives, detailed summary, and topic",
     "privacy": false,
     "draft": true
   },
   {
-    "id": "IMDB-MAP-4",
+    "id": "IMDB-23",
     "description": "negative reviews -> map: detailed summary",
     "privacy": false,
     "draft": true
   },
   {
-    "id": "IMDB-MAP-5",
+    "id": "IMDB-24",
     "description": "classify sentiment and map: detailed summary",
     "privacy": false,
     "draft": true
   },
   {
-    "id": "IMDB-MAP-6",
+    "id": "IMDB-25",
     "description": "map: retell the plot, up to 1,024 tokens",
     "privacy": false,
     "draft": true
   },
   {
-    "id": "IMDB-MAP-7",
+    "id": "IMDB-26",
     "description": "3 long maps: plot, balanced rewrite, and named people",
+    "privacy": false,
+    "draft": true
+  },
+  {
+    "id": "IMDB-27",
+    "description": "negative reviews -> 3 maps: negatives, detailed summary, and topic",
+    "privacy": false,
+    "draft": true
+  },
+  {
+    "id": "IMDB-28",
+    "description": "mixed reviews by sentiment -> map: detailed summary",
     "privacy": false,
     "draft": true
   },
@@ -533,20 +545,26 @@
     "draft": true
   },
   {
-    "id": "CUAD-MAP-1",
+    "id": "CUAD-17",
     "description": "map: contract parties and their roles",
     "privacy": false,
     "draft": true
   },
   {
-    "id": "CUAD-MAP-2",
+    "id": "CUAD-18",
     "description": "3 maps: parties, term, and governing law",
     "privacy": false,
     "draft": true
   },
   {
-    "id": "CUAD-MAP-3",
+    "id": "CUAD-19",
     "description": "non-compete contracts -> map obligations -> first 10 ids",
+    "privacy": false,
+    "draft": true
+  },
+  {
+    "id": "CUAD-20",
+    "description": "non-compete contracts -> 3 maps: parties, term, and governing law",
     "privacy": false,
     "draft": true
   },

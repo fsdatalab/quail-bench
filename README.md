@@ -383,35 +383,41 @@ positive, constant answer token limit. The prompt is a constant template,
 its KV. The [reference](docs/reference.md#maps) defines the exact rendering,
 answer tables, and token accounting.
 
-There are ten map drafts. Numbers below are answer token limits per call:
+There are thirteen map drafts. Numbers below are answer token limits per call:
 
-- **IMDB-MAP-1:** Summarize the review's negative arguments in one sentence
+- **IMDB-20:** Summarize the review's negative arguments in one sentence
   (64).
-- **IMDB-MAP-2:** Give a detailed summary covering people, main points, and
+- **IMDB-21:** Give a detailed summary covering people, main points, and
   unresolved issues (256).
-- **IMDB-MAP-3:** Return the negative arguments (64), detailed summary (256),
+- **IMDB-22:** Return the negative arguments (64), detailed summary (256),
   and main topic (32), using three maps of the same review.
-- **IMDB-MAP-4:** Filter with the new question "Is this review negative?", then
+- **IMDB-23:** Filter with the new question "Is this review negative?", then
   give the detailed summary (256). This filter has no reference labels yet.
-- **IMDB-MAP-5:** Return overall sentiment using IMDB-11's classification
+- **IMDB-24:** Return overall sentiment using IMDB-11's classification
   (`positive`, `negative`, `neutral`, `mixed`) and the detailed summary (256).
-- **IMDB-MAP-6:** Retell the plot as the review describes it (1,024). Answers
+- **IMDB-25:** Retell the plot as the review describes it (1,024). Answers
   vary with the review, mostly far below the limit.
-- **IMDB-MAP-7:** Retell the plot, rewrite the review as a balanced one, and
+- **IMDB-26:** Retell the plot, rewrite the review as a balanced one, and
   list the films and people it names (1,024 each), using three maps of the same
   review.
-- **CUAD-MAP-1:** Summarize the parties and their roles (256).
-- **CUAD-MAP-2:** Separately summarize parties and roles, term and termination,
+- **IMDB-27:** Filter with "Is this review negative?", then return the
+  negative arguments (64), detailed summary (256), and main topic (32).
+- **IMDB-28:** Classify sentiment as in IMDB-11, keep the `mixed` reviews, then
+  give the detailed summary (256).
+- **CUAD-17:** Summarize the parties and their roles (256).
+- **CUAD-18:** Separately summarize parties and roles, term and termination,
   and governing law and venue (128 each).
-- **CUAD-MAP-3:** Use the existing CUAD non-compete filter, then summarize the
+- **CUAD-19:** Use the existing CUAD non-compete filter, then summarize the
   obligations and bound parties (256), with `ORDER BY c.id LIMIT 10`.
+- **CUAD-20:** Use the CUAD non-compete filter, then summarize parties and
+  roles, term and termination, and governing law and venue (128 each).
 
 These drafts are excluded from the default 85 queries. Load them by ID with
 `accuracy=False` and call your adapter directly:
 
 ```python
 suite = quail_b.load_benchmark(
-    ["IMDB-MAP-1", "CUAD-MAP-2"], scale_factor=0.1, accuracy=False,
+    ["IMDB-20", "CUAD-18"], scale_factor=0.1, accuracy=False,
 )
 for query in suite.queries:
     output = my_engine_adapter(query, suite.tables)
