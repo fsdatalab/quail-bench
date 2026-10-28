@@ -20,7 +20,7 @@ from quail_b.substrait import Map
 from tools.make_substrait_plans import Map as MapNode
 from tools.make_substrait_plans import Scan, Struct, build_plan
 
-MAP_QUERIES = (*(f"IMDB-MAP-{i}" for i in range(1, 6)),
+MAP_QUERIES = (*(f"IMDB-MAP-{i}" for i in range(1, 8)),
                *(f"CUAD-MAP-{i}" for i in range(1, 4)))
 REVIEWS = IMDB_TABLES["reviews"]
 
@@ -49,6 +49,10 @@ def test_map_queries_are_drafts_over_their_corpora():
                        (prompts.IMDB_MAP_TOPIC, 32)],
         "IMDB-MAP-4": [(prompts.IMDB_MAP_SUMMARY, 256)],
         "IMDB-MAP-5": [(prompts.IMDB_MAP_SUMMARY, 256)],
+        "IMDB-MAP-6": [(prompts.IMDB_MAP_PLOT, 1024)],
+        "IMDB-MAP-7": [(prompts.IMDB_MAP_PLOT, 1024),
+                       (prompts.IMDB_MAP_BALANCED, 1024),
+                       (prompts.IMDB_MAP_NAMES, 1024)],
         "CUAD-MAP-1": [(prompts.CUAD_MAP_PARTIES, 256)],
         "CUAD-MAP-2": [(prompts.CUAD_MAP_PARTIES, 128),
                        (prompts.CUAD_MAP_TERM, 128),

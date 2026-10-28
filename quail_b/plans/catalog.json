@@ -129,6 +129,18 @@
     "draft": true
   },
   {
+    "id": "IMDB-MAP-6",
+    "description": "map: retell the plot, up to 1,024 tokens",
+    "privacy": false,
+    "draft": true
+  },
+  {
+    "id": "IMDB-MAP-7",
+    "description": "3 long maps: plot, balanced rewrite, and named people",
+    "privacy": false,
+    "draft": true
+  },
+  {
     "id": "BIO-1",
     "description": "filter: serious adverse event",
     "privacy": false
