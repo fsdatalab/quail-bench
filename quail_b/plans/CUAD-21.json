@@ -1,0 +1,354 @@
+{
+  "extension_urns": [
+    {
+      "extension_urn_anchor": 1,
+      "urn": "extension:org.fsdatalab.quail_b:functions_ai"
+    }
+  ],
+  "extensions": [
+    {
+      "extension_function": {
+        "extension_urn_reference": 1,
+        "function_anchor": 19,
+        "name": "ai_extract:str_str"
+      }
+    },
+    {
+      "extension_function": {
+        "extension_urn_reference": 1,
+        "function_anchor": 21,
+        "name": "ai_map:str_str_i32"
+      }
+    }
+  ],
+  "relations": [
+    {
+      "root": {
+        "input": {
+          "project": {
+            "common": {
+              "emit": {
+                "output_mapping": [
+                  6,
+                  7,
+                  8
+                ]
+              }
+            },
+            "expressions": [
+              {
+                "selection": {
+                  "direct_reference": {
+                    "struct_field": {}
+                  },
+                  "root_reference": {}
+                }
+              },
+              {
+                "nested": {
+                  "struct": {
+                    "fields": [
+                      {
+                        "selection": {
+                          "direct_reference": {
+                            "struct_field": {
+                              "field": 2
+                            }
+                          },
+                          "root_reference": {}
+                        }
+                      },
+                      {
+                        "selection": {
+                          "direct_reference": {
+                            "struct_field": {
+                              "field": 3
+                            }
+                          },
+                          "root_reference": {}
+                        }
+                      },
+                      {
+                        "selection": {
+                          "direct_reference": {
+                            "struct_field": {
+                              "field": 4
+                            }
+                          },
+                          "root_reference": {}
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "selection": {
+                  "direct_reference": {
+                    "struct_field": {
+                      "field": 5
+                    }
+                  },
+                  "root_reference": {}
+                }
+              }
+            ],
+            "input": {
+              "project": {
+                "common": {
+                  "direct": {},
+                  "hint": {
+                    "alias": "map-1",
+                    "output_names": [
+                      "c.id",
+                      "c.text",
+                      "c.non_compete",
+                      "c.exclusivity",
+                      "c.cap_on_liability",
+                      "c.summary"
+                    ]
+                  }
+                },
+                "expressions": [
+                  {
+                    "scalar_function": {
+                      "arguments": [
+                        {
+                          "value": {
+                            "literal": {
+                              "string": "{0}\n\nSummarize the contract: who the parties are, what each must do, and how long it runs."
+                            }
+                          }
+                        },
+                        {
+                          "value": {
+                            "selection": {
+                              "direct_reference": {
+                                "struct_field": {
+                                  "field": 1
+                                }
+                              },
+                              "root_reference": {}
+                            }
+                          }
+                        },
+                        {
+                          "value": {
+                            "literal": {
+                              "i32": 256
+                            }
+                          }
+                        }
+                      ],
+                      "function_reference": 21,
+                      "output_type": {
+                        "string": {
+                          "nullability": "NULLABILITY_REQUIRED"
+                        }
+                      }
+                    }
+                  }
+                ],
+                "input": {
+                  "project": {
+                    "common": {
+                      "direct": {},
+                      "hint": {
+                        "alias": "extract-3",
+                        "output_names": [
+                          "c.id",
+                          "c.text",
+                          "c.non_compete",
+                          "c.exclusivity",
+                          "c.cap_on_liability"
+                        ]
+                      }
+                    },
+                    "expressions": [
+                      {
+                        "scalar_function": {
+                          "arguments": [
+                            {
+                              "value": {
+                                "literal": {
+                                  "string": "Does the contract include a cap on liability upon the breach of a party\u2019s obligation? This includes time limitation for the counterparty to bring claims or maximum amount for recovery."
+                                }
+                              }
+                            },
+                            {
+                              "value": {
+                                "selection": {
+                                  "direct_reference": {
+                                    "struct_field": {
+                                      "field": 1
+                                    }
+                                  },
+                                  "root_reference": {}
+                                }
+                              }
+                            }
+                          ],
+                          "function_reference": 19,
+                          "output_type": {
+                            "string": {
+                              "nullability": "NULLABILITY_NULLABLE"
+                            }
+                          }
+                        }
+                      }
+                    ],
+                    "input": {
+                      "project": {
+                        "common": {
+                          "direct": {},
+                          "hint": {
+                            "alias": "extract-2",
+                            "output_names": [
+                              "c.id",
+                              "c.text",
+                              "c.non_compete",
+                              "c.exclusivity"
+                            ]
+                          }
+                        },
+                        "expressions": [
+                          {
+                            "scalar_function": {
+                              "arguments": [
+                                {
+                                  "value": {
+                                    "literal": {
+                                      "string": "Is there an exclusive dealing\u00a0 commitment with the counterparty? This includes a commitment to procure all \u201crequirements\u201d from one party of certain technology, goods, or services or a prohibition on licensing or selling technology, goods or services to third parties, or a prohibition on\u00a0 collaborating or working with other parties), whether during the contract or\u00a0 after the contract ends (or both)."
+                                    }
+                                  }
+                                },
+                                {
+                                  "value": {
+                                    "selection": {
+                                      "direct_reference": {
+                                        "struct_field": {
+                                          "field": 1
+                                        }
+                                      },
+                                      "root_reference": {}
+                                    }
+                                  }
+                                }
+                              ],
+                              "function_reference": 19,
+                              "output_type": {
+                                "string": {
+                                  "nullability": "NULLABILITY_NULLABLE"
+                                }
+                              }
+                            }
+                          }
+                        ],
+                        "input": {
+                          "project": {
+                            "common": {
+                              "direct": {},
+                              "hint": {
+                                "alias": "extract-1",
+                                "output_names": [
+                                  "c.id",
+                                  "c.text",
+                                  "c.non_compete"
+                                ]
+                              }
+                            },
+                            "expressions": [
+                              {
+                                "scalar_function": {
+                                  "arguments": [
+                                    {
+                                      "value": {
+                                        "literal": {
+                                          "string": "Is there a restriction on the ability of a party to compete with the counterparty or operate in a certain geography or business or technology sector?"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "value": {
+                                        "selection": {
+                                          "direct_reference": {
+                                            "struct_field": {
+                                              "field": 1
+                                            }
+                                          },
+                                          "root_reference": {}
+                                        }
+                                      }
+                                    }
+                                  ],
+                                  "function_reference": 19,
+                                  "output_type": {
+                                    "string": {
+                                      "nullability": "NULLABILITY_NULLABLE"
+                                    }
+                                  }
+                                }
+                              }
+                            ],
+                            "input": {
+                              "read": {
+                                "base_schema": {
+                                  "names": [
+                                    "id",
+                                    "text"
+                                  ],
+                                  "struct": {
+                                    "nullability": "NULLABILITY_REQUIRED",
+                                    "types": [
+                                      {
+                                        "string": {
+                                          "nullability": "NULLABILITY_REQUIRED"
+                                        }
+                                      },
+                                      {
+                                        "string": {
+                                          "nullability": "NULLABILITY_REQUIRED"
+                                        }
+                                      }
+                                    ]
+                                  }
+                                },
+                                "common": {
+                                  "direct": {},
+                                  "hint": {
+                                    "alias": "c"
+                                  }
+                                },
+                                "named_table": {
+                                  "names": [
+                                    "contracts"
+                                  ]
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "names": [
+          "c",
+          "contract",
+          "non_compete",
+          "exclusivity",
+          "cap_on_liability",
+          "summary"
+        ]
+      }
+    }
+  ],
+  "version": {
+    "minor_number": 103,
+    "producer": "quail-b"
+  }
+}

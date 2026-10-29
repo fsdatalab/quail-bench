@@ -185,8 +185,21 @@ CUAD_MAP_TERM = (
     "{0}\n\nState how long the contract runs and how either party can end it.")
 CUAD_MAP_GOVERNING_LAW = (
     "{0}\n\nName the governing law and the venue for disputes.")
+CUAD_MAP_SUMMARY = (
+    "{0}\n\nSummarize the contract: who the parties are, what each must do, "
+    "and how long it runs.")
 CUAD_MAP_NON_COMPETE = (
     "{0}\n\nSummarize the non-compete obligations and who they bind.")
+# Long maps whose answers run to hundreds of tokens, so decoding, not
+# reading the contract, dominates
+CUAD_MAP_OBLIGATIONS = (
+    "{0}\n\nList every obligation in the contract, clause by clause, with the "
+    "party it binds.")
+CUAD_MAP_PLAIN_TERMS = (
+    "{0}\n\nRewrite the contract's key terms in plain English: what each party "
+    "gives, gets, and must do, and how the contract can end.")
+CUAD_MAP_DEFINITIONS = (
+    "{0}\n\nList every defined term in the contract with its definition.")
 
 
 IMDB_SENTIMENT = (

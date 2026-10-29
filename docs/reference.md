@@ -697,10 +697,10 @@ rows = pa.table({
 There are no reference map answers and no accuracy score for generated text.
 Output scoring ignores map text, while IDs, filters, and classifications keep
 their usual scoring rules when reference labels are available. For example,
-IMDB-MAP-5 reuses IMDB-11's sentiment labels, but IMDB-MAP-4's new negative-review
+IMDB-24 reuses IMDB-11's sentiment labels, but IMDB-23's new negative-review
 filter has no reference labels yet.
 
-The ten [map drafts](../README.md#map-queries) are excluded from the default
+The fifteen [map drafts](../README.md#map-queries) are excluded from the default
 85 queries. Load them by ID with `accuracy=False`.
 
 ### Token accounting
