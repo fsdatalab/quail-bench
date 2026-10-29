@@ -280,6 +280,33 @@ def test_token_metrics_reject_fresh_tokens_below_one_ask_of_a_repeated_text(
         metrics(once - 1)
 
 
+def test_token_metrics_count_restored_tokens_toward_the_minimum(monkeypatch):
+    monkeypatch.setattr("quail_b.minimum.load_tokenizer", lambda _: _encode)
+    spec = _filter_spec()
+    corpus = {"docs": pa.table({"id": ["a", "b"], "body": ["alpha", "beta"]})}
+    pieces = {"tokenizer": "test", "preamble": PRE,
+              "filters": [{"id": "filter-1", "tail": QUESTION}]}
+    answers = {"filter-1": pa.table({"d": ["a", "b"], "answer": [True, True]})}
+
+    def metrics(fresh, restored):
+        return token_metrics(spec, RunOutput(
+            answers, {}, pa.table({"d": ["a", "b"]}), runtime_s=1.0,
+            measurements={"fresh_tokens": fresh, "restored_tokens": restored},
+            prompt_pieces=pieces), corpus)
+
+    minimum = metrics(10**6, 0)["minimum_tokens"]
+    # an engine that kept both documents' KV from an earlier query
+    # computes only the questions
+    kept = minimum - 2 * len(QUESTION)
+    got = metrics(minimum - kept, kept)
+    assert got["minimum_tokens"] == minimum
+    assert got["restored_tokens"] == kept and got["regret_tokens"] == 0
+    with pytest.raises(ValueError, match="below the minimum"):
+        metrics(minimum - kept - 1, kept)
+    with pytest.raises(ValueError, match="restored_tokens"):
+        metrics(minimum, -1)
+
+
 def test_partner_trie_size_matches_the_trie_of_any_subset():
     rng = random.Random(0)
     table = ("notes", "text")
@@ -317,13 +344,13 @@ def test_token_metrics_record_fresh_tokens_without_prompt_pieces():
     })
     assert token_metrics(spec, output, {}) == {
         "input_tokens": 50,
-        "fresh_tokens": 40, "minimum_tokens": None, "regret_tokens": None,
-        "regret_approximate": False,
+        "fresh_tokens": 40, "restored_tokens": 0, "minimum_tokens": None,
+        "regret_tokens": None, "regret_approximate": False,
     }
     assert token_metrics(spec, _filter_output(), {}) == {
         "input_tokens": None,
-        "fresh_tokens": None, "minimum_tokens": None, "regret_tokens": None,
-        "regret_approximate": False,
+        "fresh_tokens": None, "restored_tokens": 0, "minimum_tokens": None,
+        "regret_tokens": None, "regret_approximate": False,
     }
 
 
@@ -396,7 +423,7 @@ def test_input_tokens_do_not_count_recomputed_kv(monkeypatch):
         "input_tokens": reported, "fresh_tokens": 0,
         "minimum_tokens": round(
             counts[0]["minimum_tokens"] * reported / counts[0]["input_tokens"]),
-        "regret_tokens": 0, "regret_approximate": True,
+        "regret_tokens": 0, "regret_approximate": True, "restored_tokens": 0,
     }
 
 
@@ -530,7 +557,7 @@ def test_token_metrics_count_label_reading_as_regret(monkeypatch):
     assert metrics({"fresh_tokens": prompt + 3}) == {
         "input_tokens": prompt, "fresh_tokens": prompt + 3,
         "minimum_tokens": prompt, "regret_tokens": 3,
-        "regret_approximate": False}
+        "regret_approximate": False, "restored_tokens": 0}
     with pytest.raises(ValueError, match="classify answers"):
         metrics({"fresh_tokens": prompt}, classify_answers=None)
 
