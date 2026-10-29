@@ -11,7 +11,7 @@ Drafts are excluded from the default 85 queries. Load them by ID with
   and SEC-1 to SEC-10 lack reference answers.
 - SAE drafts: IMDB-18, IMDB-19, BIO-7, SUPPORT-7, and WRENCH-9 lack reference
   features.
-- Map drafts: IMDB-20 to IMDB-28 and CUAD-17 to CUAD-21 generate
+- Map drafts: IMDB-20 to IMDB-28 and CUAD-17 to CUAD-22 generate
   text without reference map answers. IDs, filters, and classifications still
   use the usual scoring rules when reference labels are available.
 

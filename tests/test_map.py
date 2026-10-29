@@ -21,7 +21,7 @@ from tools.make_substrait_plans import Map as MapNode
 from tools.make_substrait_plans import Scan, Struct, build_plan
 
 MAP_QUERIES = (*(f"IMDB-{i}" for i in range(20, 29)),
-               *(f"CUAD-{i}" for i in range(17, 22)))
+               *(f"CUAD-{i}" for i in range(17, 23)))
 REVIEWS = IMDB_TABLES["reviews"]
 
 
@@ -58,6 +58,9 @@ def test_map_queries_are_drafts_over_their_corpora():
                     (prompts.IMDB_MAP_TOPIC, 32)],
         "IMDB-28": [(prompts.IMDB_MAP_SUMMARY, 256)],
         "CUAD-21": [(prompts.CUAD_MAP_SUMMARY, 256)],
+        "CUAD-22": [(prompts.CUAD_MAP_OBLIGATIONS, 1024),
+                    (prompts.CUAD_MAP_PLAIN_TERMS, 1024),
+                    (prompts.CUAD_MAP_DEFINITIONS, 1024)],
         "CUAD-20": [(prompts.CUAD_MAP_PARTIES, 128),
                     (prompts.CUAD_MAP_TERM, 128),
                     (prompts.CUAD_MAP_GOVERNING_LAW, 128)],

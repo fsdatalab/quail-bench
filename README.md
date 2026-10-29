@@ -383,7 +383,7 @@ positive, constant answer token limit. The prompt is a constant template,
 its KV. The [reference](docs/reference.md#maps) defines the exact rendering,
 answer tables, and token accounting.
 
-There are fourteen map drafts. Numbers below are answer token limits per call:
+There are fifteen map drafts. Numbers below are answer token limits per call:
 
 - **IMDB-20:** Summarize the review's negative arguments in one sentence
   (64).
@@ -413,6 +413,10 @@ There are fourteen map drafts. Numbers below are answer token limits per call:
   roles, term and termination, and governing law and venue (128 each).
 - **CUAD-21:** Extract the non-compete, exclusivity, and cap on liability
   clauses as CUAD-16 does, and write a summary of the contract (256).
+- **CUAD-22:** List every obligation clause by clause, rewrite the key terms
+  in plain English, and list every defined term with its definition (1,024
+  each), using three maps of the same contract. Answers run to hundreds of
+  tokens, so decoding outweighs reading the contract.
 
 These drafts are excluded from the default 85 queries. Load them by ID with
 `accuracy=False` and call your adapter directly:

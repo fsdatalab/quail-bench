@@ -1631,6 +1631,14 @@ QUERIES = (
           select=("c", Struct("contract", (
               "c.non_compete", "c.exclusivity", "c.cap_on_liability")),
                   "c.summary"), draft=True),
+    Query("CUAD-22", "3 long maps: obligations, plain-English terms, and "
+          "defined terms",
+          Map(Map(Map(_contracts(), prompts.CUAD_MAP_OBLIGATIONS, 1024,
+                      "obligations"),
+                  prompts.CUAD_MAP_PLAIN_TERMS, 1024, "plain_terms"),
+              prompts.CUAD_MAP_DEFINITIONS, 1024, "definitions"),
+          select=("c", "c.obligations", "c.plain_terms", "c.definitions"),
+          draft=True),
     Query("CUAD-20", "non-compete contracts -> 3 maps: parties, term, and "
           "governing law",
           Map(Map(Map(_filters(_contracts(), cuad_filter("Non-Compete")),
