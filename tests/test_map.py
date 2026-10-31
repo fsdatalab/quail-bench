@@ -21,7 +21,9 @@ from tools.make_substrait_plans import CONTRACT_ASPECTS, Scan, Struct, build_pla
 from tools.make_substrait_plans import Map as MapNode
 
 MAP_QUERIES = (*(f"IMDB-{i}" for i in range(20, 29)),
-               *(f"CUAD-{i}" for i in range(17, 24)))
+               *(f"CUAD-{i}" for i in range(17, 24)), "AGENT-6", "WRENCH-10")
+MAP_RELATIONS = {"IMDB": ("reviews", "r"), "CUAD": ("contracts", "c"),
+                 "AGENT": ("agent_traces", "t"), "WRENCH": ("wrench_runs", "w")}
 REVIEWS = IMDB_TABLES["reviews"]
 
 
@@ -70,12 +72,15 @@ def test_map_queries_are_drafts_over_their_corpora():
                        (prompts.CUAD_MAP_TERM, 128),
                        (prompts.CUAD_MAP_GOVERNING_LAW, 128)],
         "CUAD-19": [(prompts.CUAD_MAP_NON_COMPETE, 256)],
+        "AGENT-6": [(prompts.AGENT_MAP_COMMANDS, 1024),
+                    (prompts.AGENT_MAP_PLAN, 1024),
+                    (prompts.AGENT_MAP_EDITS, 1024)],
+        "WRENCH-10": [(prompts.WRENCH_MAP_ACCOUNT, 1024)],
     }
     for query_id, calls in expected.items():
         info = drafts[query_id].info
         assert [(op.prompt, op.max_tokens) for op in info.maps] == calls
-        table, alias = (("reviews", "r") if query_id.startswith("IMDB")
-                        else ("contracts", "c"))
+        table, alias = MAP_RELATIONS[query_id.split("-")[0]]
         assert [(rel.table, rel.alias) for rel in info.relations] == [(table, alias)]
         assert [op.id for op in info.maps] == [
             f"map-{i}" for i in range(1, len(calls) + 1)]

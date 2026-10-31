@@ -255,7 +255,7 @@ def test_substrait_plans_are_packaged():
     catalog = package.joinpath("plans", "catalog.json")
     entries = json.loads(catalog.read_text())
 
-    assert len(entries) == 124
+    assert len(entries) == 126
     assert all(
         package.joinpath("plans", f"{entry['id']}.json").is_file()
         for entry in entries

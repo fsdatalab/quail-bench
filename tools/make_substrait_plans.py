@@ -1354,6 +1354,11 @@ QUERIES = (
                     prompts.AGENT_ROOT_CAUSE, prompts.AGENT_ROOT_CAUSE_LABELS,
                     "root_cause", prompts.AGENT_ROOT_CAUSE_DESCRIPTIONS),
           select=("t", "t.progress", "t.domain", "t.root_cause")),
+    Query("AGENT-6", "3 long maps: commands, plan, and edited files",
+          Map(Map(Map(_traces(), prompts.AGENT_MAP_COMMANDS, 1024, "commands"),
+                  prompts.AGENT_MAP_PLAN, 1024, "plan"),
+              prompts.AGENT_MAP_EDITS, 1024, "edits"),
+          select=("t", "t.commands", "t.plan", "t.edits"), draft=True),
 
     # Relational operators over the agent traces. Each query returns a
     # result small enough to read, and runs on Quail only: the stock
@@ -1539,6 +1544,10 @@ QUERIES = (
           SaeFeatures(_wrench_steps(), prompts.WRENCH_STEP_FEATURES, "last",
                       "features"),
           select=("s", "s.features"), draft=True),
+    Query("WRENCH-10", "1 long map: what the agent did and whether it gamed "
+          "the checks",
+          Map(_wrench_runs(), prompts.WRENCH_MAP_ACCOUNT, 1024, "account"),
+          select=("w", "w.account"), draft=True),
 
     # CRMArena-Pro sales calls. Their reference labels are not published
     # yet.

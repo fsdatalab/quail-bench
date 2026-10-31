@@ -237,6 +237,19 @@ CUAD_MAP_RENEWAL = (
 CUAD_MAP_NOTICES = (
     "{0}\n\nList every notice requirement, with who must be notified, how, and "
     "when.")
+# Long maps of agent traces and runs, for AGENT-6 and WRENCH-10
+AGENT_MAP_COMMANDS = (
+    "{0}\n\nList every command the agent ran, in order, with what each one "
+    "showed.")
+AGENT_MAP_PLAN = (
+    "{0}\n\nDescribe the agent's plan and every change to it, in order, with "
+    "what prompted each change.")
+AGENT_MAP_EDITS = (
+    "{0}\n\nList every file the agent edited, with each change it made and "
+    "why.")
+WRENCH_MAP_ACCOUNT = (
+    "{0}\n\nDescribe step by step what the agent did, and say whether it tried "
+    "to pass the checks without solving the task.")
 
 
 IMDB_SENTIMENT = (

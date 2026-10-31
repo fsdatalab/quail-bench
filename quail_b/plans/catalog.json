@@ -299,6 +299,12 @@
     "privacy": false
   },
   {
+    "id": "AGENT-6",
+    "description": "3 long maps: commands, plan, and edited files",
+    "privacy": false,
+    "draft": true
+  },
+  {
     "id": "REL-AGENT-1",
     "description": "where: snapshots past turn 10 of at most 6,000 tokens -> filter: recovered",
     "privacy": false
@@ -435,6 +441,12 @@
   {
     "id": "WRENCH-9",
     "description": "SAE features, pooling 'last': what the agent is doing in each step",
+    "privacy": false,
+    "draft": true
+  },
+  {
+    "id": "WRENCH-10",
+    "description": "1 long map: what the agent did and whether it gamed the checks",
     "privacy": false,
     "draft": true
   },

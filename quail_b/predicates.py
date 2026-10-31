@@ -444,6 +444,18 @@ MAP_PREDICATES = (
           ("insurance", prompts.CUAD_MAP_INSURANCE, 1024),
           ("renewal", prompts.CUAD_MAP_RENEWAL, 1024),
           ("notices", prompts.CUAD_MAP_NOTICES, 1024))),
+    *(PredicateSpec(
+        f"quailb.agent.trace.map_{slug}", "agent", f"map_{slug}", "map",
+        template, "agent_trace", "agent_traces", "trace",
+        source_policy="unpublished", max_tokens=1024)
+      for slug, template in (
+          ("commands", prompts.AGENT_MAP_COMMANDS),
+          ("plan", prompts.AGENT_MAP_PLAN),
+          ("edits", prompts.AGENT_MAP_EDITS))),
+    PredicateSpec(
+        "quailb.wrench.run.map_account", "wrench", "map_account", "map",
+        prompts.WRENCH_MAP_ACCOUNT, "agent_run", "wrench_runs", "transcript",
+        source_policy="unpublished", max_tokens=1024),
 )
 IMDB_MAP_FILTER_PREDICATES = (
     PredicateSpec(
