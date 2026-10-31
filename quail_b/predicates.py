@@ -429,7 +429,21 @@ MAP_PREDICATES = (
           ("summary", prompts.CUAD_MAP_SUMMARY, 256),
           ("obligations", prompts.CUAD_MAP_OBLIGATIONS, 1024),
           ("plain_terms", prompts.CUAD_MAP_PLAIN_TERMS, 1024),
-          ("definitions", prompts.CUAD_MAP_DEFINITIONS, 1024))),
+          ("definitions", prompts.CUAD_MAP_DEFINITIONS, 1024),
+          ("parties_1024", prompts.CUAD_MAP_PARTIES, 1024),
+          ("sections", prompts.CUAD_MAP_SECTIONS, 1024),
+          ("dates", prompts.CUAD_MAP_DATES, 1024),
+          ("payments", prompts.CUAD_MAP_PAYMENTS, 1024),
+          ("termination", prompts.CUAD_MAP_TERMINATION, 1024),
+          ("licensing", prompts.CUAD_MAP_LICENSING, 1024),
+          ("confidentiality", prompts.CUAD_MAP_CONFIDENTIALITY, 1024),
+          ("warranties", prompts.CUAD_MAP_WARRANTIES, 1024),
+          ("indemnification", prompts.CUAD_MAP_INDEMNIFICATION, 1024),
+          ("disputes", prompts.CUAD_MAP_DISPUTES, 1024),
+          ("assignment", prompts.CUAD_MAP_ASSIGNMENT, 1024),
+          ("insurance", prompts.CUAD_MAP_INSURANCE, 1024),
+          ("renewal", prompts.CUAD_MAP_RENEWAL, 1024),
+          ("notices", prompts.CUAD_MAP_NOTICES, 1024))),
 )
 IMDB_MAP_FILTER_PREDICATES = (
     PredicateSpec(

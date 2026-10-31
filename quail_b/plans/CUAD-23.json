@@ -1,0 +1,1279 @@
+{
+  "extension_urns": [
+    {
+      "extension_urn_anchor": 1,
+      "urn": "extension:org.fsdatalab.quail_b:functions_ai"
+    }
+  ],
+  "extensions": [
+    {
+      "extension_function": {
+        "extension_urn_reference": 1,
+        "function_anchor": 21,
+        "name": "ai_map:str_str_i32"
+      }
+    }
+  ],
+  "relations": [
+    {
+      "root": {
+        "input": {
+          "project": {
+            "common": {
+              "emit": {
+                "output_mapping": [
+                  18,
+                  19,
+                  20,
+                  21,
+                  22,
+                  23,
+                  24,
+                  25,
+                  26,
+                  27,
+                  28,
+                  29,
+                  30,
+                  31,
+                  32,
+                  33,
+                  34
+                ]
+              }
+            },
+            "expressions": [
+              {
+                "selection": {
+                  "direct_reference": {
+                    "struct_field": {}
+                  },
+                  "root_reference": {}
+                }
+              },
+              {
+                "selection": {
+                  "direct_reference": {
+                    "struct_field": {
+                      "field": 2
+                    }
+                  },
+                  "root_reference": {}
+                }
+              },
+              {
+                "selection": {
+                  "direct_reference": {
+                    "struct_field": {
+                      "field": 3
+                    }
+                  },
+                  "root_reference": {}
+                }
+              },
+              {
+                "selection": {
+                  "direct_reference": {
+                    "struct_field": {
+                      "field": 4
+                    }
+                  },
+                  "root_reference": {}
+                }
+              },
+              {
+                "selection": {
+                  "direct_reference": {
+                    "struct_field": {
+                      "field": 5
+                    }
+                  },
+                  "root_reference": {}
+                }
+              },
+              {
+                "selection": {
+                  "direct_reference": {
+                    "struct_field": {
+                      "field": 6
+                    }
+                  },
+                  "root_reference": {}
+                }
+              },
+              {
+                "selection": {
+                  "direct_reference": {
+                    "struct_field": {
+                      "field": 7
+                    }
+                  },
+                  "root_reference": {}
+                }
+              },
+              {
+                "selection": {
+                  "direct_reference": {
+                    "struct_field": {
+                      "field": 8
+                    }
+                  },
+                  "root_reference": {}
+                }
+              },
+              {
+                "selection": {
+                  "direct_reference": {
+                    "struct_field": {
+                      "field": 9
+                    }
+                  },
+                  "root_reference": {}
+                }
+              },
+              {
+                "selection": {
+                  "direct_reference": {
+                    "struct_field": {
+                      "field": 10
+                    }
+                  },
+                  "root_reference": {}
+                }
+              },
+              {
+                "selection": {
+                  "direct_reference": {
+                    "struct_field": {
+                      "field": 11
+                    }
+                  },
+                  "root_reference": {}
+                }
+              },
+              {
+                "selection": {
+                  "direct_reference": {
+                    "struct_field": {
+                      "field": 12
+                    }
+                  },
+                  "root_reference": {}
+                }
+              },
+              {
+                "selection": {
+                  "direct_reference": {
+                    "struct_field": {
+                      "field": 13
+                    }
+                  },
+                  "root_reference": {}
+                }
+              },
+              {
+                "selection": {
+                  "direct_reference": {
+                    "struct_field": {
+                      "field": 14
+                    }
+                  },
+                  "root_reference": {}
+                }
+              },
+              {
+                "selection": {
+                  "direct_reference": {
+                    "struct_field": {
+                      "field": 15
+                    }
+                  },
+                  "root_reference": {}
+                }
+              },
+              {
+                "selection": {
+                  "direct_reference": {
+                    "struct_field": {
+                      "field": 16
+                    }
+                  },
+                  "root_reference": {}
+                }
+              },
+              {
+                "selection": {
+                  "direct_reference": {
+                    "struct_field": {
+                      "field": 17
+                    }
+                  },
+                  "root_reference": {}
+                }
+              }
+            ],
+            "input": {
+              "project": {
+                "common": {
+                  "direct": {},
+                  "hint": {
+                    "alias": "map-16",
+                    "output_names": [
+                      "c.id",
+                      "c.text",
+                      "c.obligations",
+                      "c.definitions",
+                      "c.sections",
+                      "c.dates",
+                      "c.payments",
+                      "c.termination",
+                      "c.parties",
+                      "c.licensing",
+                      "c.confidentiality",
+                      "c.warranties",
+                      "c.indemnification",
+                      "c.disputes",
+                      "c.assignment",
+                      "c.insurance",
+                      "c.renewal",
+                      "c.notices"
+                    ]
+                  }
+                },
+                "expressions": [
+                  {
+                    "scalar_function": {
+                      "arguments": [
+                        {
+                          "value": {
+                            "literal": {
+                              "string": "{0}\n\nList every notice requirement, with who must be notified, how, and when."
+                            }
+                          }
+                        },
+                        {
+                          "value": {
+                            "selection": {
+                              "direct_reference": {
+                                "struct_field": {
+                                  "field": 1
+                                }
+                              },
+                              "root_reference": {}
+                            }
+                          }
+                        },
+                        {
+                          "value": {
+                            "literal": {
+                              "i32": 1024
+                            }
+                          }
+                        }
+                      ],
+                      "function_reference": 21,
+                      "output_type": {
+                        "string": {
+                          "nullability": "NULLABILITY_REQUIRED"
+                        }
+                      }
+                    }
+                  }
+                ],
+                "input": {
+                  "project": {
+                    "common": {
+                      "direct": {},
+                      "hint": {
+                        "alias": "map-15",
+                        "output_names": [
+                          "c.id",
+                          "c.text",
+                          "c.obligations",
+                          "c.definitions",
+                          "c.sections",
+                          "c.dates",
+                          "c.payments",
+                          "c.termination",
+                          "c.parties",
+                          "c.licensing",
+                          "c.confidentiality",
+                          "c.warranties",
+                          "c.indemnification",
+                          "c.disputes",
+                          "c.assignment",
+                          "c.insurance",
+                          "c.renewal"
+                        ]
+                      }
+                    },
+                    "expressions": [
+                      {
+                        "scalar_function": {
+                          "arguments": [
+                            {
+                              "value": {
+                                "literal": {
+                                  "string": "{0}\n\nDescribe the term of the contract and every renewal and extension term."
+                                }
+                              }
+                            },
+                            {
+                              "value": {
+                                "selection": {
+                                  "direct_reference": {
+                                    "struct_field": {
+                                      "field": 1
+                                    }
+                                  },
+                                  "root_reference": {}
+                                }
+                              }
+                            },
+                            {
+                              "value": {
+                                "literal": {
+                                  "i32": 1024
+                                }
+                              }
+                            }
+                          ],
+                          "function_reference": 21,
+                          "output_type": {
+                            "string": {
+                              "nullability": "NULLABILITY_REQUIRED"
+                            }
+                          }
+                        }
+                      }
+                    ],
+                    "input": {
+                      "project": {
+                        "common": {
+                          "direct": {},
+                          "hint": {
+                            "alias": "map-14",
+                            "output_names": [
+                              "c.id",
+                              "c.text",
+                              "c.obligations",
+                              "c.definitions",
+                              "c.sections",
+                              "c.dates",
+                              "c.payments",
+                              "c.termination",
+                              "c.parties",
+                              "c.licensing",
+                              "c.confidentiality",
+                              "c.warranties",
+                              "c.indemnification",
+                              "c.disputes",
+                              "c.assignment",
+                              "c.insurance"
+                            ]
+                          }
+                        },
+                        "expressions": [
+                          {
+                            "scalar_function": {
+                              "arguments": [
+                                {
+                                  "value": {
+                                    "literal": {
+                                      "string": "{0}\n\nList every insurance, audit, and record-keeping requirement."
+                                    }
+                                  }
+                                },
+                                {
+                                  "value": {
+                                    "selection": {
+                                      "direct_reference": {
+                                        "struct_field": {
+                                          "field": 1
+                                        }
+                                      },
+                                      "root_reference": {}
+                                    }
+                                  }
+                                },
+                                {
+                                  "value": {
+                                    "literal": {
+                                      "i32": 1024
+                                    }
+                                  }
+                                }
+                              ],
+                              "function_reference": 21,
+                              "output_type": {
+                                "string": {
+                                  "nullability": "NULLABILITY_REQUIRED"
+                                }
+                              }
+                            }
+                          }
+                        ],
+                        "input": {
+                          "project": {
+                            "common": {
+                              "direct": {},
+                              "hint": {
+                                "alias": "map-13",
+                                "output_names": [
+                                  "c.id",
+                                  "c.text",
+                                  "c.obligations",
+                                  "c.definitions",
+                                  "c.sections",
+                                  "c.dates",
+                                  "c.payments",
+                                  "c.termination",
+                                  "c.parties",
+                                  "c.licensing",
+                                  "c.confidentiality",
+                                  "c.warranties",
+                                  "c.indemnification",
+                                  "c.disputes",
+                                  "c.assignment"
+                                ]
+                              }
+                            },
+                            "expressions": [
+                              {
+                                "scalar_function": {
+                                  "arguments": [
+                                    {
+                                      "value": {
+                                        "literal": {
+                                          "string": "{0}\n\nDescribe every assignment, transfer, and change of control term."
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "value": {
+                                        "selection": {
+                                          "direct_reference": {
+                                            "struct_field": {
+                                              "field": 1
+                                            }
+                                          },
+                                          "root_reference": {}
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "value": {
+                                        "literal": {
+                                          "i32": 1024
+                                        }
+                                      }
+                                    }
+                                  ],
+                                  "function_reference": 21,
+                                  "output_type": {
+                                    "string": {
+                                      "nullability": "NULLABILITY_REQUIRED"
+                                    }
+                                  }
+                                }
+                              }
+                            ],
+                            "input": {
+                              "project": {
+                                "common": {
+                                  "direct": {},
+                                  "hint": {
+                                    "alias": "map-12",
+                                    "output_names": [
+                                      "c.id",
+                                      "c.text",
+                                      "c.obligations",
+                                      "c.definitions",
+                                      "c.sections",
+                                      "c.dates",
+                                      "c.payments",
+                                      "c.termination",
+                                      "c.parties",
+                                      "c.licensing",
+                                      "c.confidentiality",
+                                      "c.warranties",
+                                      "c.indemnification",
+                                      "c.disputes"
+                                    ]
+                                  }
+                                },
+                                "expressions": [
+                                  {
+                                    "scalar_function": {
+                                      "arguments": [
+                                        {
+                                          "value": {
+                                            "literal": {
+                                              "string": "{0}\n\nDescribe the governing law, venue, and every dispute resolution step."
+                                            }
+                                          }
+                                        },
+                                        {
+                                          "value": {
+                                            "selection": {
+                                              "direct_reference": {
+                                                "struct_field": {
+                                                  "field": 1
+                                                }
+                                              },
+                                              "root_reference": {}
+                                            }
+                                          }
+                                        },
+                                        {
+                                          "value": {
+                                            "literal": {
+                                              "i32": 1024
+                                            }
+                                          }
+                                        }
+                                      ],
+                                      "function_reference": 21,
+                                      "output_type": {
+                                        "string": {
+                                          "nullability": "NULLABILITY_REQUIRED"
+                                        }
+                                      }
+                                    }
+                                  }
+                                ],
+                                "input": {
+                                  "project": {
+                                    "common": {
+                                      "direct": {},
+                                      "hint": {
+                                        "alias": "map-11",
+                                        "output_names": [
+                                          "c.id",
+                                          "c.text",
+                                          "c.obligations",
+                                          "c.definitions",
+                                          "c.sections",
+                                          "c.dates",
+                                          "c.payments",
+                                          "c.termination",
+                                          "c.parties",
+                                          "c.licensing",
+                                          "c.confidentiality",
+                                          "c.warranties",
+                                          "c.indemnification"
+                                        ]
+                                      }
+                                    },
+                                    "expressions": [
+                                      {
+                                        "scalar_function": {
+                                          "arguments": [
+                                            {
+                                              "value": {
+                                                "literal": {
+                                                  "string": "{0}\n\nDescribe every liability limit and indemnification duty, with what it covers."
+                                                }
+                                              }
+                                            },
+                                            {
+                                              "value": {
+                                                "selection": {
+                                                  "direct_reference": {
+                                                    "struct_field": {
+                                                      "field": 1
+                                                    }
+                                                  },
+                                                  "root_reference": {}
+                                                }
+                                              }
+                                            },
+                                            {
+                                              "value": {
+                                                "literal": {
+                                                  "i32": 1024
+                                                }
+                                              }
+                                            }
+                                          ],
+                                          "function_reference": 21,
+                                          "output_type": {
+                                            "string": {
+                                              "nullability": "NULLABILITY_REQUIRED"
+                                            }
+                                          }
+                                        }
+                                      }
+                                    ],
+                                    "input": {
+                                      "project": {
+                                        "common": {
+                                          "direct": {},
+                                          "hint": {
+                                            "alias": "map-10",
+                                            "output_names": [
+                                              "c.id",
+                                              "c.text",
+                                              "c.obligations",
+                                              "c.definitions",
+                                              "c.sections",
+                                              "c.dates",
+                                              "c.payments",
+                                              "c.termination",
+                                              "c.parties",
+                                              "c.licensing",
+                                              "c.confidentiality",
+                                              "c.warranties"
+                                            ]
+                                          }
+                                        },
+                                        "expressions": [
+                                          {
+                                            "scalar_function": {
+                                              "arguments": [
+                                                {
+                                                  "value": {
+                                                    "literal": {
+                                                      "string": "{0}\n\nList every warranty, representation, and disclaimer each party makes."
+                                                    }
+                                                  }
+                                                },
+                                                {
+                                                  "value": {
+                                                    "selection": {
+                                                      "direct_reference": {
+                                                        "struct_field": {
+                                                          "field": 1
+                                                        }
+                                                      },
+                                                      "root_reference": {}
+                                                    }
+                                                  }
+                                                },
+                                                {
+                                                  "value": {
+                                                    "literal": {
+                                                      "i32": 1024
+                                                    }
+                                                  }
+                                                }
+                                              ],
+                                              "function_reference": 21,
+                                              "output_type": {
+                                                "string": {
+                                                  "nullability": "NULLABILITY_REQUIRED"
+                                                }
+                                              }
+                                            }
+                                          }
+                                        ],
+                                        "input": {
+                                          "project": {
+                                            "common": {
+                                              "direct": {},
+                                              "hint": {
+                                                "alias": "map-9",
+                                                "output_names": [
+                                                  "c.id",
+                                                  "c.text",
+                                                  "c.obligations",
+                                                  "c.definitions",
+                                                  "c.sections",
+                                                  "c.dates",
+                                                  "c.payments",
+                                                  "c.termination",
+                                                  "c.parties",
+                                                  "c.licensing",
+                                                  "c.confidentiality"
+                                                ]
+                                              }
+                                            },
+                                            "expressions": [
+                                              {
+                                                "scalar_function": {
+                                                  "arguments": [
+                                                    {
+                                                      "value": {
+                                                        "literal": {
+                                                          "string": "{0}\n\nDescribe every confidentiality and non-disclosure obligation, with its scope and duration."
+                                                        }
+                                                      }
+                                                    },
+                                                    {
+                                                      "value": {
+                                                        "selection": {
+                                                          "direct_reference": {
+                                                            "struct_field": {
+                                                              "field": 1
+                                                            }
+                                                          },
+                                                          "root_reference": {}
+                                                        }
+                                                      }
+                                                    },
+                                                    {
+                                                      "value": {
+                                                        "literal": {
+                                                          "i32": 1024
+                                                        }
+                                                      }
+                                                    }
+                                                  ],
+                                                  "function_reference": 21,
+                                                  "output_type": {
+                                                    "string": {
+                                                      "nullability": "NULLABILITY_REQUIRED"
+                                                    }
+                                                  }
+                                                }
+                                              }
+                                            ],
+                                            "input": {
+                                              "project": {
+                                                "common": {
+                                                  "direct": {},
+                                                  "hint": {
+                                                    "alias": "map-8",
+                                                    "output_names": [
+                                                      "c.id",
+                                                      "c.text",
+                                                      "c.obligations",
+                                                      "c.definitions",
+                                                      "c.sections",
+                                                      "c.dates",
+                                                      "c.payments",
+                                                      "c.termination",
+                                                      "c.parties",
+                                                      "c.licensing"
+                                                    ]
+                                                  }
+                                                },
+                                                "expressions": [
+                                                  {
+                                                    "scalar_function": {
+                                                      "arguments": [
+                                                        {
+                                                          "value": {
+                                                            "literal": {
+                                                              "string": "{0}\n\nDescribe every intellectual property, license, and ownership term, clause by clause."
+                                                            }
+                                                          }
+                                                        },
+                                                        {
+                                                          "value": {
+                                                            "selection": {
+                                                              "direct_reference": {
+                                                                "struct_field": {
+                                                                  "field": 1
+                                                                }
+                                                              },
+                                                              "root_reference": {}
+                                                            }
+                                                          }
+                                                        },
+                                                        {
+                                                          "value": {
+                                                            "literal": {
+                                                              "i32": 1024
+                                                            }
+                                                          }
+                                                        }
+                                                      ],
+                                                      "function_reference": 21,
+                                                      "output_type": {
+                                                        "string": {
+                                                          "nullability": "NULLABILITY_REQUIRED"
+                                                        }
+                                                      }
+                                                    }
+                                                  }
+                                                ],
+                                                "input": {
+                                                  "project": {
+                                                    "common": {
+                                                      "direct": {},
+                                                      "hint": {
+                                                        "alias": "map-7",
+                                                        "output_names": [
+                                                          "c.id",
+                                                          "c.text",
+                                                          "c.obligations",
+                                                          "c.definitions",
+                                                          "c.sections",
+                                                          "c.dates",
+                                                          "c.payments",
+                                                          "c.termination",
+                                                          "c.parties"
+                                                        ]
+                                                      }
+                                                    },
+                                                    "expressions": [
+                                                      {
+                                                        "scalar_function": {
+                                                          "arguments": [
+                                                            {
+                                                              "value": {
+                                                                "literal": {
+                                                                  "string": "{0}\n\nList the parties to this contract and the role of each."
+                                                                }
+                                                              }
+                                                            },
+                                                            {
+                                                              "value": {
+                                                                "selection": {
+                                                                  "direct_reference": {
+                                                                    "struct_field": {
+                                                                      "field": 1
+                                                                    }
+                                                                  },
+                                                                  "root_reference": {}
+                                                                }
+                                                              }
+                                                            },
+                                                            {
+                                                              "value": {
+                                                                "literal": {
+                                                                  "i32": 1024
+                                                                }
+                                                              }
+                                                            }
+                                                          ],
+                                                          "function_reference": 21,
+                                                          "output_type": {
+                                                            "string": {
+                                                              "nullability": "NULLABILITY_REQUIRED"
+                                                            }
+                                                          }
+                                                        }
+                                                      }
+                                                    ],
+                                                    "input": {
+                                                      "project": {
+                                                        "common": {
+                                                          "direct": {},
+                                                          "hint": {
+                                                            "alias": "map-6",
+                                                            "output_names": [
+                                                              "c.id",
+                                                              "c.text",
+                                                              "c.obligations",
+                                                              "c.definitions",
+                                                              "c.sections",
+                                                              "c.dates",
+                                                              "c.payments",
+                                                              "c.termination"
+                                                            ]
+                                                          }
+                                                        },
+                                                        "expressions": [
+                                                          {
+                                                            "scalar_function": {
+                                                              "arguments": [
+                                                                {
+                                                                  "value": {
+                                                                    "literal": {
+                                                                      "string": "{0}\n\nQuote every clause that lets a party terminate the contract, with its conditions."
+                                                                    }
+                                                                  }
+                                                                },
+                                                                {
+                                                                  "value": {
+                                                                    "selection": {
+                                                                      "direct_reference": {
+                                                                        "struct_field": {
+                                                                          "field": 1
+                                                                        }
+                                                                      },
+                                                                      "root_reference": {}
+                                                                    }
+                                                                  }
+                                                                },
+                                                                {
+                                                                  "value": {
+                                                                    "literal": {
+                                                                      "i32": 1024
+                                                                    }
+                                                                  }
+                                                                }
+                                                              ],
+                                                              "function_reference": 21,
+                                                              "output_type": {
+                                                                "string": {
+                                                                  "nullability": "NULLABILITY_REQUIRED"
+                                                                }
+                                                              }
+                                                            }
+                                                          }
+                                                        ],
+                                                        "input": {
+                                                          "project": {
+                                                            "common": {
+                                                              "direct": {},
+                                                              "hint": {
+                                                                "alias": "map-5",
+                                                                "output_names": [
+                                                                  "c.id",
+                                                                  "c.text",
+                                                                  "c.obligations",
+                                                                  "c.definitions",
+                                                                  "c.sections",
+                                                                  "c.dates",
+                                                                  "c.payments"
+                                                                ]
+                                                              }
+                                                            },
+                                                            "expressions": [
+                                                              {
+                                                                "scalar_function": {
+                                                                  "arguments": [
+                                                                    {
+                                                                      "value": {
+                                                                        "literal": {
+                                                                          "string": "{0}\n\nList every payment, fee, and price term, with amounts and conditions."
+                                                                        }
+                                                                      }
+                                                                    },
+                                                                    {
+                                                                      "value": {
+                                                                        "selection": {
+                                                                          "direct_reference": {
+                                                                            "struct_field": {
+                                                                              "field": 1
+                                                                            }
+                                                                          },
+                                                                          "root_reference": {}
+                                                                        }
+                                                                      }
+                                                                    },
+                                                                    {
+                                                                      "value": {
+                                                                        "literal": {
+                                                                          "i32": 1024
+                                                                        }
+                                                                      }
+                                                                    }
+                                                                  ],
+                                                                  "function_reference": 21,
+                                                                  "output_type": {
+                                                                    "string": {
+                                                                      "nullability": "NULLABILITY_REQUIRED"
+                                                                    }
+                                                                  }
+                                                                }
+                                                              }
+                                                            ],
+                                                            "input": {
+                                                              "project": {
+                                                                "common": {
+                                                                  "direct": {},
+                                                                  "hint": {
+                                                                    "alias": "map-4",
+                                                                    "output_names": [
+                                                                      "c.id",
+                                                                      "c.text",
+                                                                      "c.obligations",
+                                                                      "c.definitions",
+                                                                      "c.sections",
+                                                                      "c.dates"
+                                                                    ]
+                                                                  }
+                                                                },
+                                                                "expressions": [
+                                                                  {
+                                                                    "scalar_function": {
+                                                                      "arguments": [
+                                                                        {
+                                                                          "value": {
+                                                                            "literal": {
+                                                                              "string": "{0}\n\nList every date, deadline, and notice period the contract sets, with what each applies to."
+                                                                            }
+                                                                          }
+                                                                        },
+                                                                        {
+                                                                          "value": {
+                                                                            "selection": {
+                                                                              "direct_reference": {
+                                                                                "struct_field": {
+                                                                                  "field": 1
+                                                                                }
+                                                                              },
+                                                                              "root_reference": {}
+                                                                            }
+                                                                          }
+                                                                        },
+                                                                        {
+                                                                          "value": {
+                                                                            "literal": {
+                                                                              "i32": 1024
+                                                                            }
+                                                                          }
+                                                                        }
+                                                                      ],
+                                                                      "function_reference": 21,
+                                                                      "output_type": {
+                                                                        "string": {
+                                                                          "nullability": "NULLABILITY_REQUIRED"
+                                                                        }
+                                                                      }
+                                                                    }
+                                                                  }
+                                                                ],
+                                                                "input": {
+                                                                  "project": {
+                                                                    "common": {
+                                                                      "direct": {},
+                                                                      "hint": {
+                                                                        "alias": "map-3",
+                                                                        "output_names": [
+                                                                          "c.id",
+                                                                          "c.text",
+                                                                          "c.obligations",
+                                                                          "c.definitions",
+                                                                          "c.sections"
+                                                                        ]
+                                                                      }
+                                                                    },
+                                                                    "expressions": [
+                                                                      {
+                                                                        "scalar_function": {
+                                                                          "arguments": [
+                                                                            {
+                                                                              "value": {
+                                                                                "literal": {
+                                                                                  "string": "{0}\n\nSummarize each section of the contract in one sentence."
+                                                                                }
+                                                                              }
+                                                                            },
+                                                                            {
+                                                                              "value": {
+                                                                                "selection": {
+                                                                                  "direct_reference": {
+                                                                                    "struct_field": {
+                                                                                      "field": 1
+                                                                                    }
+                                                                                  },
+                                                                                  "root_reference": {}
+                                                                                }
+                                                                              }
+                                                                            },
+                                                                            {
+                                                                              "value": {
+                                                                                "literal": {
+                                                                                  "i32": 1024
+                                                                                }
+                                                                              }
+                                                                            }
+                                                                          ],
+                                                                          "function_reference": 21,
+                                                                          "output_type": {
+                                                                            "string": {
+                                                                              "nullability": "NULLABILITY_REQUIRED"
+                                                                            }
+                                                                          }
+                                                                        }
+                                                                      }
+                                                                    ],
+                                                                    "input": {
+                                                                      "project": {
+                                                                        "common": {
+                                                                          "direct": {},
+                                                                          "hint": {
+                                                                            "alias": "map-2",
+                                                                            "output_names": [
+                                                                              "c.id",
+                                                                              "c.text",
+                                                                              "c.obligations",
+                                                                              "c.definitions"
+                                                                            ]
+                                                                          }
+                                                                        },
+                                                                        "expressions": [
+                                                                          {
+                                                                            "scalar_function": {
+                                                                              "arguments": [
+                                                                                {
+                                                                                  "value": {
+                                                                                    "literal": {
+                                                                                      "string": "{0}\n\nList every defined term in the contract with its definition."
+                                                                                    }
+                                                                                  }
+                                                                                },
+                                                                                {
+                                                                                  "value": {
+                                                                                    "selection": {
+                                                                                      "direct_reference": {
+                                                                                        "struct_field": {
+                                                                                          "field": 1
+                                                                                        }
+                                                                                      },
+                                                                                      "root_reference": {}
+                                                                                    }
+                                                                                  }
+                                                                                },
+                                                                                {
+                                                                                  "value": {
+                                                                                    "literal": {
+                                                                                      "i32": 1024
+                                                                                    }
+                                                                                  }
+                                                                                }
+                                                                              ],
+                                                                              "function_reference": 21,
+                                                                              "output_type": {
+                                                                                "string": {
+                                                                                  "nullability": "NULLABILITY_REQUIRED"
+                                                                                }
+                                                                              }
+                                                                            }
+                                                                          }
+                                                                        ],
+                                                                        "input": {
+                                                                          "project": {
+                                                                            "common": {
+                                                                              "direct": {},
+                                                                              "hint": {
+                                                                                "alias": "map-1",
+                                                                                "output_names": [
+                                                                                  "c.id",
+                                                                                  "c.text",
+                                                                                  "c.obligations"
+                                                                                ]
+                                                                              }
+                                                                            },
+                                                                            "expressions": [
+                                                                              {
+                                                                                "scalar_function": {
+                                                                                  "arguments": [
+                                                                                    {
+                                                                                      "value": {
+                                                                                        "literal": {
+                                                                                          "string": "{0}\n\nList every obligation in the contract, clause by clause, with the party it binds."
+                                                                                        }
+                                                                                      }
+                                                                                    },
+                                                                                    {
+                                                                                      "value": {
+                                                                                        "selection": {
+                                                                                          "direct_reference": {
+                                                                                            "struct_field": {
+                                                                                              "field": 1
+                                                                                            }
+                                                                                          },
+                                                                                          "root_reference": {}
+                                                                                        }
+                                                                                      }
+                                                                                    },
+                                                                                    {
+                                                                                      "value": {
+                                                                                        "literal": {
+                                                                                          "i32": 1024
+                                                                                        }
+                                                                                      }
+                                                                                    }
+                                                                                  ],
+                                                                                  "function_reference": 21,
+                                                                                  "output_type": {
+                                                                                    "string": {
+                                                                                      "nullability": "NULLABILITY_REQUIRED"
+                                                                                    }
+                                                                                  }
+                                                                                }
+                                                                              }
+                                                                            ],
+                                                                            "input": {
+                                                                              "read": {
+                                                                                "base_schema": {
+                                                                                  "names": [
+                                                                                    "id",
+                                                                                    "text"
+                                                                                  ],
+                                                                                  "struct": {
+                                                                                    "nullability": "NULLABILITY_REQUIRED",
+                                                                                    "types": [
+                                                                                      {
+                                                                                        "string": {
+                                                                                          "nullability": "NULLABILITY_REQUIRED"
+                                                                                        }
+                                                                                      },
+                                                                                      {
+                                                                                        "string": {
+                                                                                          "nullability": "NULLABILITY_REQUIRED"
+                                                                                        }
+                                                                                      }
+                                                                                    ]
+                                                                                  }
+                                                                                },
+                                                                                "common": {
+                                                                                  "direct": {},
+                                                                                  "hint": {
+                                                                                    "alias": "c"
+                                                                                  }
+                                                                                },
+                                                                                "named_table": {
+                                                                                  "names": [
+                                                                                    "contracts"
+                                                                                  ]
+                                                                                }
+                                                                              }
+                                                                            }
+                                                                          }
+                                                                        }
+                                                                      }
+                                                                    }
+                                                                  }
+                                                                }
+                                                              }
+                                                            }
+                                                          }
+                                                        }
+                                                      }
+                                                    }
+                                                  }
+                                                }
+                                              }
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "names": [
+          "c",
+          "obligations",
+          "definitions",
+          "sections",
+          "dates",
+          "payments",
+          "termination",
+          "parties",
+          "licensing",
+          "confidentiality",
+          "warranties",
+          "indemnification",
+          "disputes",
+          "assignment",
+          "insurance",
+          "renewal",
+          "notices"
+        ]
+      }
+    }
+  ],
+  "version": {
+    "minor_number": 103,
+    "producer": "quail-b"
+  }
+}

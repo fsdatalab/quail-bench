@@ -575,6 +575,12 @@
     "draft": true
   },
   {
+    "id": "CUAD-23",
+    "description": "16 long maps: one aspect of the contract each",
+    "privacy": false,
+    "draft": true
+  },
+  {
     "id": "CUAD-20",
     "description": "non-compete contracts -> 3 maps: parties, term, and governing law",
     "privacy": false,

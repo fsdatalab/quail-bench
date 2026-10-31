@@ -200,6 +200,43 @@ CUAD_MAP_PLAIN_TERMS = (
     "gives, gets, and must do, and how the contract can end.")
 CUAD_MAP_DEFINITIONS = (
     "{0}\n\nList every defined term in the contract with its definition.")
+# One aspect of the contract each, for CUAD-23's sixteen maps of one contract
+CUAD_MAP_SECTIONS = (
+    "{0}\n\nSummarize each section of the contract in one sentence.")
+CUAD_MAP_DATES = (
+    "{0}\n\nList every date, deadline, and notice period the contract sets, "
+    "with what each applies to.")
+CUAD_MAP_PAYMENTS = (
+    "{0}\n\nList every payment, fee, and price term, with amounts and "
+    "conditions.")
+CUAD_MAP_TERMINATION = (
+    "{0}\n\nQuote every clause that lets a party terminate the contract, with "
+    "its conditions.")
+CUAD_MAP_LICENSING = (
+    "{0}\n\nDescribe every intellectual property, license, and ownership term, "
+    "clause by clause.")
+CUAD_MAP_CONFIDENTIALITY = (
+    "{0}\n\nDescribe every confidentiality and non-disclosure obligation, with "
+    "its scope and duration.")
+CUAD_MAP_WARRANTIES = (
+    "{0}\n\nList every warranty, representation, and disclaimer each party "
+    "makes.")
+CUAD_MAP_INDEMNIFICATION = (
+    "{0}\n\nDescribe every liability limit and indemnification duty, with what "
+    "it covers.")
+CUAD_MAP_DISPUTES = (
+    "{0}\n\nDescribe the governing law, venue, and every dispute resolution "
+    "step.")
+CUAD_MAP_ASSIGNMENT = (
+    "{0}\n\nDescribe every assignment, transfer, and change of control term.")
+CUAD_MAP_INSURANCE = (
+    "{0}\n\nList every insurance, audit, and record-keeping requirement.")
+CUAD_MAP_RENEWAL = (
+    "{0}\n\nDescribe the term of the contract and every renewal and extension "
+    "term.")
+CUAD_MAP_NOTICES = (
+    "{0}\n\nList every notice requirement, with who must be notified, how, and "
+    "when.")
 
 
 IMDB_SENTIMENT = (

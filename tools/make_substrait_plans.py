@@ -976,6 +976,35 @@ def _contracts(alias="c"):
     return Scan("contracts", alias, "text")
 
 
+# CUAD-23's maps: one aspect of a contract each, in answer column order
+CONTRACT_ASPECTS = (
+    ("obligations", prompts.CUAD_MAP_OBLIGATIONS),
+    ("definitions", prompts.CUAD_MAP_DEFINITIONS),
+    ("sections", prompts.CUAD_MAP_SECTIONS),
+    ("dates", prompts.CUAD_MAP_DATES),
+    ("payments", prompts.CUAD_MAP_PAYMENTS),
+    ("termination", prompts.CUAD_MAP_TERMINATION),
+    ("parties", prompts.CUAD_MAP_PARTIES),
+    ("licensing", prompts.CUAD_MAP_LICENSING),
+    ("confidentiality", prompts.CUAD_MAP_CONFIDENTIALITY),
+    ("warranties", prompts.CUAD_MAP_WARRANTIES),
+    ("indemnification", prompts.CUAD_MAP_INDEMNIFICATION),
+    ("disputes", prompts.CUAD_MAP_DISPUTES),
+    ("assignment", prompts.CUAD_MAP_ASSIGNMENT),
+    ("insurance", prompts.CUAD_MAP_INSURANCE),
+    ("renewal", prompts.CUAD_MAP_RENEWAL),
+    ("notices", prompts.CUAD_MAP_NOTICES),
+)
+
+
+def _contract_aspects():
+    """Map every contract to CONTRACT_ASPECTS' answers, 1,024 tokens each."""
+    relation = _contracts()
+    for name, prompt in CONTRACT_ASPECTS:
+        relation = Map(relation, prompt, 1024, name)
+    return relation
+
+
 def _sec_filings():
     return Scan("sec_filings", "f", "text", ("filing_month",))
 
@@ -1638,6 +1667,10 @@ QUERIES = (
                   prompts.CUAD_MAP_PLAIN_TERMS, 1024, "plain_terms"),
               prompts.CUAD_MAP_DEFINITIONS, 1024, "definitions"),
           select=("c", "c.obligations", "c.plain_terms", "c.definitions"),
+          draft=True),
+    Query("CUAD-23", "16 long maps: one aspect of the contract each",
+          _contract_aspects(),
+          select=("c", *(f"c.{name}" for name, _ in CONTRACT_ASPECTS)),
           draft=True),
     Query("CUAD-20", "non-compete contracts -> 3 maps: parties, term, and "
           "governing law",

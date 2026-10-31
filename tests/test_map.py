@@ -17,11 +17,11 @@ from quail_b import minimum, predicates, prompts, rendering
 from quail_b.queries import queries
 from quail_b.run import _query_hash, _read_output, _save_output, _validate_output
 from quail_b.substrait import Map
+from tools.make_substrait_plans import CONTRACT_ASPECTS, Scan, Struct, build_plan
 from tools.make_substrait_plans import Map as MapNode
-from tools.make_substrait_plans import Scan, Struct, build_plan
 
 MAP_QUERIES = (*(f"IMDB-{i}" for i in range(20, 29)),
-               *(f"CUAD-{i}" for i in range(17, 23)))
+               *(f"CUAD-{i}" for i in range(17, 24)))
 REVIEWS = IMDB_TABLES["reviews"]
 
 
@@ -61,6 +61,7 @@ def test_map_queries_are_drafts_over_their_corpora():
         "CUAD-22": [(prompts.CUAD_MAP_OBLIGATIONS, 1024),
                     (prompts.CUAD_MAP_PLAIN_TERMS, 1024),
                     (prompts.CUAD_MAP_DEFINITIONS, 1024)],
+        "CUAD-23": [(prompt, 1024) for _, prompt in CONTRACT_ASPECTS],
         "CUAD-20": [(prompts.CUAD_MAP_PARTIES, 128),
                     (prompts.CUAD_MAP_TERM, 128),
                     (prompts.CUAD_MAP_GOVERNING_LAW, 128)],
