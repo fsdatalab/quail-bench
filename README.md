@@ -383,7 +383,7 @@ positive, constant answer token limit. The prompt is a constant template,
 its KV. The [reference](docs/reference.md#maps) defines the exact rendering,
 answer tables, and token accounting.
 
-There are eighteen map drafts. Numbers below are answer token limits per call:
+There are seventeen map drafts. Numbers below are answer token limits per call:
 
 - **IMDB-20:** Summarize the review's negative arguments in one sentence
   (64).
@@ -426,8 +426,6 @@ There are eighteen map drafts. Numbers below are answer token limits per call:
   its plan and every change to it, and list every file it edited with each
   change (1,024 each), using three maps of the same trace snapshot. Snapshots
   of one trajectory share their first turns.
-- **WRENCH-10:** Describe step by step what the agent did, and say whether it
-  tried to pass the checks without solving the task (1,024).
 
 These drafts are excluded from the default 85 queries. Load them by ID with
 `accuracy=False` and call your adapter directly:

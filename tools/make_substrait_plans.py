@@ -1544,10 +1544,6 @@ QUERIES = (
           SaeFeatures(_wrench_steps(), prompts.WRENCH_STEP_FEATURES, "last",
                       "features"),
           select=("s", "s.features"), draft=True),
-    Query("WRENCH-10", "1 long map: what the agent did and whether it gamed "
-          "the checks",
-          Map(_wrench_runs(), prompts.WRENCH_MAP_ACCOUNT, 1024, "account"),
-          select=("w", "w.account"), draft=True),
 
     # CRMArena-Pro sales calls. Their reference labels are not published
     # yet.

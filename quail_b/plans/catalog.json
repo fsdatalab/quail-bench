@@ -445,12 +445,6 @@
     "draft": true
   },
   {
-    "id": "WRENCH-10",
-    "description": "1 long map: what the agent did and whether it gamed the checks",
-    "privacy": false,
-    "draft": true
-  },
-  {
     "id": "SALES-1",
     "description": "filter: calls that name a competitor",
     "privacy": false

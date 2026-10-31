@@ -452,10 +452,6 @@ MAP_PREDICATES = (
           ("commands", prompts.AGENT_MAP_COMMANDS),
           ("plan", prompts.AGENT_MAP_PLAN),
           ("edits", prompts.AGENT_MAP_EDITS))),
-    PredicateSpec(
-        "quailb.wrench.run.map_account", "wrench", "map_account", "map",
-        prompts.WRENCH_MAP_ACCOUNT, "agent_run", "wrench_runs", "transcript",
-        source_policy="unpublished", max_tokens=1024),
 )
 IMDB_MAP_FILTER_PREDICATES = (
     PredicateSpec(
