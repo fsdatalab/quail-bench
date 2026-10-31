@@ -17,11 +17,17 @@ from quail_b import minimum, predicates, prompts, rendering
 from quail_b.queries import queries
 from quail_b.run import _query_hash, _read_output, _save_output, _validate_output
 from quail_b.substrait import Map
-from tools.make_substrait_plans import CONTRACT_ASPECTS, Scan, Struct, build_plan
+from tools.make_substrait_plans import (
+    CONTRACT_ASPECTS,
+    Filter,
+    Scan,
+    Struct,
+    build_plan,
+)
 from tools.make_substrait_plans import Map as MapNode
 
-MAP_QUERIES = (*(f"IMDB-{i}" for i in range(20, 29)),
-               *(f"CUAD-{i}" for i in range(17, 24)), "AGENT-6")
+MAP_QUERIES = (*(f"IMDB-{i}" for i in range(20, 26)),
+               *(f"CUAD-{i}" for i in range(17, 23)), "AGENT-6")
 MAP_RELATIONS = {"IMDB": ("reviews", "r"), "CUAD": ("contracts", "c"),
                  "AGENT": ("agent_traces", "t")}
 REVIEWS = IMDB_TABLES["reviews"]
@@ -44,34 +50,28 @@ def test_map_queries_are_drafts_over_their_corpora():
     assert all(query_id not in published for query_id in MAP_QUERIES)
     assert all(query_id in drafts for query_id in MAP_QUERIES)
     expected = {
-        "IMDB-20": [(prompts.IMDB_MAP_NEGATIVES, 64)],
-        "IMDB-21": [(prompts.IMDB_MAP_SUMMARY, 256)],
-        "IMDB-22": [(prompts.IMDB_MAP_NEGATIVES, 64),
-                       (prompts.IMDB_MAP_SUMMARY, 256),
-                       (prompts.IMDB_MAP_TOPIC, 32)],
-        "IMDB-23": [(prompts.IMDB_MAP_SUMMARY, 256)],
-        "IMDB-24": [(prompts.IMDB_MAP_SUMMARY, 256)],
-        "IMDB-25": [(prompts.IMDB_MAP_PLOT, 1024)],
-        "IMDB-26": [(prompts.IMDB_MAP_PLOT, 1024),
-                       (prompts.IMDB_MAP_BALANCED, 1024),
-                       (prompts.IMDB_MAP_NAMES, 1024)],
-        "IMDB-27": [(prompts.IMDB_MAP_NEGATIVES, 64),
+        "IMDB-20": [(prompts.IMDB_MAP_NEGATIVES, 64),
                     (prompts.IMDB_MAP_SUMMARY, 256),
                     (prompts.IMDB_MAP_TOPIC, 32)],
-        "IMDB-28": [(prompts.IMDB_MAP_SUMMARY, 256)],
-        "CUAD-21": [(prompts.CUAD_MAP_SUMMARY, 256)],
-        "CUAD-22": [(prompts.CUAD_MAP_OBLIGATIONS, 1024),
-                    (prompts.CUAD_MAP_PLAIN_TERMS, 1024),
-                    (prompts.CUAD_MAP_DEFINITIONS, 1024)],
-        "CUAD-23": [(prompt, 1024) for _, prompt in CONTRACT_ASPECTS],
-        "CUAD-20": [(prompts.CUAD_MAP_PARTIES, 128),
-                    (prompts.CUAD_MAP_TERM, 128),
-                    (prompts.CUAD_MAP_GOVERNING_LAW, 128)],
+        "IMDB-21": [(prompts.IMDB_MAP_SUMMARY, 256)],
+        "IMDB-22": [(prompts.IMDB_MAP_PLOT, 1024)],
+        "IMDB-23": [(prompts.IMDB_MAP_PLOT, 1024),
+                    (prompts.IMDB_MAP_BALANCED, 1024),
+                    (prompts.IMDB_MAP_NAMES, 1024)],
+        "IMDB-24": [(prompts.IMDB_MAP_NEGATIVES, 64),
+                    (prompts.IMDB_MAP_SUMMARY, 256),
+                    (prompts.IMDB_MAP_TOPIC, 32)],
+        "IMDB-25": [(prompts.IMDB_MAP_SUMMARY, 256)],
         "CUAD-17": [(prompts.CUAD_MAP_PARTIES, 256)],
         "CUAD-18": [(prompts.CUAD_MAP_PARTIES, 128),
-                       (prompts.CUAD_MAP_TERM, 128),
-                       (prompts.CUAD_MAP_GOVERNING_LAW, 128)],
+                    (prompts.CUAD_MAP_TERM, 128),
+                    (prompts.CUAD_MAP_GOVERNING_LAW, 128)],
         "CUAD-19": [(prompts.CUAD_MAP_NON_COMPETE, 256)],
+        "CUAD-20": [(prompts.CUAD_MAP_SUMMARY, 256)],
+        "CUAD-21": [(prompts.CUAD_MAP_OBLIGATIONS, 1024),
+                    (prompts.CUAD_MAP_PLAIN_TERMS, 1024),
+                    (prompts.CUAD_MAP_DEFINITIONS, 1024)],
+        "CUAD-22": [(prompt, 1024) for _, prompt in CONTRACT_ASPECTS],
         "AGENT-6": [(prompts.AGENT_MAP_COMMANDS, 1024),
                     (prompts.AGENT_MAP_PLAN, 1024),
                     (prompts.AGENT_MAP_EDITS, 1024)],
@@ -83,7 +83,7 @@ def test_map_queries_are_drafts_over_their_corpora():
         assert [(rel.table, rel.alias) for rel in info.relations] == [(table, alias)]
         assert [op.id for op in info.maps] == [
             f"map-{i}" for i in range(1, len(calls) + 1)]
-        # only CUAD-21's extractions return a struct; maps never do
+        # only CUAD-20's extractions return a struct; maps never do
         assert all(op.output not in field for struct in info.structs
                    for field in struct.fields for op in info.maps)
         assert all(f"{alias}.{op.output}" in info.select for op in info.maps)
@@ -113,11 +113,12 @@ def test_map_plan_has_literal_limit_and_nonnull_string_output():
 
 
 def test_map_filter_classification_and_relational_compositions():
-    filtered = quail_b.get_query("IMDB-23").info
-    assert [op.id for op in filtered.ai_operators] == ["filter-1", "map-1"]
+    filtered = quail_b.get_query("IMDB-24").info
+    assert [op.id for op in filtered.ai_operators] == [
+        "filter-1", "map-1", "map-2", "map-3"]
     assert filtered.filters[0].prompt == "Is this review negative?\n\n{0}"
     assert filtered.filters[0].prompt == prompts.IMDB_NEGATIVE
-    classified = quail_b.get_query("IMDB-24").info
+    classified = quail_b.get_query("IMDB-21").info
     original = quail_b.get_query("IMDB-11").info.classifies[0]
     (operator,) = classified.classifies
     assert operator.output == "tone"
@@ -236,14 +237,14 @@ def _output(rows=None, answers=None):
     if answers is None:
         answers = pa.table({"r": ["r0", "r1"], "answer": ["Weak plot.", ""]})
     if rows is None:
-        output = quail_b.get_query("IMDB-20").info.maps[0].output
+        output = quail_b.get_query("IMDB-22").info.maps[0].output
         rows = pa.table({"r": ["r0", "r1"], output: ["Weak plot.", ""]})
     return quail_b.RunOutput({}, {}, rows, runtime_s=1.0,
                              map_answers={"map-1": answers})
 
 
 def test_map_validation_accepts_empty_strings_and_partial_evaluation():
-    _validate_output(quail_b.get_query("IMDB-20"), _output(),
+    _validate_output(quail_b.get_query("IMDB-22"), _output(),
                      {"reviews": REVIEWS})
 
 
@@ -264,7 +265,7 @@ def test_map_validation_rejects_null_and_nonstring_text(
         name = output.rows.column_names[1]
         output.rows = output.rows.set_column(1, name, pa.array(values, type_))
     with pytest.raises(ValueError):
-        _validate_output(quail_b.get_query("IMDB-20"), output,
+        _validate_output(quail_b.get_query("IMDB-22"), output,
                          {"reviews": REVIEWS})
 
 
@@ -290,12 +291,12 @@ def test_map_validation_checks_operator_ids_document_ids_and_returned_text(
     else:
         output.map_answers["map-1"] = output.map_answers["map-1"].slice(0, 1)
     with pytest.raises(ValueError):
-        _validate_output(quail_b.get_query("IMDB-20"), output,
+        _validate_output(quail_b.get_query("IMDB-22"), output,
                          {"reviews": REVIEWS})
 
 
 def test_map_answers_persist_and_round_trip(tmp_path):
-    spec = quail_b.get_query("IMDB-20")
+    spec = quail_b.get_query("IMDB-22")
     output = _output()
     directory = tmp_path / "query"
     paths = _save_output(directory, output, spec)
@@ -339,7 +340,7 @@ def _token_tables(monkeypatch):
 
 
 def test_multiple_maps_share_prompts_but_count_each_answer_decode(monkeypatch):
-    spec = quail_b.get_query("IMDB-22")
+    spec = quail_b.get_query("IMDB-20")
     tables = _token_tables(monkeypatch)
     answers = pa.table({"r": ["r0", "r1"], "answer": ["short", "long " * 5]})
     output = quail_b.RunOutput(
@@ -375,7 +376,7 @@ def test_multiple_maps_share_prompts_but_count_each_answer_decode(monkeypatch):
 @pytest.mark.parametrize("reported_input", [None, 4, 8])
 def test_map_regret_excludes_required_decode_inputs(
         monkeypatch, answer, decode, extra, reported_input):
-    spec = quail_b.get_query("IMDB-21")
+    spec = quail_b.get_query("IMDB-22")
     tables = _token_tables(monkeypatch)
     # One prompt has no shared KV: preamble + document + tail = 5 tokens.
     prompt = 5 if reported_input is None else reported_input
@@ -398,7 +399,7 @@ def test_map_regret_excludes_required_decode_inputs(
 
 
 def test_empty_map_answer_table_needs_no_tokens(monkeypatch):
-    spec = quail_b.get_query("IMDB-21")
+    spec = quail_b.get_query("IMDB-22")
     tables = _token_tables(monkeypatch)
     output = quail_b.RunOutput(
         {}, {}, None, runtime_s=1.0, measurements={"fresh_tokens": 0},
@@ -413,7 +414,7 @@ def test_empty_map_answer_table_needs_no_tokens(monkeypatch):
 
 @pytest.mark.parametrize("ids", [("map-99",), ("map-1", "map-1")])
 def test_map_prompt_pieces_reject_unknown_and_duplicate_operators(ids):
-    spec = quail_b.get_query("IMDB-20")
+    spec = quail_b.get_query("IMDB-22")
     with pytest.raises(ValueError, match="unknown map operator"):
         minimum.validate_prompt_pieces(spec, {
             "tokenizer": "test", "maps": [
@@ -421,7 +422,9 @@ def test_map_prompt_pieces_reject_unknown_and_duplicate_operators(ids):
 
 
 def test_filtered_map_counts_only_documents_actually_mapped(monkeypatch):
-    spec = quail_b.get_query("IMDB-23")
+    spec = _spec(MapNode(Filter(Scan("reviews", "r", "body"), prompts.IMDB_NEGATIVE),
+                         prompts.IMDB_MAP_SUMMARY, 256, "summary"),
+                 ("r", "r.summary"))
     tables = _token_tables(monkeypatch)
     output = quail_b.RunOutput(
         {"filter-1": pa.table({"r": ["r0", "r1"], "answer": [False, True]})},
@@ -437,7 +440,7 @@ def test_filtered_map_counts_only_documents_actually_mapped(monkeypatch):
 
 def test_map_only_run_scores_ids_and_rescores_without_reference_predicates(tmp_path):
     _collection(tmp_path, IMDB_TABLES, [])
-    spec = quail_b.get_query("IMDB-20")
+    spec = quail_b.get_query("IMDB-22")
     name = spec.info.maps[0].output
     ids = ["r0", "r1", "r2"]
     text = ["Invented text.", "", "No reference is needed."]
@@ -466,7 +469,7 @@ def test_map_text_is_not_scored_but_accompanying_classification_is(tmp_path):
     labels = ["positive", "negative", "neutral"]
     _collection(tmp_path, IMDB_TABLES, [
         (_classify_predicate(SENTIMENT), list(zip(["r0", "r1", "r2"], labels)))])
-    spec = quail_b.get_query("IMDB-24")
+    spec = quail_b.get_query("IMDB-21")
     name = spec.info.maps[0].output
     answers = ["Arbitrary generated text.", "", "Not a reference answer."]
     output = quail_b.RunOutput(
@@ -517,14 +520,15 @@ def test_map_text_is_not_scored_but_accompanying_filter_and_sorted_ids_are(tmp_p
 
 def test_a_draft_with_an_unlabeled_filter_runs_and_scores_no_rows(tmp_path):
     _collection(tmp_path, IMDB_TABLES, [])
-    spec = quail_b.get_query("IMDB-23")
-    name = spec.info.maps[0].output
+    spec = quail_b.get_query("IMDB-24")
+    text = ["One answer.", "Another."]
     output = quail_b.RunOutput(
         {"filter-1": pa.table({"r": ["r0", "r1", "r2"],
                                 "answer": [True, False, True]})}, {},
-        pa.table({"r": ["r0", "r2"], name: ["One summary.", "Another."]}),
-        runtime_s=1.0, map_answers={"map-1": pa.table({
-            "r": ["r0", "r2"], "answer": ["One summary.", "Another."]})})
+        pa.table({"r": ["r0", "r2"],
+                  **{op.output: text for op in spec.info.maps}}),
+        runtime_s=1.0, map_answers={op.id: pa.table({
+            "r": ["r0", "r2"], "answer": text}) for op in spec.info.maps})
     directory = tmp_path / "run"
     record = quail_b.run(lambda query, tables: output, queries=[spec.id],
                          output_dir=directory, root=tmp_path)
@@ -546,6 +550,6 @@ def test_a_published_query_still_needs_its_labels(tmp_path):
 def test_map_drafts_load_inputs_without_reference_labels(tmp_path):
     _collection(tmp_path, IMDB_TABLES, [])
     suite = quail_b.load_benchmark(
-        ["IMDB-20", "IMDB-22"], accuracy=False, root=tmp_path)
-    assert [spec.id for spec in suite.queries] == ["IMDB-20", "IMDB-22"]
+        ["IMDB-22", "IMDB-20"], accuracy=False, root=tmp_path)
+    assert [spec.id for spec in suite.queries] == ["IMDB-22", "IMDB-20"]
     assert suite.tables["reviews"].equals(REVIEWS)

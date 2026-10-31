@@ -200,7 +200,7 @@ CUAD_MAP_PLAIN_TERMS = (
     "gives, gets, and must do, and how the contract can end.")
 CUAD_MAP_DEFINITIONS = (
     "{0}\n\nList every defined term in the contract with its definition.")
-# One aspect of the contract each, for CUAD-23's sixteen maps of one contract
+# One aspect of the contract each, for CUAD-22's sixteen maps of one contract
 CUAD_MAP_SECTIONS = (
     "{0}\n\nSummarize each section of the contract in one sentence.")
 CUAD_MAP_DATES = (

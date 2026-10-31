@@ -22,10 +22,8 @@
             "common": {
               "emit": {
                 "output_mapping": [
-                  5,
-                  6,
-                  7,
-                  8
+                  3,
+                  4
                 ]
               }
             },
@@ -47,26 +45,6 @@
                   },
                   "root_reference": {}
                 }
-              },
-              {
-                "selection": {
-                  "direct_reference": {
-                    "struct_field": {
-                      "field": 3
-                    }
-                  },
-                  "root_reference": {}
-                }
-              },
-              {
-                "selection": {
-                  "direct_reference": {
-                    "struct_field": {
-                      "field": 4
-                    }
-                  },
-                  "root_reference": {}
-                }
               }
             ],
             "input": {
@@ -74,13 +52,11 @@
                 "common": {
                   "direct": {},
                   "hint": {
-                    "alias": "map-3",
+                    "alias": "map-1",
                     "output_names": [
                       "r.id",
                       "r.body",
-                      "r.negatives",
-                      "r.summary",
-                      "r.topic"
+                      "r.plot"
                     ]
                   }
                 },
@@ -91,7 +67,7 @@
                         {
                           "value": {
                             "literal": {
-                              "string": "{0}\n\nName the main topic of the document in a few words."
+                              "string": "{0}\n\nRetell the plot of the film as the review describes it, in order, with every character and event the review mentions."
                             }
                           }
                         },
@@ -110,7 +86,7 @@
                         {
                           "value": {
                             "literal": {
-                              "i32": 32
+                              "i32": 1024
                             }
                           }
                         }
@@ -125,149 +101,38 @@
                   }
                 ],
                 "input": {
-                  "project": {
-                    "common": {
-                      "direct": {},
-                      "hint": {
-                        "alias": "map-2",
-                        "output_names": [
-                          "r.id",
-                          "r.body",
-                          "r.negatives",
-                          "r.summary"
-                        ]
-                      }
-                    },
-                    "expressions": [
-                      {
-                        "scalar_function": {
-                          "arguments": [
-                            {
-                              "value": {
-                                "literal": {
-                                  "string": "{0}\n\nWrite a detailed summary of the document: the people involved, the main points they make, and anything unresolved."
-                                }
-                              }
-                            },
-                            {
-                              "value": {
-                                "selection": {
-                                  "direct_reference": {
-                                    "struct_field": {
-                                      "field": 1
-                                    }
-                                  },
-                                  "root_reference": {}
-                                }
-                              }
-                            },
-                            {
-                              "value": {
-                                "literal": {
-                                  "i32": 256
-                                }
-                              }
+                  "read": {
+                    "base_schema": {
+                      "names": [
+                        "id",
+                        "body"
+                      ],
+                      "struct": {
+                        "nullability": "NULLABILITY_REQUIRED",
+                        "types": [
+                          {
+                            "string": {
+                              "nullability": "NULLABILITY_REQUIRED"
                             }
-                          ],
-                          "function_reference": 21,
-                          "output_type": {
+                          },
+                          {
                             "string": {
                               "nullability": "NULLABILITY_REQUIRED"
                             }
                           }
-                        }
+                        ]
                       }
-                    ],
-                    "input": {
-                      "project": {
-                        "common": {
-                          "direct": {},
-                          "hint": {
-                            "alias": "map-1",
-                            "output_names": [
-                              "r.id",
-                              "r.body",
-                              "r.negatives"
-                            ]
-                          }
-                        },
-                        "expressions": [
-                          {
-                            "scalar_function": {
-                              "arguments": [
-                                {
-                                  "value": {
-                                    "literal": {
-                                      "string": "{0}\n\nSummarize the negative arguments the writer makes, in one sentence."
-                                    }
-                                  }
-                                },
-                                {
-                                  "value": {
-                                    "selection": {
-                                      "direct_reference": {
-                                        "struct_field": {
-                                          "field": 1
-                                        }
-                                      },
-                                      "root_reference": {}
-                                    }
-                                  }
-                                },
-                                {
-                                  "value": {
-                                    "literal": {
-                                      "i32": 64
-                                    }
-                                  }
-                                }
-                              ],
-                              "function_reference": 21,
-                              "output_type": {
-                                "string": {
-                                  "nullability": "NULLABILITY_REQUIRED"
-                                }
-                              }
-                            }
-                          }
-                        ],
-                        "input": {
-                          "read": {
-                            "base_schema": {
-                              "names": [
-                                "id",
-                                "body"
-                              ],
-                              "struct": {
-                                "nullability": "NULLABILITY_REQUIRED",
-                                "types": [
-                                  {
-                                    "string": {
-                                      "nullability": "NULLABILITY_REQUIRED"
-                                    }
-                                  },
-                                  {
-                                    "string": {
-                                      "nullability": "NULLABILITY_REQUIRED"
-                                    }
-                                  }
-                                ]
-                              }
-                            },
-                            "common": {
-                              "direct": {},
-                              "hint": {
-                                "alias": "r"
-                              }
-                            },
-                            "named_table": {
-                              "names": [
-                                "reviews"
-                              ]
-                            }
-                          }
-                        }
+                    },
+                    "common": {
+                      "direct": {},
+                      "hint": {
+                        "alias": "r"
                       }
+                    },
+                    "named_table": {
+                      "names": [
+                        "reviews"
+                      ]
                     }
                   }
                 }
@@ -277,9 +142,7 @@
         },
         "names": [
           "r",
-          "negatives",
-          "summary",
-          "topic"
+          "plot"
         ]
       }
     }

@@ -383,41 +383,34 @@ positive, constant answer token limit. The prompt is a constant template,
 its KV. The [reference](docs/reference.md#maps) defines the exact rendering,
 answer tables, and token accounting.
 
-There are seventeen map drafts. Numbers below are answer token limits per call:
+There are thirteen map drafts. Numbers below are answer token limits per call:
 
-- **IMDB-20:** Summarize the review's negative arguments in one sentence
-  (64).
-- **IMDB-21:** Give a detailed summary covering people, main points, and
-  unresolved issues (256).
-- **IMDB-22:** Return the negative arguments (64), detailed summary (256),
-  and main topic (32), using three maps of the same review.
-- **IMDB-23:** Filter with the new question "Is this review negative?", then
-  give the detailed summary (256). This filter has no reference labels yet.
-- **IMDB-24:** Return overall sentiment using IMDB-11's classification
+- **IMDB-20:** Return the negative arguments (64), a detailed summary (256),
+  and the main topic (32), using three maps of the same review.
+- **IMDB-21:** Return overall sentiment using IMDB-11's classification
   (`positive`, `negative`, `neutral`, `mixed`) and the detailed summary (256).
-- **IMDB-25:** Retell the plot as the review describes it (1,024). Answers
+- **IMDB-22:** Retell the plot as the review describes it (1,024). Answers
   vary with the review, mostly far below the limit.
-- **IMDB-26:** Retell the plot, rewrite the review as a balanced one, and
+- **IMDB-23:** Retell the plot, rewrite the review as a balanced one, and
   list the films and people it names (1,024 each), using three maps of the same
   review.
-- **IMDB-27:** Filter with "Is this review negative?", then return the
-  negative arguments (64), detailed summary (256), and main topic (32).
-- **IMDB-28:** Classify sentiment as in IMDB-11, keep the `mixed` reviews, then
+- **IMDB-24:** Filter with the new question "Is this review negative?", then
+  return the negative arguments (64), detailed summary (256), and main topic
+  (32). This filter has no reference labels yet.
+- **IMDB-25:** Classify sentiment as in IMDB-11, keep the `mixed` reviews, then
   give the detailed summary (256).
 - **CUAD-17:** Summarize the parties and their roles (256).
 - **CUAD-18:** Separately summarize parties and roles, term and termination,
   and governing law and venue (128 each).
 - **CUAD-19:** Use the existing CUAD non-compete filter, then summarize the
   obligations and bound parties (256), with `ORDER BY c.id LIMIT 10`.
-- **CUAD-20:** Use the CUAD non-compete filter, then summarize parties and
-  roles, term and termination, and governing law and venue (128 each).
-- **CUAD-21:** Extract the non-compete, exclusivity, and cap on liability
+- **CUAD-20:** Extract the non-compete, exclusivity, and cap on liability
   clauses as CUAD-16 does, and write a summary of the contract (256).
-- **CUAD-22:** List every obligation clause by clause, rewrite the key terms
+- **CUAD-21:** List every obligation clause by clause, rewrite the key terms
   in plain English, and list every defined term with its definition (1,024
   each), using three maps of the same contract. Answers run to hundreds of
   tokens, so decoding outweighs reading the contract.
-- **CUAD-23:** Describe sixteen aspects of each contract, one map each (1,024
+- **CUAD-22:** Describe sixteen aspects of each contract, one map each (1,024
   each): obligations, defined terms, sections, dates, payments, termination,
   parties, licensing, confidentiality, warranties, indemnification, disputes,
   assignment, insurance, renewal, and notices. The sixteen answers of a

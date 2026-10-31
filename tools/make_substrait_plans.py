@@ -976,7 +976,7 @@ def _contracts(alias="c"):
     return Scan("contracts", alias, "text")
 
 
-# CUAD-23's maps: one aspect of a contract each, in answer column order
+# CUAD-22's maps: one aspect of a contract each, in answer column order
 CONTRACT_ASPECTS = (
     ("obligations", prompts.CUAD_MAP_OBLIGATIONS),
     ("definitions", prompts.CUAD_MAP_DEFINITIONS),
@@ -1197,42 +1197,32 @@ QUERIES = (
                       "features"),
           select=("r", "r.features"), draft=True),
 
-    Query("IMDB-20", "map: negative arguments in one sentence",
-          Map(_reviews(), prompts.IMDB_MAP_NEGATIVES, 64, "negatives"),
-          select=("r", "r.negatives"), draft=True),
-    Query("IMDB-21", "map: detailed summary of every review",
-          Map(_reviews(), prompts.IMDB_MAP_SUMMARY, 256, "summary"),
-          select=("r", "r.summary"), draft=True),
-    Query("IMDB-22", "3 maps: negatives, detailed summary, and topic",
+    Query("IMDB-20", "3 maps: negatives, detailed summary, and topic",
           Map(Map(Map(_reviews(), prompts.IMDB_MAP_NEGATIVES, 64, "negatives"),
                   prompts.IMDB_MAP_SUMMARY, 256, "summary"),
               prompts.IMDB_MAP_TOPIC, 32, "topic"),
           select=("r", "r.negatives", "r.summary", "r.topic"), draft=True),
-    Query("IMDB-23", "negative reviews -> map: detailed summary",
-          Map(_filters(_reviews(), prompts.IMDB_NEGATIVE),
-              prompts.IMDB_MAP_SUMMARY, 256, "summary"),
-          select=("r", "r.summary"), draft=True),
-    Query("IMDB-24", "classify sentiment and map: detailed summary",
+    Query("IMDB-21", "classify sentiment and map: detailed summary",
           Map(_classify(_reviews(), prompts.IMDB_SENTIMENT,
                         prompts.IMDB_SENTIMENT_LABELS, "tone"),
               prompts.IMDB_MAP_SUMMARY, 256, "summary"),
           select=("r", "r.tone", "r.summary"), draft=True),
-    Query("IMDB-25", "map: retell the plot, up to 1,024 tokens",
+    Query("IMDB-22", "map: retell the plot, up to 1,024 tokens",
           Map(_reviews(), prompts.IMDB_MAP_PLOT, 1024, "plot"),
           select=("r", "r.plot"), draft=True),
-    Query("IMDB-26", "3 long maps: plot, balanced rewrite, and named people",
+    Query("IMDB-23", "3 long maps: plot, balanced rewrite, and named people",
           Map(Map(Map(_reviews(), prompts.IMDB_MAP_PLOT, 1024, "plot"),
                   prompts.IMDB_MAP_BALANCED, 1024, "balanced"),
               prompts.IMDB_MAP_NAMES, 1024, "names"),
           select=("r", "r.plot", "r.balanced", "r.names"), draft=True),
-    Query("IMDB-27", "negative reviews -> 3 maps: negatives, detailed summary, "
+    Query("IMDB-24", "negative reviews -> 3 maps: negatives, detailed summary, "
           "and topic",
           Map(Map(Map(_filters(_reviews(), prompts.IMDB_NEGATIVE),
                       prompts.IMDB_MAP_NEGATIVES, 64, "negatives"),
                   prompts.IMDB_MAP_SUMMARY, 256, "summary"),
               prompts.IMDB_MAP_TOPIC, 32, "topic"),
           select=("r", "r.negatives", "r.summary", "r.topic"), draft=True),
-    Query("IMDB-28", "mixed reviews by sentiment -> map: detailed summary",
+    Query("IMDB-25", "mixed reviews by sentiment -> map: detailed summary",
           Map(InList(_sentiment(_reviews()), "sentiment", ("mixed",)),
               prompts.IMDB_MAP_SUMMARY, 256, "summary"),
           select=("r", "r.sentiment", "r.summary"), draft=True),
@@ -1655,7 +1645,7 @@ QUERIES = (
                          prompts.CUAD_MAP_NON_COMPETE, 256, "non_compete"),
                      (("c.id", False),)), 10),
           select=("c", "c.non_compete"), draft=True),
-    Query("CUAD-21", "3 clause extracts and a map: non-compete, exclusivity, "
+    Query("CUAD-20", "3 clause extracts and a map: non-compete, exclusivity, "
           "and cap on liability clauses, and a summary",
           Map(_cuad_extract(_cuad_extract(_cuad_extract(
               _contracts(), "Non-Compete", "non_compete"),
@@ -1665,7 +1655,7 @@ QUERIES = (
           select=("c", Struct("contract", (
               "c.non_compete", "c.exclusivity", "c.cap_on_liability")),
                   "c.summary"), draft=True),
-    Query("CUAD-22", "3 long maps: obligations, plain-English terms, and "
+    Query("CUAD-21", "3 long maps: obligations, plain-English terms, and "
           "defined terms",
           Map(Map(Map(_contracts(), prompts.CUAD_MAP_OBLIGATIONS, 1024,
                       "obligations"),
@@ -1673,17 +1663,10 @@ QUERIES = (
               prompts.CUAD_MAP_DEFINITIONS, 1024, "definitions"),
           select=("c", "c.obligations", "c.plain_terms", "c.definitions"),
           draft=True),
-    Query("CUAD-23", "16 long maps: one aspect of the contract each",
+    Query("CUAD-22", "16 long maps: one aspect of the contract each",
           _contract_aspects(),
           select=("c", *(f"c.{name}" for name, _ in CONTRACT_ASPECTS)),
           draft=True),
-    Query("CUAD-20", "non-compete contracts -> 3 maps: parties, term, and "
-          "governing law",
-          Map(Map(Map(_filters(_contracts(), cuad_filter("Non-Compete")),
-                      prompts.CUAD_MAP_PARTIES, 128, "parties"),
-                  prompts.CUAD_MAP_TERM, 128, "term"),
-              prompts.CUAD_MAP_GOVERNING_LAW, 128, "governing_law"),
-          select=("c", "c.parties", "c.term", "c.governing_law"), draft=True),
 
     Query("SEC-1", "filter: announced CEO departure", _sec_departures(),
           draft=True),
