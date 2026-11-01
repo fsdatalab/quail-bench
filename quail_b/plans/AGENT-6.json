@@ -9,13 +9,6 @@
     {
       "extension_function": {
         "extension_urn_reference": 1,
-        "function_anchor": 5,
-        "name": "ai_classify:str_str_list_list"
-      }
-    },
-    {
-      "extension_function": {
-        "extension_urn_reference": 1,
         "function_anchor": 21,
         "name": "ai_map:str_str_i32"
       }
@@ -29,9 +22,10 @@
             "common": {
               "emit": {
                 "output_mapping": [
-                  4,
                   5,
-                  6
+                  6,
+                  7,
+                  8
                 ]
               }
             },
@@ -63,6 +57,16 @@
                   },
                   "root_reference": {}
                 }
+              },
+              {
+                "selection": {
+                  "direct_reference": {
+                    "struct_field": {
+                      "field": 4
+                    }
+                  },
+                  "root_reference": {}
+                }
               }
             ],
             "input": {
@@ -70,12 +74,13 @@
                 "common": {
                   "direct": {},
                   "hint": {
-                    "alias": "map-1",
+                    "alias": "map-3",
                     "output_names": [
-                      "r.id",
-                      "r.body",
-                      "r.sentiment",
-                      "r.summary"
+                      "t.id",
+                      "t.trace",
+                      "t.commands",
+                      "t.plan",
+                      "t.edits"
                     ]
                   }
                 },
@@ -86,7 +91,7 @@
                         {
                           "value": {
                             "literal": {
-                              "string": "{0}\n\nWrite a detailed summary of the document: the people involved, the main points they make, and anything unresolved."
+                              "string": "{0}\n\nList every file the agent edited, with each change it made and why."
                             }
                           }
                         },
@@ -105,7 +110,7 @@
                         {
                           "value": {
                             "literal": {
-                              "i32": 256
+                              "i32": 1024
                             }
                           }
                         }
@@ -120,44 +125,69 @@
                   }
                 ],
                 "input": {
-                  "filter": {
+                  "project": {
                     "common": {
                       "direct": {},
                       "hint": {
-                        "alias": "in-list-1"
+                        "alias": "map-2",
+                        "output_names": [
+                          "t.id",
+                          "t.trace",
+                          "t.commands",
+                          "t.plan"
+                        ]
                       }
                     },
-                    "condition": {
-                      "singular_or_list": {
-                        "options": [
-                          {
-                            "literal": {
-                              "string": "mixed"
-                            }
-                          }
-                        ],
-                        "value": {
-                          "selection": {
-                            "direct_reference": {
-                              "struct_field": {
-                                "field": 2
+                    "expressions": [
+                      {
+                        "scalar_function": {
+                          "arguments": [
+                            {
+                              "value": {
+                                "literal": {
+                                  "string": "{0}\n\nDescribe the agent's plan and every change to it, in order, with what prompted each change."
+                                }
                               }
                             },
-                            "root_reference": {}
+                            {
+                              "value": {
+                                "selection": {
+                                  "direct_reference": {
+                                    "struct_field": {
+                                      "field": 1
+                                    }
+                                  },
+                                  "root_reference": {}
+                                }
+                              }
+                            },
+                            {
+                              "value": {
+                                "literal": {
+                                  "i32": 1024
+                                }
+                              }
+                            }
+                          ],
+                          "function_reference": 21,
+                          "output_type": {
+                            "string": {
+                              "nullability": "NULLABILITY_REQUIRED"
+                            }
                           }
                         }
                       }
-                    },
+                    ],
                     "input": {
                       "project": {
                         "common": {
                           "direct": {},
                           "hint": {
-                            "alias": "classify-1",
+                            "alias": "map-1",
                             "output_names": [
-                              "r.id",
-                              "r.body",
-                              "r.sentiment"
+                              "t.id",
+                              "t.trace",
+                              "t.commands"
                             ]
                           }
                         },
@@ -168,7 +198,7 @@
                                 {
                                   "value": {
                                     "literal": {
-                                      "string": "Judge strictly from the review above which category best describes the overall sentiment it expresses about the movie.\n\n{0}"
+                                      "string": "{0}\n\nList every command the agent ran, in order, with what each one showed."
                                     }
                                   }
                                 },
@@ -187,49 +217,12 @@
                                 {
                                   "value": {
                                     "literal": {
-                                      "list": {
-                                        "values": [
-                                          {
-                                            "string": "positive"
-                                          },
-                                          {
-                                            "string": "negative"
-                                          },
-                                          {
-                                            "string": "neutral"
-                                          },
-                                          {
-                                            "string": "mixed"
-                                          }
-                                        ]
-                                      }
-                                    }
-                                  }
-                                },
-                                {
-                                  "value": {
-                                    "literal": {
-                                      "list": {
-                                        "values": [
-                                          {
-                                            "string": ""
-                                          },
-                                          {
-                                            "string": ""
-                                          },
-                                          {
-                                            "string": ""
-                                          },
-                                          {
-                                            "string": ""
-                                          }
-                                        ]
-                                      }
+                                      "i32": 1024
                                     }
                                   }
                                 }
                               ],
-                              "function_reference": 5,
+                              "function_reference": 21,
                               "output_type": {
                                 "string": {
                                   "nullability": "NULLABILITY_REQUIRED"
@@ -243,7 +236,7 @@
                             "base_schema": {
                               "names": [
                                 "id",
-                                "body"
+                                "trace"
                               ],
                               "struct": {
                                 "nullability": "NULLABILITY_REQUIRED",
@@ -264,12 +257,12 @@
                             "common": {
                               "direct": {},
                               "hint": {
-                                "alias": "r"
+                                "alias": "t"
                               }
                             },
                             "named_table": {
                               "names": [
-                                "reviews"
+                                "agent_traces"
                               ]
                             }
                           }
@@ -283,9 +276,10 @@
           }
         },
         "names": [
-          "r",
-          "sentiment",
-          "summary"
+          "t",
+          "commands",
+          "plan",
+          "edits"
         ]
       }
     }

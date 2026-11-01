@@ -9,13 +9,6 @@
     {
       "extension_function": {
         "extension_urn_reference": 1,
-        "function_anchor": 19,
-        "name": "ai_extract:str_str"
-      }
-    },
-    {
-      "extension_function": {
-        "extension_urn_reference": 1,
         "function_anchor": 21,
         "name": "ai_map:str_str_i32"
       }
@@ -29,6 +22,7 @@
             "common": {
               "emit": {
                 "output_mapping": [
+                  5,
                   6,
                   7,
                   8
@@ -45,48 +39,30 @@
                 }
               },
               {
-                "nested": {
-                  "struct": {
-                    "fields": [
-                      {
-                        "selection": {
-                          "direct_reference": {
-                            "struct_field": {
-                              "field": 2
-                            }
-                          },
-                          "root_reference": {}
-                        }
-                      },
-                      {
-                        "selection": {
-                          "direct_reference": {
-                            "struct_field": {
-                              "field": 3
-                            }
-                          },
-                          "root_reference": {}
-                        }
-                      },
-                      {
-                        "selection": {
-                          "direct_reference": {
-                            "struct_field": {
-                              "field": 4
-                            }
-                          },
-                          "root_reference": {}
-                        }
-                      }
-                    ]
-                  }
+                "selection": {
+                  "direct_reference": {
+                    "struct_field": {
+                      "field": 2
+                    }
+                  },
+                  "root_reference": {}
                 }
               },
               {
                 "selection": {
                   "direct_reference": {
                     "struct_field": {
-                      "field": 5
+                      "field": 3
+                    }
+                  },
+                  "root_reference": {}
+                }
+              },
+              {
+                "selection": {
+                  "direct_reference": {
+                    "struct_field": {
+                      "field": 4
                     }
                   },
                   "root_reference": {}
@@ -98,14 +74,13 @@
                 "common": {
                   "direct": {},
                   "hint": {
-                    "alias": "map-1",
+                    "alias": "map-3",
                     "output_names": [
                       "c.id",
                       "c.text",
-                      "c.non_compete",
-                      "c.exclusivity",
-                      "c.cap_on_liability",
-                      "c.summary"
+                      "c.obligations",
+                      "c.plain_terms",
+                      "c.definitions"
                     ]
                   }
                 },
@@ -116,7 +91,7 @@
                         {
                           "value": {
                             "literal": {
-                              "string": "{0}\n\nSummarize the contract: who the parties are, what each must do, and how long it runs."
+                              "string": "{0}\n\nList every defined term in the contract with its definition."
                             }
                           }
                         },
@@ -135,7 +110,7 @@
                         {
                           "value": {
                             "literal": {
-                              "i32": 256
+                              "i32": 1024
                             }
                           }
                         }
@@ -154,13 +129,12 @@
                     "common": {
                       "direct": {},
                       "hint": {
-                        "alias": "extract-3",
+                        "alias": "map-2",
                         "output_names": [
                           "c.id",
                           "c.text",
-                          "c.non_compete",
-                          "c.exclusivity",
-                          "c.cap_on_liability"
+                          "c.obligations",
+                          "c.plain_terms"
                         ]
                       }
                     },
@@ -171,7 +145,7 @@
                             {
                               "value": {
                                 "literal": {
-                                  "string": "Does the contract include a cap on liability upon the breach of a party\u2019s obligation? This includes time limitation for the counterparty to bring claims or maximum amount for recovery."
+                                  "string": "{0}\n\nRewrite the contract's key terms in plain English: what each party gives, gets, and must do, and how the contract can end."
                                 }
                               }
                             },
@@ -186,12 +160,19 @@
                                   "root_reference": {}
                                 }
                               }
+                            },
+                            {
+                              "value": {
+                                "literal": {
+                                  "i32": 1024
+                                }
+                              }
                             }
                           ],
-                          "function_reference": 19,
+                          "function_reference": 21,
                           "output_type": {
                             "string": {
-                              "nullability": "NULLABILITY_NULLABLE"
+                              "nullability": "NULLABILITY_REQUIRED"
                             }
                           }
                         }
@@ -202,12 +183,11 @@
                         "common": {
                           "direct": {},
                           "hint": {
-                            "alias": "extract-2",
+                            "alias": "map-1",
                             "output_names": [
                               "c.id",
                               "c.text",
-                              "c.non_compete",
-                              "c.exclusivity"
+                              "c.obligations"
                             ]
                           }
                         },
@@ -218,7 +198,7 @@
                                 {
                                   "value": {
                                     "literal": {
-                                      "string": "Is there an exclusive dealing\u00a0 commitment with the counterparty? This includes a commitment to procure all \u201crequirements\u201d from one party of certain technology, goods, or services or a prohibition on licensing or selling technology, goods or services to third parties, or a prohibition on\u00a0 collaborating or working with other parties), whether during the contract or\u00a0 after the contract ends (or both)."
+                                      "string": "{0}\n\nList every obligation in the contract, clause by clause, with the party it binds."
                                     }
                                   }
                                 },
@@ -233,98 +213,57 @@
                                       "root_reference": {}
                                     }
                                   }
+                                },
+                                {
+                                  "value": {
+                                    "literal": {
+                                      "i32": 1024
+                                    }
+                                  }
                                 }
                               ],
-                              "function_reference": 19,
+                              "function_reference": 21,
                               "output_type": {
                                 "string": {
-                                  "nullability": "NULLABILITY_NULLABLE"
+                                  "nullability": "NULLABILITY_REQUIRED"
                                 }
                               }
                             }
                           }
                         ],
                         "input": {
-                          "project": {
-                            "common": {
-                              "direct": {},
-                              "hint": {
-                                "alias": "extract-1",
-                                "output_names": [
-                                  "c.id",
-                                  "c.text",
-                                  "c.non_compete"
+                          "read": {
+                            "base_schema": {
+                              "names": [
+                                "id",
+                                "text"
+                              ],
+                              "struct": {
+                                "nullability": "NULLABILITY_REQUIRED",
+                                "types": [
+                                  {
+                                    "string": {
+                                      "nullability": "NULLABILITY_REQUIRED"
+                                    }
+                                  },
+                                  {
+                                    "string": {
+                                      "nullability": "NULLABILITY_REQUIRED"
+                                    }
+                                  }
                                 ]
                               }
                             },
-                            "expressions": [
-                              {
-                                "scalar_function": {
-                                  "arguments": [
-                                    {
-                                      "value": {
-                                        "literal": {
-                                          "string": "Is there a restriction on the ability of a party to compete with the counterparty or operate in a certain geography or business or technology sector?"
-                                        }
-                                      }
-                                    },
-                                    {
-                                      "value": {
-                                        "selection": {
-                                          "direct_reference": {
-                                            "struct_field": {
-                                              "field": 1
-                                            }
-                                          },
-                                          "root_reference": {}
-                                        }
-                                      }
-                                    }
-                                  ],
-                                  "function_reference": 19,
-                                  "output_type": {
-                                    "string": {
-                                      "nullability": "NULLABILITY_NULLABLE"
-                                    }
-                                  }
-                                }
+                            "common": {
+                              "direct": {},
+                              "hint": {
+                                "alias": "c"
                               }
-                            ],
-                            "input": {
-                              "read": {
-                                "base_schema": {
-                                  "names": [
-                                    "id",
-                                    "text"
-                                  ],
-                                  "struct": {
-                                    "nullability": "NULLABILITY_REQUIRED",
-                                    "types": [
-                                      {
-                                        "string": {
-                                          "nullability": "NULLABILITY_REQUIRED"
-                                        }
-                                      },
-                                      {
-                                        "string": {
-                                          "nullability": "NULLABILITY_REQUIRED"
-                                        }
-                                      }
-                                    ]
-                                  }
-                                },
-                                "common": {
-                                  "direct": {},
-                                  "hint": {
-                                    "alias": "c"
-                                  }
-                                },
-                                "named_table": {
-                                  "names": [
-                                    "contracts"
-                                  ]
-                                }
-                              }
+                            },
+                            "named_table": {
+                              "names": [
+                                "contracts"
+                              ]
                             }
                           }
                         }
@@ -338,11 +277,9 @@
         },
         "names": [
           "c",
-          "contract",
-          "non_compete",
-          "exclusivity",
-          "cap_on_liability",
-          "summary"
+          "obligations",
+          "plain_terms",
+          "definitions"
         ]
       }
     }

@@ -100,54 +100,36 @@
   },
   {
     "id": "IMDB-20",
-    "description": "map: negative arguments in one sentence",
-    "privacy": false,
-    "draft": true
-  },
-  {
-    "id": "IMDB-21",
-    "description": "map: detailed summary of every review",
-    "privacy": false,
-    "draft": true
-  },
-  {
-    "id": "IMDB-22",
     "description": "3 maps: negatives, detailed summary, and topic",
     "privacy": false,
     "draft": true
   },
   {
-    "id": "IMDB-23",
-    "description": "negative reviews -> map: detailed summary",
-    "privacy": false,
-    "draft": true
-  },
-  {
-    "id": "IMDB-24",
+    "id": "IMDB-21",
     "description": "classify sentiment and map: detailed summary",
     "privacy": false,
     "draft": true
   },
   {
-    "id": "IMDB-25",
+    "id": "IMDB-22",
     "description": "map: retell the plot, up to 1,024 tokens",
     "privacy": false,
     "draft": true
   },
   {
-    "id": "IMDB-26",
+    "id": "IMDB-23",
     "description": "3 long maps: plot, balanced rewrite, and named people",
     "privacy": false,
     "draft": true
   },
   {
-    "id": "IMDB-27",
+    "id": "IMDB-24",
     "description": "negative reviews -> 3 maps: negatives, detailed summary, and topic",
     "privacy": false,
     "draft": true
   },
   {
-    "id": "IMDB-28",
+    "id": "IMDB-25",
     "description": "mixed reviews by sentiment -> map: detailed summary",
     "privacy": false,
     "draft": true
@@ -297,6 +279,12 @@
     "id": "AGENT-5",
     "description": "classify every trace three ways: how far the agent has gotten, the project's PyPI topic, and the defect type of the bug",
     "privacy": false
+  },
+  {
+    "id": "AGENT-6",
+    "description": "3 long maps: commands, plan, and edited files",
+    "privacy": false,
+    "draft": true
   },
   {
     "id": "REL-AGENT-1",
@@ -563,20 +551,20 @@
     "draft": true
   },
   {
-    "id": "CUAD-21",
+    "id": "CUAD-20",
     "description": "3 clause extracts and a map: non-compete, exclusivity, and cap on liability clauses, and a summary",
     "privacy": false,
     "draft": true
   },
   {
-    "id": "CUAD-22",
+    "id": "CUAD-21",
     "description": "3 long maps: obligations, plain-English terms, and defined terms",
     "privacy": false,
     "draft": true
   },
   {
-    "id": "CUAD-20",
-    "description": "non-compete contracts -> 3 maps: parties, term, and governing law",
+    "id": "CUAD-22",
+    "description": "16 long maps: one aspect of the contract each",
     "privacy": false,
     "draft": true
   },
