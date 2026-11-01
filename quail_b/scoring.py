@@ -1173,8 +1173,12 @@ def row_counts(spec: QuerySpec, output: RunOutput, ground_truth,
 def unlabeled_operators(spec: QuerySpec, ground_truth) -> set[str]:
     """Return the IDs of a query's scored operators without reference labels.
 
-    Only a draft query can have them; map text is never scored.
+    Only a draft query can have them, or every operator when no labels
+    were loaded; map text is never scored.
     """
+    if ground_truth is None:
+        return {operator.id for operator in spec.info.ai_operators
+                if operator not in spec.info.maps}
     unlabeled = set()
     for operator in spec.info.ai_operators:
         if operator in spec.info.maps:
@@ -1237,7 +1241,7 @@ def evaluate(spec: QuerySpec, output: RunOutput, ground_truth, corpus_rows) -> d
             "predicate_key": labels.key, "op": "extract",
             "alias": operator.relation, **counts.as_dict()})
 
-    if unlabeled:
+    if unlabeled or ground_truth is None:
         # the reference rows follow every predicate's labels
         output_accuracy = None
     elif spec.info.relational:
@@ -1259,8 +1263,10 @@ def evaluate(spec: QuerySpec, output: RunOutput, ground_truth, corpus_rows) -> d
         for row_id in _ids(corpus_rows[relation.table])
     }
     return {
-        "ground_truth_collection_id": ground_truth.collection_id,
-        "ground_truth_reference_model": ground_truth.reference_model,
+        "ground_truth_collection_id": (
+            None if ground_truth is None else ground_truth.collection_id),
+        "ground_truth_reference_model": (
+            None if ground_truth is None else ground_truth.reference_model),
         "answer_accuracy": (total.as_dict() if total.evaluated else None),
         "label_accuracy": (
             label_total.as_dict() if label_total.evaluated else None),

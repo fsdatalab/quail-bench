@@ -147,8 +147,8 @@ def _write_report(directory, record):
         f"Status: {record['status']}", "",
         f"Scale factor: {record['scale_factor']}", "",
         f"Corpus: {record['corpus_id']}", "",
-        f"Reference collection: {record['collection_id']}", "",
-        f"Reference model: {record['reference_model']}", "",
+        f"Reference collection: {record['collection_id'] or 'none loaded'}", "",
+        f"Reference model: {record['reference_model'] or 'none loaded'}", "",
         "Query duration excludes model startup, result collection, scoring, "
         "and result saving.", "",
         "Predicate accuracy is agreement on evaluated answers. Engines may "
@@ -244,7 +244,8 @@ def report(run_dir, *, rescore=True, cache_dir=None, root=None):
     with download_cache(cache_dir):
         suite = load_benchmark(
             ids, scale_factor=record["scale_factor"],
-            collection_id=record["collection_id"], root=root)
+            collection_id=record["collection_id"],
+            accuracy=record["reference_model"] is not None, root=root)
     if suite.corpus_id != record["corpus_id"]:
         raise ValueError("saved corpus does not match the benchmark")
     for spec, item in zip(suite.queries, record["queries"]):

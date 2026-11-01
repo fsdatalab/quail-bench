@@ -287,6 +287,29 @@ def test_saved_answers_survive_scoring_failure_and_can_move(tmp_path):
     assert (tmp_path / "pinned/IMDB-4/rows.parquet").exists()
 
 
+def test_a_run_without_reference_labels_saves_answers_and_no_accuracy(tmp_path):
+    _inputs(tmp_path, 0.1)
+
+    def execute(spec, tables):
+        return quail_b.RunOutput(
+            None,
+            {"join-1": pa.table({"r": ["r1"], "a": ["a0"], "answer": [True]})},
+            pa.table({"r": ["r1"], "a": ["a0"]}), runtime_s=2.0)
+
+    record = quail_b.run(execute, queries=["IMDB-4"], output_dir=tmp_path / "run",
+                         root=tmp_path, accuracy=False)
+    assert record["collection_id"] is None
+    (item,) = record["queries"]
+    accuracy = item["metrics"]["accuracy"]
+    assert accuracy["answer_accuracy"] is None
+    assert accuracy["output_accuracy"] is None
+    assert accuracy["unlabeled_operators"] == ["filter-1", "filter-2", "join-1"]
+    assert (tmp_path / "run/IMDB-4/rows.parquet").exists()
+    quail_b.report(tmp_path / "run", root=tmp_path, rescore=True)
+    assert "Reference collection: none loaded" in (
+        tmp_path / "run/report.md").read_text()
+
+
 def test_score_answers_are_saved_read_back_and_checked(tmp_path):
     from quail_b.run import _read_output, _save_output, _validate_output
 
