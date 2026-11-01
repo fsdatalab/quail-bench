@@ -613,7 +613,8 @@ def _score(spec, output, suite, gpu_count, gpu_hourly_rate_usd, tokens=None):
 
 def run(run_query, *, queries=None, scale_factor=0.1, output_dir,
         metadata=None, gpu_count=1, gpu_hourly_rate_usd=None,
-        collection_id=None, cache_dir=None, data_dir=None, root=None):
+        collection_id=None, cache_dir=None, data_dir=None, root=None,
+        accuracy=True):
     """Run selected queries, save their answers, and generate a report.
 
     Args:
@@ -628,6 +629,8 @@ def run(run_query, *, queries=None, scale_factor=0.1, output_dir,
         cache_dir: Download cache directory, or None for the default.
         data_dir: Optional directory of input Parquet files to validate.
         root: Optional published-data mirror for offline use.
+        accuracy: Whether to load reference labels and score accuracy.
+            False runs queries without published labels, such as SEC.
 
     Returns:
         The saved run record. Query failures raise after saving their status.
@@ -648,12 +651,13 @@ def run(run_query, *, queries=None, scale_factor=0.1, output_dir,
     with download_cache(cache_dir):
         suite = load_benchmark(
             queries, scale_factor=scale_factor, collection_id=collection_id,
-            data_dir=data_dir, root=root)
+            data_dir=data_dir, accuracy=accuracy, root=root)
     truth = suite.ground_truth
     record = {
         "schema_version": RUN_SCHEMA_VERSION, "quail_b_version": __version__,
         "scale_factor": scale_factor, "corpus_id": suite.corpus_id,
-        "collection_id": truth.collection_id, "reference_model": truth.reference_model,
+        "collection_id": None if truth is None else truth.collection_id,
+        "reference_model": None if truth is None else truth.reference_model,
         "metadata": metadata or {}, "gpu_count": gpu_count,
         "gpu_hourly_rate_usd": gpu_hourly_rate_usd,
         "started_at": datetime.now(timezone.utc).isoformat(), "status": "running",
