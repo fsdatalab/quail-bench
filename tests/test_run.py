@@ -185,7 +185,7 @@ def test_prompt_pieces_give_the_minimum_and_the_regret(
         "query": "IMDB-4", "runtime_s": 2.0, "fresh_tokens": 1000,
         "input_tokens": 65, "input_tokens_per_second": 32.5,
         "minimum_tokens": minimum, "regret_tokens": 1000 - minimum,
-        "regret_approximate": False,
+        "regret_approximate": False, "restored_tokens": 0,
         "evaluated_document_pairs": 2, "input_rows": 3,
         "answers_evaluated": 2 * stages + 2, "answers_correct": 2 * stages + 2,
         "labels_evaluated": None, "labels_correct": None,
