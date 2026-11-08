@@ -407,10 +407,12 @@ There are thirteen map drafts. Numbers below are answer token limits per call:
 - **CUAD-20:** Extract the non-compete, exclusivity, and cap on liability
   clauses as CUAD-16 does, and write a summary of the contract (256).
 - **CUAD-21:** List every obligation clause by clause, rewrite the key terms
-  in plain English, and list every defined term with its definition (1,024
+  in plain English, and list every defined term with its definition (3,072
   each), using three maps of the same contract. Answers run to hundreds of
-  tokens, so decoding outweighs reading the contract.
-- **CUAD-22:** Describe sixteen aspects of each contract, one map each (1,024
+  tokens, so decoding outweighs reading the contract. The list maps end with
+  "Do not repeat an item.", because a small model can repeat one item until
+  the limit.
+- **CUAD-22:** Describe sixteen aspects of each contract, one map each (3,072
   each): obligations, defined terms, sections, dates, payments, termination,
   parties, licensing, confidentiality, warranties, indemnification, disputes,
   assignment, insurance, renewal, and notices. The sixteen answers of a
