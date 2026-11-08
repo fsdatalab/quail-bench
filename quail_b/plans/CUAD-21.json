@@ -91,7 +91,7 @@
                         {
                           "value": {
                             "literal": {
-                              "string": "{0}\n\nList every defined term in the contract with its definition."
+                              "string": "{0}\n\nList every defined term in the contract with its definition. Do not repeat an item."
                             }
                           }
                         },
@@ -110,7 +110,7 @@
                         {
                           "value": {
                             "literal": {
-                              "i32": 1024
+                              "i32": 3072
                             }
                           }
                         }
@@ -164,7 +164,7 @@
                             {
                               "value": {
                                 "literal": {
-                                  "i32": 1024
+                                  "i32": 3072
                                 }
                               }
                             }
@@ -198,7 +198,7 @@
                                 {
                                   "value": {
                                     "literal": {
-                                      "string": "{0}\n\nList every obligation in the contract, clause by clause, with the party it binds."
+                                      "string": "{0}\n\nList every obligation in the contract, clause by clause, with the party it binds. Do not repeat an item."
                                     }
                                   }
                                 },
@@ -217,7 +217,7 @@
                                 {
                                   "value": {
                                     "literal": {
-                                      "i32": 1024
+                                      "i32": 3072
                                     }
                                   }
                                 }

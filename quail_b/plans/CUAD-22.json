@@ -247,7 +247,7 @@
                         {
                           "value": {
                             "literal": {
-                              "string": "{0}\n\nList every notice requirement, with who must be notified, how, and when."
+                              "string": "{0}\n\nList every notice requirement, with who must be notified, how, and when. Do not repeat an item."
                             }
                           }
                         },
@@ -266,7 +266,7 @@
                         {
                           "value": {
                             "literal": {
-                              "i32": 1024
+                              "i32": 3072
                             }
                           }
                         }
@@ -333,7 +333,7 @@
                             {
                               "value": {
                                 "literal": {
-                                  "i32": 1024
+                                  "i32": 3072
                                 }
                               }
                             }
@@ -380,7 +380,7 @@
                                 {
                                   "value": {
                                     "literal": {
-                                      "string": "{0}\n\nList every insurance, audit, and record-keeping requirement."
+                                      "string": "{0}\n\nList every insurance, audit, and record-keeping requirement. Do not repeat an item."
                                     }
                                   }
                                 },
@@ -399,7 +399,7 @@
                                 {
                                   "value": {
                                     "literal": {
-                                      "i32": 1024
+                                      "i32": 3072
                                     }
                                   }
                                 }
@@ -445,7 +445,7 @@
                                     {
                                       "value": {
                                         "literal": {
-                                          "string": "{0}\n\nDescribe every assignment, transfer, and change of control term."
+                                          "string": "{0}\n\nDescribe every assignment, transfer, and change of control term. Do not repeat an item."
                                         }
                                       }
                                     },
@@ -464,7 +464,7 @@
                                     {
                                       "value": {
                                         "literal": {
-                                          "i32": 1024
+                                          "i32": 3072
                                         }
                                       }
                                     }
@@ -509,7 +509,7 @@
                                         {
                                           "value": {
                                             "literal": {
-                                              "string": "{0}\n\nDescribe the governing law, venue, and every dispute resolution step."
+                                              "string": "{0}\n\nDescribe the governing law, venue, and every dispute resolution step. Do not repeat an item."
                                             }
                                           }
                                         },
@@ -528,7 +528,7 @@
                                         {
                                           "value": {
                                             "literal": {
-                                              "i32": 1024
+                                              "i32": 3072
                                             }
                                           }
                                         }
@@ -572,7 +572,7 @@
                                             {
                                               "value": {
                                                 "literal": {
-                                                  "string": "{0}\n\nDescribe every liability limit and indemnification duty, with what it covers."
+                                                  "string": "{0}\n\nDescribe every liability limit and indemnification duty, with what it covers. Do not repeat an item."
                                                 }
                                               }
                                             },
@@ -591,7 +591,7 @@
                                             {
                                               "value": {
                                                 "literal": {
-                                                  "i32": 1024
+                                                  "i32": 3072
                                                 }
                                               }
                                             }
@@ -634,7 +634,7 @@
                                                 {
                                                   "value": {
                                                     "literal": {
-                                                      "string": "{0}\n\nList every warranty, representation, and disclaimer each party makes."
+                                                      "string": "{0}\n\nList every warranty, representation, and disclaimer each party makes. Do not repeat an item."
                                                     }
                                                   }
                                                 },
@@ -653,7 +653,7 @@
                                                 {
                                                   "value": {
                                                     "literal": {
-                                                      "i32": 1024
+                                                      "i32": 3072
                                                     }
                                                   }
                                                 }
@@ -695,7 +695,7 @@
                                                     {
                                                       "value": {
                                                         "literal": {
-                                                          "string": "{0}\n\nDescribe every confidentiality and non-disclosure obligation, with its scope and duration."
+                                                          "string": "{0}\n\nDescribe every confidentiality and non-disclosure obligation, with its scope and duration. Do not repeat an item."
                                                         }
                                                       }
                                                     },
@@ -714,7 +714,7 @@
                                                     {
                                                       "value": {
                                                         "literal": {
-                                                          "i32": 1024
+                                                          "i32": 3072
                                                         }
                                                       }
                                                     }
@@ -755,7 +755,7 @@
                                                         {
                                                           "value": {
                                                             "literal": {
-                                                              "string": "{0}\n\nDescribe every intellectual property, license, and ownership term, clause by clause."
+                                                              "string": "{0}\n\nDescribe every intellectual property, license, and ownership term, clause by clause. Do not repeat an item."
                                                             }
                                                           }
                                                         },
@@ -774,7 +774,7 @@
                                                         {
                                                           "value": {
                                                             "literal": {
-                                                              "i32": 1024
+                                                              "i32": 3072
                                                             }
                                                           }
                                                         }
@@ -833,7 +833,7 @@
                                                             {
                                                               "value": {
                                                                 "literal": {
-                                                                  "i32": 1024
+                                                                  "i32": 3072
                                                                 }
                                                               }
                                                             }
@@ -872,7 +872,7 @@
                                                                 {
                                                                   "value": {
                                                                     "literal": {
-                                                                      "string": "{0}\n\nQuote every clause that lets a party terminate the contract, with its conditions."
+                                                                      "string": "{0}\n\nQuote every clause that lets a party terminate the contract, with its conditions. Do not repeat an item."
                                                                     }
                                                                   }
                                                                 },
@@ -891,7 +891,7 @@
                                                                 {
                                                                   "value": {
                                                                     "literal": {
-                                                                      "i32": 1024
+                                                                      "i32": 3072
                                                                     }
                                                                   }
                                                                 }
@@ -929,7 +929,7 @@
                                                                     {
                                                                       "value": {
                                                                         "literal": {
-                                                                          "string": "{0}\n\nList every payment, fee, and price term, with amounts and conditions."
+                                                                          "string": "{0}\n\nList every payment, fee, and price term, with amounts and conditions. Do not repeat an item."
                                                                         }
                                                                       }
                                                                     },
@@ -948,7 +948,7 @@
                                                                     {
                                                                       "value": {
                                                                         "literal": {
-                                                                          "i32": 1024
+                                                                          "i32": 3072
                                                                         }
                                                                       }
                                                                     }
@@ -985,7 +985,7 @@
                                                                         {
                                                                           "value": {
                                                                             "literal": {
-                                                                              "string": "{0}\n\nList every date, deadline, and notice period the contract sets, with what each applies to."
+                                                                              "string": "{0}\n\nList every date, deadline, and notice period the contract sets, with what each applies to. Do not repeat an item."
                                                                             }
                                                                           }
                                                                         },
@@ -1004,7 +1004,7 @@
                                                                         {
                                                                           "value": {
                                                                             "literal": {
-                                                                              "i32": 1024
+                                                                              "i32": 3072
                                                                             }
                                                                           }
                                                                         }
@@ -1059,7 +1059,7 @@
                                                                             {
                                                                               "value": {
                                                                                 "literal": {
-                                                                                  "i32": 1024
+                                                                                  "i32": 3072
                                                                                 }
                                                                               }
                                                                             }
@@ -1094,7 +1094,7 @@
                                                                                 {
                                                                                   "value": {
                                                                                     "literal": {
-                                                                                      "string": "{0}\n\nList every defined term in the contract with its definition."
+                                                                                      "string": "{0}\n\nList every defined term in the contract with its definition. Do not repeat an item."
                                                                                     }
                                                                                   }
                                                                                 },
@@ -1113,7 +1113,7 @@
                                                                                 {
                                                                                   "value": {
                                                                                     "literal": {
-                                                                                      "i32": 1024
+                                                                                      "i32": 3072
                                                                                     }
                                                                                   }
                                                                                 }
@@ -1147,7 +1147,7 @@
                                                                                     {
                                                                                       "value": {
                                                                                         "literal": {
-                                                                                          "string": "{0}\n\nList every obligation in the contract, clause by clause, with the party it binds."
+                                                                                          "string": "{0}\n\nList every obligation in the contract, clause by clause, with the party it binds. Do not repeat an item."
                                                                                         }
                                                                                       }
                                                                                     },
@@ -1166,7 +1166,7 @@
                                                                                     {
                                                                                       "value": {
                                                                                         "literal": {
-                                                                                          "i32": 1024
+                                                                                          "i32": 3072
                                                                                         }
                                                                                       }
                                                                                     }

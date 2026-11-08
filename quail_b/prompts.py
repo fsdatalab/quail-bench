@@ -191,52 +191,56 @@ CUAD_MAP_SUMMARY = (
 CUAD_MAP_NON_COMPETE = (
     "{0}\n\nSummarize the non-compete obligations and who they bind.")
 # Long maps whose answers run to hundreds of tokens, so decoding, not
-# reading the contract, dominates
+# reading the contract, dominates. A small model can repeat one item until
+# the limit; "Do not repeat an item." makes that rarer.
 CUAD_MAP_OBLIGATIONS = (
     "{0}\n\nList every obligation in the contract, clause by clause, with the "
-    "party it binds.")
+    "party it binds. Do not repeat an item.")
 CUAD_MAP_PLAIN_TERMS = (
     "{0}\n\nRewrite the contract's key terms in plain English: what each party "
     "gives, gets, and must do, and how the contract can end.")
 CUAD_MAP_DEFINITIONS = (
-    "{0}\n\nList every defined term in the contract with its definition.")
+    "{0}\n\nList every defined term in the contract with its definition. Do "
+    "not repeat an item.")
 # One aspect of the contract each, for CUAD-22's sixteen maps of one contract
 CUAD_MAP_SECTIONS = (
     "{0}\n\nSummarize each section of the contract in one sentence.")
 CUAD_MAP_DATES = (
     "{0}\n\nList every date, deadline, and notice period the contract sets, "
-    "with what each applies to.")
+    "with what each applies to. Do not repeat an item.")
 CUAD_MAP_PAYMENTS = (
     "{0}\n\nList every payment, fee, and price term, with amounts and "
-    "conditions.")
+    "conditions. Do not repeat an item.")
 CUAD_MAP_TERMINATION = (
     "{0}\n\nQuote every clause that lets a party terminate the contract, with "
-    "its conditions.")
+    "its conditions. Do not repeat an item.")
 CUAD_MAP_LICENSING = (
     "{0}\n\nDescribe every intellectual property, license, and ownership term, "
-    "clause by clause.")
+    "clause by clause. Do not repeat an item.")
 CUAD_MAP_CONFIDENTIALITY = (
     "{0}\n\nDescribe every confidentiality and non-disclosure obligation, with "
-    "its scope and duration.")
+    "its scope and duration. Do not repeat an item.")
 CUAD_MAP_WARRANTIES = (
     "{0}\n\nList every warranty, representation, and disclaimer each party "
-    "makes.")
+    "makes. Do not repeat an item.")
 CUAD_MAP_INDEMNIFICATION = (
     "{0}\n\nDescribe every liability limit and indemnification duty, with what "
-    "it covers.")
+    "it covers. Do not repeat an item.")
 CUAD_MAP_DISPUTES = (
     "{0}\n\nDescribe the governing law, venue, and every dispute resolution "
-    "step.")
+    "step. Do not repeat an item.")
 CUAD_MAP_ASSIGNMENT = (
-    "{0}\n\nDescribe every assignment, transfer, and change of control term.")
+    "{0}\n\nDescribe every assignment, transfer, and change of control term. "
+    "Do not repeat an item.")
 CUAD_MAP_INSURANCE = (
-    "{0}\n\nList every insurance, audit, and record-keeping requirement.")
+    "{0}\n\nList every insurance, audit, and record-keeping requirement. Do "
+    "not repeat an item.")
 CUAD_MAP_RENEWAL = (
     "{0}\n\nDescribe the term of the contract and every renewal and extension "
     "term.")
 CUAD_MAP_NOTICES = (
     "{0}\n\nList every notice requirement, with who must be notified, how, and "
-    "when.")
+    "when. Do not repeat an item.")
 # Long maps of agent trace snapshots, for AGENT-6
 AGENT_MAP_COMMANDS = (
     "{0}\n\nList every command the agent ran, in order, with what each one "
