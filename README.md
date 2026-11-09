@@ -406,17 +406,19 @@ There are thirteen map drafts. Numbers below are answer token limits per call:
   obligations and bound parties (256), with `ORDER BY c.id LIMIT 10`.
 - **CUAD-20:** Extract the non-compete, exclusivity, and cap on liability
   clauses as CUAD-16 does, and write a summary of the contract (256).
-- **CUAD-21:** List every obligation clause by clause, rewrite the key terms
-  in plain English, and list every defined term with its definition (3,072
-  each), using three maps of the same contract. Answers run to hundreds of
-  tokens, so decoding outweighs reading the contract. The list maps end with
-  "Do not repeat an item.", because a small model can repeat one item until
-  the limit.
-- **CUAD-22:** Describe sixteen aspects of each contract, one map each (3,072
+- **CUAD-21:** List the main obligations, one line each, rewrite the key terms
+  in plain English, and list the main defined terms with their definitions
+  (1,024 each), using three maps of the same contract. Answers run to
+  hundreds of tokens, so decoding outweighs reading the contract.
+- **CUAD-22:** Describe sixteen aspects of each contract, one map each (1,024
   each): obligations, defined terms, sections, dates, payments, termination,
   parties, licensing, confidentiality, warranties, indemnification, disputes,
   assignment, insurance, renewal, and notices. The sixteen answers of a
-  contract share its prompt, and their lengths differ by map.
+  contract share its prompt. Each instruction is sized so most answers end
+  before the limit and the maps of one contract end at similar lengths; with
+  Qwen3 4B, no map reaches the limit on more than about a fifth of contracts.
+  The list maps end with "Do not repeat an item.", because a small model can
+  repeat one item until the limit.
 - **AGENT-6:** List every command the agent ran with what it showed, describe
   its plan and every change to it, and list every file it edited with each
   change (1,024 each), using three maps of the same trace snapshot. Snapshots
