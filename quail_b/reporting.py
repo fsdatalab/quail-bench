@@ -27,6 +27,7 @@ MEASUREMENT_SCHEMA = pa.schema([
     ("input_tokens", pa.int64()),
     ("input_tokens_per_second", pa.float64()),
     ("fresh_tokens", pa.int64()),
+    ("restored_tokens", pa.int64()),
     ("minimum_tokens", pa.int64()),
     ("regret_tokens", pa.int64()),
     ("regret_approximate", pa.bool_()),
@@ -64,8 +65,12 @@ def measurement_rows(record) -> list[dict]:
             when the engine did not report it.
         minimum_tokens: Distinct prefix positions those requests need with
             unlimited KV. Null without prompt pieces and answers.
-        regret_tokens: `fresh_tokens` minus `minimum_tokens`. The KV the
-            engine computed again. Null when either side is null.
+        restored_tokens: Input token positions read from KV the engine
+            kept from an earlier query. Engine-reported; 0 when absent.
+        regret_tokens: `fresh_tokens` plus `restored_tokens` minus
+            `minimum_tokens`. The KV the engine computed again, counting
+            a restored position as computed by the query that first saved
+            it. Null when either side is null.
         regret_approximate: True when the engine tokenized full prompts
             itself, so the minimum is scaled to the engine's token count.
         evaluated_document_pairs: Join pairs the engine asked, summed
@@ -107,6 +112,7 @@ def measurement_rows(record) -> list[dict]:
             "input_tokens": metrics.get("input_tokens"),
             "input_tokens_per_second": metrics.get("input_tokens_per_second"),
             "fresh_tokens": metrics["fresh_tokens"],
+            "restored_tokens": metrics.get("restored_tokens", 0),
             "minimum_tokens": metrics["minimum_tokens"],
             "regret_tokens": metrics["regret_tokens"],
             "regret_approximate": metrics.get("regret_approximate", False),
@@ -195,9 +201,9 @@ def _write_report(directory, record):
     lines.extend([
         "", "## Input rows and token counts", "",
         "| Query | Input rows by alias | Input tokens | Fresh tokens | "
-        "Minimum tokens | "
+        "Restored tokens | Minimum tokens | "
         "Recomputed KV tokens |",
-        "| --- | --- | ---: | ---: | ---: | ---: |",
+        "| --- | --- | ---: | ---: | ---: | ---: | ---: |",
     ])
     for item in record["queries"]:
         metrics = item.get("metrics", {})
@@ -207,6 +213,7 @@ def _write_report(directory, record):
             f"| {item['id']} | {counts or 'unavailable'} | "
             f"{_number(metrics.get('input_tokens'))} | "
             f"{_number(metrics.get('fresh_tokens'))} | "
+            f"{_number(metrics.get('restored_tokens', 0))} | "
             f"{_number(metrics.get('minimum_tokens'))} | "
             f"{_number(metrics.get('regret_tokens'))} |")
     lines.extend(["", "## Configuration", "", "```json",
