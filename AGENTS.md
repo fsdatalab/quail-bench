@@ -24,7 +24,10 @@ Read `README.md` for the public benchmark contract and metric definitions.
 - `quail_b/prompts.py`, `rendering.py`, and `predicates.py`: prompt definitions
   and exact rendered text.
 - `quail_b/data.py` and `labels.py`: published inputs and reference labels.
-- `quail_b/sec.py`: download SEC filings, select the sample, and check the data.
+- `quail_b/sec.py`: the SEC 8-K sample. `load_sec_table()` reads the published
+  `sec_filings` table from `s3://quail-bench`, like every other corpus.
+  `build_sec_corpus()` rebuilds that sample from the Hugging Face dataset
+  `TeraflopAI/SEC-EDGAR`; only maintainers need it.
 - `quail_b/run.py`, `scoring.py`, `minimum.py`, and `reporting.py`: adapter
   validation, scoring, token accounting, and result reports.
 - `tests/`: tests for the public contract and benchmark data.
