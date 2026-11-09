@@ -414,11 +414,7 @@ There are thirteen map drafts. Numbers below are answer token limits per call:
   each): obligations, defined terms, sections, dates, payments, termination,
   parties, licensing, confidentiality, warranties, indemnification, disputes,
   assignment, insurance, renewal, and notices. The sixteen answers of a
-  contract share its prompt. Each instruction is sized so most answers end
-  before the limit and the maps of one contract end at similar lengths; with
-  Qwen3 4B, no map reaches the limit on more than about a fifth of contracts.
-  The list maps end with "Do not repeat an item.", because a small model can
-  repeat one item until the limit.
+  contract share its prompt.
 - **AGENT-6:** List every command the agent ran with what it showed, describe
   its plan and every change to it, and list every file it edited with each
   change (1,024 each), using three maps of the same trace snapshot. Snapshots
