@@ -91,7 +91,7 @@
                         {
                           "value": {
                             "literal": {
-                              "string": "{0}\n\nList every defined term in the contract with its definition. Do not repeat an item."
+                              "string": "{0}\n\nList the main defined terms in the contract with their definitions. Do not repeat an item."
                             }
                           }
                         },
@@ -110,7 +110,7 @@
                         {
                           "value": {
                             "literal": {
-                              "i32": 3072
+                              "i32": 1024
                             }
                           }
                         }
@@ -164,7 +164,7 @@
                             {
                               "value": {
                                 "literal": {
-                                  "i32": 3072
+                                  "i32": 1024
                                 }
                               }
                             }
@@ -198,7 +198,7 @@
                                 {
                                   "value": {
                                     "literal": {
-                                      "string": "{0}\n\nList every obligation in the contract, clause by clause, with the party it binds. Do not repeat an item."
+                                      "string": "{0}\n\nList the main obligations in the contract, in clause order, numbered, one line each: the party bound and what it must do, in your own words. Do not repeat an item."
                                     }
                                   }
                                 },
@@ -217,7 +217,7 @@
                                 {
                                   "value": {
                                     "literal": {
-                                      "i32": 3072
+                                      "i32": 1024
                                     }
                                   }
                                 }
