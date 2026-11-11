@@ -452,6 +452,10 @@ MAP_PREDICATES = (
           ("commands", prompts.AGENT_MAP_COMMANDS),
           ("plan", prompts.AGENT_MAP_PLAN),
           ("edits", prompts.AGENT_MAP_EDITS))),
+    PredicateSpec(
+        "quailb.sales.call.map_objection", "sales", "map_objection", "map",
+        prompts.SALES_MAP_OBJECTION, "sales_call", "sales_calls", "transcript",
+        source_policy="unpublished", max_tokens=32),
 )
 IMDB_MAP_FILTER_PREDICATES = (
     PredicateSpec(

@@ -383,7 +383,7 @@ positive, constant answer token limit. The prompt is a constant template,
 its KV. The [reference](docs/reference.md#maps) defines the exact rendering,
 answer tables, and token accounting.
 
-There are thirteen map drafts. Numbers below are answer token limits per call:
+There are sixteen map drafts. Numbers below are answer token limits per call:
 
 - **IMDB-20:** Return the negative arguments (64), a detailed summary (256),
   and the main topic (32), using three maps of the same review.
@@ -419,6 +419,13 @@ There are thirteen map drafts. Numbers below are answer token limits per call:
   its plan and every change to it, and list every file it edited with each
   change (1,024 each), using three maps of the same trace snapshot. Snapshots
   of one trajectory share their first turns.
+- **SALES-6:** Name the customer's main objection in each call (price, timing,
+  competitor, security, or none), then what the customer said (32). Keep the
+  calls whose answer starts with `price`. An engine can stop each other
+  answer after its first word.
+- **SALES-7:** SALES-6 over the calls on deals in negotiation.
+- **SALES-8:** SALES-6 without the test: every call's objection. It gives the
+  cost of the same map with no answer to stop early.
 
 These drafts are excluded from the default 85 queries. Load them by ID with
 `accuracy=False` and call your adapter directly:

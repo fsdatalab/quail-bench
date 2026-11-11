@@ -53,6 +53,9 @@ def reference_table(spec: QuerySpec, ground_truth, corpus_rows) -> pd.DataFrame:
     for operator in info.operators:
         if operator in (*info.column_tests, *info.extracts, *info.maps):
             continue
+        if operator in info.starts_withs:
+            raise ValueError(
+                f"{operator.id} tests a map answer, which has no reference")
         if operator in info.in_lists:
             column = table[f"{operator.relation}.{operator.output}"]
             table = table[column.isin(operator.accepted)]
