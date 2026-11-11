@@ -120,7 +120,10 @@ literal prefix, ignoring letter case, as SQL's `c.objection ILIKE 'price%'`
 does. The call is Substrait's `starts_with` from
 `extension:io.substrait:functions_string`, with the option
 `case_sensitivity: CASE_INSENSITIVE`. It asks the model nothing. An engine
-may stop writing an answer once its first tokens rule the prefix out.
+may stop writing an answer once its first tokens rule the prefix out; the
+answer it reports for that document is then the text it wrote. The test
+reads the answer as the engine returns it, so an engine removes the
+whitespace a model writes before its first word.
 
 ## Input tables
 

@@ -13,7 +13,7 @@ from test_classify import (
 )
 
 import quail_b
-from quail_b import minimum, predicates, prompts, rendering
+from quail_b import minimum, predicates, prompts, rendering, scoring
 from quail_b.queries import queries
 from quail_b.run import _query_hash, _read_output, _save_output, _validate_output
 from quail_b.substrait import Map, StartsWith
@@ -576,3 +576,13 @@ def test_a_starts_with_filter_tests_a_map_answer_ignoring_case():
         _spec(StartsWithNode(
             MapNode(reviews, prompts.IMDB_MAP_TOPIC, 32, "topic"), "topic", ""),
             ("r", "r.topic"))
+
+
+def test_a_starts_with_filter_narrows_the_rows_the_answers_imply():
+    spec = queries(include_draft=True)["SALES-6"]
+    answers = {"map-1": pa.table({
+        "c": ["s0", "s1", "s2"],
+        "answer": ["Price: too high", "t", "none"]})}
+    survivors, relations = scoring.answer_relations(
+        spec, {}, {}, map_answers=answers)
+    assert survivors == {"c": {"s0"}} and not relations
