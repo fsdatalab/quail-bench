@@ -123,10 +123,8 @@ literal prefix. SQL writes the same filter as `c.objection ILIKE 'price%'`.
 - The filter ignores letter case. The call sets the option
   `case_sensitivity: CASE_INSENSITIVE`.
 - The filter asks the model nothing.
-- The filter reads the answer text that the engine returns. The engine must
-  remove whitespace before the first word of an answer.
-- The engine may stop an answer when the tokens so far cannot match the
-  prefix. The engine then reports the text it wrote as that document's answer.
+- The filter reads the answer text as reported. Whitespace before the first
+  word counts, as it does in SQL.
 
 ## Input tables
 
