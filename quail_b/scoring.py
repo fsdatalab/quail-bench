@@ -1187,12 +1187,14 @@ def unlabeled_operators(spec: QuerySpec, ground_truth) -> set[str]:
     """Return the IDs of a query's scored operators without reference labels.
 
     Only a draft query can have them, or every operator when no labels
-    were loaded; map text is never scored.
+    were loaded; map text is never scored. A starts-with filter is
+    always one: the rows it keeps follow map text.
     """
+    tests = {operator.id for operator in spec.info.starts_withs}
     if ground_truth is None:
-        return {operator.id for operator in spec.info.ai_operators
-                if operator not in spec.info.maps}
-    unlabeled = set()
+        return tests | {operator.id for operator in spec.info.ai_operators
+                        if operator not in spec.info.maps}
+    unlabeled = tests
     for operator in spec.info.ai_operators:
         if operator in spec.info.maps:
             continue

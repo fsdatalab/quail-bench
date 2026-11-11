@@ -586,3 +586,8 @@ def test_a_starts_with_filter_narrows_the_rows_the_answers_imply():
     survivors, relations = scoring.answer_relations(
         spec, {}, {}, map_answers=answers)
     assert survivors == {"c": {"s0"}} and not relations
+
+
+def test_a_starts_with_query_has_no_reference_rows():
+    spec = queries(include_draft=True)["SALES-7"]
+    assert scoring.unlabeled_operators(spec, None) == {"starts-with-1"}
