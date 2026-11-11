@@ -661,6 +661,12 @@ SALES_CONCERN_DESCRIPTIONS = (
     "the customer raises no concern",
 )
 
+# The answer starts with the kind of objection, so a test of its first
+# word selects the calls of one kind.
+SALES_MAP_OBJECTION = (
+    "{0}\n\nWhat is the customer's main objection in this call? Answer with "
+    "one of price, timing, competitor, security, or none, then a colon and "
+    "what the customer said.")
 SALES_CHANGED_OFFER = (
     "DOCUMENT {1} is the next call about the same deal as the sales call in "
     "DOCUMENT {0}. Does the sales rep in DOCUMENT {1} quote a price, "

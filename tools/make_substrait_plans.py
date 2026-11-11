@@ -79,8 +79,11 @@ from quail_b.substrait import (
     AND_NAME,
     ARITHMETIC_EXTENSION_URN,
     BOOLEAN_EXTENSION_URN,
+    CASE_SENSITIVITY,
     COMPARISON_EXTENSION_URN,
     EQUAL_NAME,
+    STARTS_WITH_NAME,
+    STRING_EXTENSION_URN,
     SUBSTRAIT_VERSION,
     output_name,
 )
@@ -95,6 +98,7 @@ _URN_ANCHORS = {
     BOOLEAN_EXTENSION_URN: 3,
     AGGREGATE_GENERIC_EXTENSION_URN: 4,
     ARITHMETIC_EXTENSION_URN: 5,
+    STRING_EXTENSION_URN: 6,
 }
 _FUNCTIONS = {
     AI_FILTER_NAME: (1, AI_EXTENSION_URN),
@@ -118,6 +122,7 @@ _FUNCTIONS = {
     AI_EXTRACT_NAME: (19, AI_EXTENSION_URN),
     AI_SAE_FEATURES_NAME: (20, AI_EXTENSION_URN),
     AI_MAP_NAME: (21, AI_EXTENSION_URN),
+    STARTS_WITH_NAME: (22, STRING_EXTENSION_URN),
 }
 _COMPARISONS = {
     "=": EQUAL_NAME, "<>": "not_equal:any_any", "<": "lt:any_any",
@@ -299,6 +304,18 @@ class InList:
     input: Classify | InList
     output: str
     accepted: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class StartsWith:
+    """Keep the documents whose map answer starts with a prefix.
+
+    The test ignores letter case.
+    """
+
+    input: Map
+    output: str
+    prefix: str
 
 
 @dataclass(frozen=True)
@@ -486,7 +503,8 @@ class _Emitter:
 
     def __init__(self):
         self.counts = {"filter": 0, "join": 0, "classify": 0,
-                       "in-list": 0, "where": 0, "score": 0, "extract": 0,
+                       "in-list": 0, "starts-with": 0, "where": 0,
+                       "score": 0, "extract": 0,
                        "sae-features": 0, "map": 0,
                        "aggregate": 0, "having": 0, "sort": 0, "fetch": 0}
         self.functions = set()
@@ -644,6 +662,21 @@ class _Emitter:
                         options=[_literal(label) for label in node.accepted],
                     )
                 ),
+            )
+            return algebra.Rel(filter=relation), fields, text
+
+        if isinstance(node, StartsWith):
+            rel, fields, text = self.emit(node.input)
+            (field,) = [field for field in fields if field[1] == node.output]
+            self.functions.add(STARTS_WITH_NAME)
+            condition = _call(STARTS_WITH_NAME, [
+                _field(fields.index(field)), _literal(node.prefix)])
+            condition.scalar_function.options.add(
+                name=CASE_SENSITIVITY[0], preference=[CASE_SENSITIVITY[1]])
+            relation = algebra.FilterRel(
+                common=_common(self._operator_id("starts-with")),
+                input=rel,
+                condition=condition,
             )
             return algebra.Rel(filter=relation), fields, text
 
@@ -1070,6 +1103,10 @@ def _law_counts(node):
     return Sort(Aggregate(_governing_law(node), ("c.governing_law_state",),
                           (("contracts", "count", None),)),
                 (("contracts", True), ("c.governing_law_state", False)))
+
+
+def _objection(node):
+    return Map(node, prompts.SALES_MAP_OBJECTION, 32, "objection")
 
 
 def _next_call_pairs():
@@ -1561,6 +1598,19 @@ QUERIES = (
                            SALES_COMMITS, "commit_score"),
                      (("c.commit_score", True), ("c.id", False))), 25),
           select=("c", "c.commit_score")),
+    Query("SALES-6", "map: the main objection and what the customer said -> "
+          "price objections",
+          StartsWith(_objection(_sales_calls()), "objection", "price"),
+          select=("c", "c.objection"), draft=True),
+    Query("SALES-7", "where: deals in negotiation -> map: the main objection "
+          "and what the customer said -> price objections",
+          StartsWith(_objection(Where(_sales_calls("c", "deal_stage"),
+                                      "deal_stage", "=", "Negotiation")),
+                     "objection", "price"),
+          select=("c", "c.objection"), draft=True),
+    Query("SALES-8", "map: the main objection and what the customer said",
+          _objection(_sales_calls()),
+          select=("c", "c.objection"), draft=True),
 
     # CUAD contracts, with the lawyers' labels. Their reference labels
     # are not published yet.

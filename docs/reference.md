@@ -91,8 +91,8 @@ A plan reader matches on these names:
 | `ai_map` | `ai_map:str_str_i32` |
 | `ai_sae_features` | `ai_sae_features:str_str_str` |
 
-Each operator that asks the model, and each IN-list filter, has an operator
-ID as its hint alias:
+Each operator that asks the model, and each IN-list or starts-with filter,
+has an operator ID as its hint alias:
 
 | Operator | Substrait form | ID |
 | --- | --- | --- |
@@ -104,6 +104,7 @@ ID as its hint alias:
 | Map | `ProjectRel` calling `ai_map` | `map-N` |
 | SAE features | `ProjectRel` calling `ai_sae_features` | `sae-features-N` |
 | IN-list filter | `FilterRel` with a `SingularOrList` condition | `in-list-N` |
+| Starts-with filter | `FilterRel` calling `starts_with:str_str` | `starts-with-N` |
 
 A classification adds one label column to its relation. Its hint output
 names end with `alias.column`, such as `r.sentiment`. The five-argument form
@@ -113,6 +114,17 @@ labels the rows of the join below it instead of single documents;
 An IN-list filter keeps the documents whose label column holds one of the
 listed labels, as SQL's `r.sentiment IN ('negative', 'mixed')` does. It asks
 the model nothing.
+
+A starts-with filter keeps the documents whose map answer starts with a
+literal prefix. SQL writes the same filter as `c.objection ILIKE 'price%'`.
+
+- The filter calls `starts_with` from
+  `extension:io.substrait:functions_string`.
+- The filter ignores letter case. The call sets the option
+  `case_sensitivity: CASE_INSENSITIVE`.
+- The filter asks the model nothing.
+- The filter reads the answer text as reported. Whitespace before the first
+  word counts, as it does in SQL.
 
 ## Input tables
 
@@ -700,7 +712,7 @@ their usual scoring rules when reference labels are available. For example,
 IMDB-21 reuses IMDB-11's sentiment labels, but IMDB-24's new negative-review
 filter has no reference labels yet.
 
-The thirteen [map drafts](../README.md#map-queries) are excluded from the default
+The sixteen [map drafts](../README.md#map-queries) are excluded from the default
 85 queries. Load them by ID with `accuracy=False`.
 
 ### Token accounting

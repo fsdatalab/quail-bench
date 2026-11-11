@@ -452,6 +452,24 @@
     "privacy": false
   },
   {
+    "id": "SALES-6",
+    "description": "map: the main objection and what the customer said -> price objections",
+    "privacy": false,
+    "draft": true
+  },
+  {
+    "id": "SALES-7",
+    "description": "where: deals in negotiation -> map: the main objection and what the customer said -> price objections",
+    "privacy": false,
+    "draft": true
+  },
+  {
+    "id": "SALES-8",
+    "description": "map: the main objection and what the customer said",
+    "privacy": false,
+    "draft": true
+  },
+  {
     "id": "CUAD-1",
     "description": "extract: the governing law of each contract",
     "privacy": false

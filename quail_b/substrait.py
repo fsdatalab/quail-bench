@@ -22,6 +22,10 @@ AI_SAE_FEATURES_NAME = "ai_sae_features:str_str_str"
 SAE_POOLINGS = ("last", "max")
 EQUAL_NAME = "equal:any_any"
 AND_NAME = "and:bool"
+STRING_EXTENSION_URN = "extension:io.substrait:functions_string"
+STARTS_WITH_NAME = "starts_with:str_str"
+# the option that makes starts_with ignore letter case
+CASE_SENSITIVITY = ("case_sensitivity", "CASE_INSENSITIVE")
 AGGREGATE_GENERIC_EXTENSION_URN = (
     "extension:io.substrait:functions_aggregate_generic")
 ARITHMETIC_EXTENSION_URN = "extension:io.substrait:functions_arithmetic"
@@ -48,6 +52,7 @@ _FUNCTION_URNS = {
     AI_MAP_NAME: AI_EXTENSION_URN,
     EQUAL_NAME: COMPARISON_EXTENSION_URN,
     AND_NAME: BOOLEAN_EXTENSION_URN,
+    STARTS_WITH_NAME: STRING_EXTENSION_URN,
     **{name: COMPARISON_EXTENSION_URN for name in COMPARISON_NAMES},
     "count:any": AGGREGATE_GENERIC_EXTENSION_URN,
     **{name: ARITHMETIC_EXTENSION_URN for name in AGGREGATE_NAMES
@@ -121,6 +126,20 @@ class InList:
     relation: str
     output: str
     accepted: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class StartsWith:
+    """Keep the documents whose map answer starts with a prefix.
+
+    The test ignores letter case. An engine may stop writing an answer
+    once its first tokens rule the prefix out.
+    """
+
+    id: str
+    relation: str
+    output: str
+    prefix: str
 
 
 @dataclass(frozen=True)
@@ -261,7 +280,7 @@ class Fetch:
 
 
 type Operator = (Filter | Join | Classify | InList | Score | ColumnTest
-                 | Extract | SaeFeatures | Map)
+                 | Extract | SaeFeatures | Map | StartsWith)
 type Step = Aggregate | Having | Sort | Fetch
 
 
@@ -326,7 +345,7 @@ class PlanInfo:
         return tuple(
             operator
             for operator in self.operators
-            if not isinstance(operator, (InList, ColumnTest))
+            if not isinstance(operator, (InList, ColumnTest, StartsWith))
         )
 
     @property
@@ -399,6 +418,14 @@ class PlanInfo:
             operator
             for operator in self.operators
             if isinstance(operator, InList)
+        )
+
+    @property
+    def starts_withs(self) -> tuple[StartsWith, ...]:
+        return tuple(
+            operator
+            for operator in self.operators
+            if isinstance(operator, StartsWith)
         )
 
     def classify_output(self, output: str) -> Classify:
@@ -552,6 +579,16 @@ def _validate_labels(labels, descriptions) -> None:
                     f"ai_classify label {other!r} extends label {label!r}")
 
 
+def _is_call(
+    expression: algebra_pb2.Expression,
+    functions: dict[int, str],
+    name: str,
+) -> bool:
+    return (expression.HasField("scalar_function")
+            and functions.get(
+                expression.scalar_function.function_reference) == name)
+
+
 def _flatten(
     expression: algebra_pb2.Expression,
     functions: dict[int, str],
@@ -610,6 +647,30 @@ def _decode(
             raise ValueError("an IN-list filter accepts a label not in its call")
         operator = InList(
             rel.filter.common.hint.alias, alias, output, accepted)
+        return _Decoded(child.fields, child.tables, child.text_columns,
+                        (*child.operators, operator))
+
+    if kind == "filter" and _is_call(
+            rel.filter.condition, functions, STARTS_WITH_NAME):
+        child = _decode(rel.filter.input, functions)
+        function = rel.filter.condition.scalar_function
+        arguments = _arguments(rel.filter.condition)
+        if len(arguments) != 2:
+            raise ValueError("starts_with needs an answer column and a prefix")
+        alias, output = _selected(child.fields, arguments[0])
+        if not any(isinstance(operator, Map)
+                   and (operator.relation, operator.output) == (alias, output)
+                   for operator in child.operators):
+            raise ValueError("a starts_with filter must test an ai_map column")
+        options = {(option.name, tuple(option.preference))
+                   for option in function.options}
+        if options != {(CASE_SENSITIVITY[0], (CASE_SENSITIVITY[1],))}:
+            raise ValueError("a starts_with filter ignores letter case")
+        prefix = _literal_string(arguments[1])
+        if not prefix:
+            raise ValueError("a starts_with filter needs a prefix")
+        operator = StartsWith(
+            rel.filter.common.hint.alias, alias, output, prefix)
         return _Decoded(child.fields, child.tables, child.text_columns,
                         (*child.operators, operator))
 
@@ -1139,7 +1200,7 @@ def _validate_info(info: PlanInfo) -> None:
                     "join of its two relations")
         elif (
             isinstance(operator, (Filter, Classify, InList, ColumnTest,
-                                  Extract, SaeFeatures, Map))
+                                  Extract, SaeFeatures, Map, StartsWith))
             and index > first_join[operator.relation]
         ):
             raise ValueError(
@@ -1178,6 +1239,7 @@ def _validate_info(info: PlanInfo) -> None:
             raise ValueError(f"a query selecting the joined-row label {name!r} must "
                              "select both relations' ids")
     used = {operator.output for operator in info.in_lists}
+    used.update(operator.output for operator in info.starts_withs)
     used.update(name.split(".", 1)[1] for name in info.select)
     for operator in info.classifies:
         if operator.output not in used:

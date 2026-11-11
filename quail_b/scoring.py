@@ -541,6 +541,19 @@ def answer_relations(spec: QuerySpec, filter_answers, join_answers,
             return None
         _narrow(survivors, operator.relation,
                 pc.cast(table.column(operator.relation), pa.string()).to_pylist())
+    # a starts-with filter keeps the documents whose answer has the prefix
+    maps = {(operator.relation, operator.output): operator.id
+            for operator in spec.info.maps}
+    for test in spec.info.starts_withs:
+        table = map_answers.get(maps[(test.relation, test.output)])
+        if table is None:
+            return None
+        prefix = test.prefix.lower()
+        _narrow(survivors, test.relation, [
+            str(row_id)
+            for row_id, answer in zip(table.column(test.relation).to_pylist(),
+                                      table.column("answer").to_pylist())
+            if answer is not None and answer.lower().startswith(prefix)])
     # a document with no features row cannot appear with its feature list
     for operator in selected_features(spec):
         table = features_answers.get(operator.id)
@@ -1174,12 +1187,14 @@ def unlabeled_operators(spec: QuerySpec, ground_truth) -> set[str]:
     """Return the IDs of a query's scored operators without reference labels.
 
     Only a draft query can have them, or every operator when no labels
-    were loaded; map text is never scored.
+    were loaded; map text is never scored. A starts-with filter is
+    always one: the rows it keeps follow map text.
     """
+    tests = {operator.id for operator in spec.info.starts_withs}
     if ground_truth is None:
-        return {operator.id for operator in spec.info.ai_operators
-                if operator not in spec.info.maps}
-    unlabeled = set()
+        return tests | {operator.id for operator in spec.info.ai_operators
+                        if operator not in spec.info.maps}
+    unlabeled = tests
     for operator in spec.info.ai_operators:
         if operator in spec.info.maps:
             continue

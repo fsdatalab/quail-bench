@@ -1,0 +1,154 @@
+{
+  "extension_urns": [
+    {
+      "extension_urn_anchor": 1,
+      "urn": "extension:org.fsdatalab.quail_b:functions_ai"
+    }
+  ],
+  "extensions": [
+    {
+      "extension_function": {
+        "extension_urn_reference": 1,
+        "function_anchor": 21,
+        "name": "ai_map:str_str_i32"
+      }
+    }
+  ],
+  "relations": [
+    {
+      "root": {
+        "input": {
+          "project": {
+            "common": {
+              "emit": {
+                "output_mapping": [
+                  3,
+                  4
+                ]
+              }
+            },
+            "expressions": [
+              {
+                "selection": {
+                  "direct_reference": {
+                    "struct_field": {}
+                  },
+                  "root_reference": {}
+                }
+              },
+              {
+                "selection": {
+                  "direct_reference": {
+                    "struct_field": {
+                      "field": 2
+                    }
+                  },
+                  "root_reference": {}
+                }
+              }
+            ],
+            "input": {
+              "project": {
+                "common": {
+                  "direct": {},
+                  "hint": {
+                    "alias": "map-1",
+                    "output_names": [
+                      "c.id",
+                      "c.transcript",
+                      "c.objection"
+                    ]
+                  }
+                },
+                "expressions": [
+                  {
+                    "scalar_function": {
+                      "arguments": [
+                        {
+                          "value": {
+                            "literal": {
+                              "string": "{0}\n\nWhat is the customer's main objection in this call? Answer with one of price, timing, competitor, security, or none, then a colon and what the customer said."
+                            }
+                          }
+                        },
+                        {
+                          "value": {
+                            "selection": {
+                              "direct_reference": {
+                                "struct_field": {
+                                  "field": 1
+                                }
+                              },
+                              "root_reference": {}
+                            }
+                          }
+                        },
+                        {
+                          "value": {
+                            "literal": {
+                              "i32": 32
+                            }
+                          }
+                        }
+                      ],
+                      "function_reference": 21,
+                      "output_type": {
+                        "string": {
+                          "nullability": "NULLABILITY_REQUIRED"
+                        }
+                      }
+                    }
+                  }
+                ],
+                "input": {
+                  "read": {
+                    "base_schema": {
+                      "names": [
+                        "id",
+                        "transcript"
+                      ],
+                      "struct": {
+                        "nullability": "NULLABILITY_REQUIRED",
+                        "types": [
+                          {
+                            "string": {
+                              "nullability": "NULLABILITY_REQUIRED"
+                            }
+                          },
+                          {
+                            "string": {
+                              "nullability": "NULLABILITY_REQUIRED"
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    "common": {
+                      "direct": {},
+                      "hint": {
+                        "alias": "c"
+                      }
+                    },
+                    "named_table": {
+                      "names": [
+                        "sales_calls"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "names": [
+          "c",
+          "objection"
+        ]
+      }
+    }
+  ],
+  "version": {
+    "minor_number": 103,
+    "producer": "quail-b"
+  }
+}

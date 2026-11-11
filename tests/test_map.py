@@ -13,10 +13,10 @@ from test_classify import (
 )
 
 import quail_b
-from quail_b import minimum, predicates, prompts, rendering
+from quail_b import minimum, predicates, prompts, rendering, scoring
 from quail_b.queries import queries
 from quail_b.run import _query_hash, _read_output, _save_output, _validate_output
-from quail_b.substrait import Map
+from quail_b.substrait import Map, StartsWith
 from tools.make_substrait_plans import (
     CONTRACT_ASPECTS,
     Filter,
@@ -25,11 +25,13 @@ from tools.make_substrait_plans import (
     build_plan,
 )
 from tools.make_substrait_plans import Map as MapNode
+from tools.make_substrait_plans import StartsWith as StartsWithNode
 
 MAP_QUERIES = (*(f"IMDB-{i}" for i in range(20, 26)),
-               *(f"CUAD-{i}" for i in range(17, 23)), "AGENT-6")
+               *(f"CUAD-{i}" for i in range(17, 23)), "AGENT-6",
+               *(f"SALES-{i}" for i in range(6, 9)))
 MAP_RELATIONS = {"IMDB": ("reviews", "r"), "CUAD": ("contracts", "c"),
-                 "AGENT": ("agent_traces", "t")}
+                 "AGENT": ("agent_traces", "t"), "SALES": ("sales_calls", "c")}
 REVIEWS = IMDB_TABLES["reviews"]
 
 
@@ -75,6 +77,9 @@ def test_map_queries_are_drafts_over_their_corpora():
         "AGENT-6": [(prompts.AGENT_MAP_COMMANDS, 1024),
                     (prompts.AGENT_MAP_PLAN, 1024),
                     (prompts.AGENT_MAP_EDITS, 1024)],
+        "SALES-6": [(prompts.SALES_MAP_OBJECTION, 32)],
+        "SALES-7": [(prompts.SALES_MAP_OBJECTION, 32)],
+        "SALES-8": [(prompts.SALES_MAP_OBJECTION, 32)],
     }
     for query_id, calls in expected.items():
         info = drafts[query_id].info
@@ -553,3 +558,36 @@ def test_map_drafts_load_inputs_without_reference_labels(tmp_path):
         ["IMDB-22", "IMDB-20"], accuracy=False, root=tmp_path)
     assert [spec.id for spec in suite.queries] == ["IMDB-22", "IMDB-20"]
     assert suite.tables["reviews"].equals(REVIEWS)
+
+
+def test_a_starts_with_filter_tests_a_map_answer_ignoring_case():
+    drafts = queries(include_draft=True)
+    test = StartsWith("starts-with-1", "c", "objection", "price")
+    assert drafts["SALES-6"].info.starts_withs == (test,)
+    assert [operator.id for operator in drafts["SALES-7"].info.operators] == [
+        "where-1", "map-1", "starts-with-1"]
+    assert not drafts["SALES-8"].info.starts_withs
+    # the prefix test asks the model nothing
+    assert drafts["SALES-6"].info.ai_operators == drafts["SALES-6"].info.maps
+    reviews = Scan("reviews", "r", "body")
+    with pytest.raises(ValueError, match="must test an ai_map column"):
+        _spec(StartsWithNode(reviews, "body", "a"), ("r",))
+    with pytest.raises(ValueError, match="needs a prefix"):
+        _spec(StartsWithNode(
+            MapNode(reviews, prompts.IMDB_MAP_TOPIC, 32, "topic"), "topic", ""),
+            ("r", "r.topic"))
+
+
+def test_a_starts_with_filter_narrows_the_rows_the_answers_imply():
+    spec = queries(include_draft=True)["SALES-6"]
+    answers = {"map-1": pa.table({
+        "c": ["s0", "s1", "s2"],
+        "answer": ["Price: too high", "t", "none"]})}
+    survivors, relations = scoring.answer_relations(
+        spec, {}, {}, map_answers=answers)
+    assert survivors == {"c": {"s0"}} and not relations
+
+
+def test_a_starts_with_query_has_no_reference_rows():
+    spec = queries(include_draft=True)["SALES-7"]
+    assert scoring.unlabeled_operators(spec, None) == {"starts-with-1"}

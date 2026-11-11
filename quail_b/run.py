@@ -38,6 +38,7 @@ from quail_b.substrait import (
     Map,
     SaeFeatures,
     Score,
+    StartsWith,
     output_name,
 )
 
@@ -107,6 +108,14 @@ def _query_hash(spec):
                 "relation": operator.relation,
                 "output": operator.output,
                 "accepted": operator.accepted,
+            })
+        elif isinstance(operator, StartsWith):
+            operators.append({
+                "kind": "starts_with",
+                "id": operator.id,
+                "relation": operator.relation,
+                "output": operator.output,
+                "prefix": operator.prefix,
             })
         elif isinstance(operator, ColumnTest):
             operators.append({
