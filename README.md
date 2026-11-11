@@ -419,13 +419,12 @@ There are sixteen map drafts. Numbers below are answer token limits per call:
   its plan and every change to it, and list every file it edited with each
   change (1,024 each), using three maps of the same trace snapshot. Snapshots
   of one trajectory share their first turns.
-- **SALES-6:** Name the customer's main objection in each call (price, timing,
-  competitor, security, or none), then what the customer said (32). Keep the
-  calls whose answer starts with `price`. An engine can stop each other
-  answer after its first word.
+- **SALES-6:** Write the customer's main objection in each call (32): a
+  category (price, timing, competitor, security, or none), then what the
+  customer said. Keep the calls whose answer starts with `price`.
 - **SALES-7:** SALES-6 over the calls on deals in negotiation.
-- **SALES-8:** SALES-6 without the test: every call's objection. It gives the
-  cost of the same map with no answer to stop early.
+- **SALES-8:** Write the same objection for every call (32), with no filter on
+  the answer.
 
 These drafts are excluded from the default 85 queries. Load them by ID with
 `accuracy=False` and call your adapter directly:

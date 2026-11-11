@@ -116,14 +116,17 @@ listed labels, as SQL's `r.sentiment IN ('negative', 'mixed')` does. It asks
 the model nothing.
 
 A starts-with filter keeps the documents whose map answer starts with a
-literal prefix, ignoring letter case, as SQL's `c.objection ILIKE 'price%'`
-does. The call is Substrait's `starts_with` from
-`extension:io.substrait:functions_string`, with the option
-`case_sensitivity: CASE_INSENSITIVE`. It asks the model nothing. An engine
-may stop writing an answer once its first tokens rule the prefix out; the
-answer it reports for that document is then the text it wrote. The test
-reads the answer as the engine returns it, so an engine removes the
-whitespace a model writes before its first word.
+literal prefix. SQL writes the same filter as `c.objection ILIKE 'price%'`.
+
+- The filter calls `starts_with` from
+  `extension:io.substrait:functions_string`.
+- The filter ignores letter case. The call sets the option
+  `case_sensitivity: CASE_INSENSITIVE`.
+- The filter asks the model nothing.
+- The filter reads the answer text that the engine returns. The engine must
+  remove whitespace before the first word of an answer.
+- The engine may stop an answer when the tokens so far cannot match the
+  prefix. The engine then reports the text it wrote as that document's answer.
 
 ## Input tables
 
