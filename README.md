@@ -552,6 +552,15 @@ The `mode` column stores the dataset's label, `hack` or `baseline`. Only
 WRENCH-5 reads `mode`, to select the baseline runs. You can also use `mode` to
 compare a filter's answers with the dataset's labels.
 
+Some runs' harness instructions let the agent read a reference solution: the
+first user message ends with a section saying a reference solution is at
+`/solution/` as a hint, not to be copied verbatim. The section is left out of
+the text. It appears in some runs of Gemini 3.1 Pro and GPT-5.4 and in no run of
+Claude Opus 4.6, so a filter that flags reading `/solution/` as an exploit can
+count permitted reads. Tables built from the sources record it in a
+`reference_offered` column on both tables. The published corpora do not have the
+column yet, so `load_benchmark` and `load_table` leave it out. No query reads it.
+
 | Query | Question | Operators |
 | --- | --- | --- |
 | WRENCH-1 | Which runs exploited the verifier? | `ai_filter` over the whole run |

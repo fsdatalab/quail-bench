@@ -27,7 +27,7 @@ from quail_b._files import (
 from quail_b._files import PUBLIC_BUCKET as PUBLIC_BUCKET
 
 DATA_SEED = 20260818
-CACHE_SCHEMA_VERSION = 11
+CACHE_SCHEMA_VERSION = 12
 # The labeled corpus for each scale factor, saved beside its labels in
 # the public bucket. build_sets downloads it instead of rebuilding from
 # the sources; the corpus id is checked after download.
@@ -94,6 +94,9 @@ WRENCH_REPO = "few-sh/terminal-wrench"
 WRENCH_INDEX_REPO = "few-sh/terminal-wrench-trajectories"
 WRENCH_SPLITS = {"sanitized_hack": "hack", "baseline": "baseline"}
 WRENCH_TASKS = 331
+# Some runs' first user message ends with this section, which lets the agent
+# read a reference solution at /solution/ as a hint but not copy it verbatim.
+WRENCH_REFERENCE_HEADING = "## Reference Solution"
 WRENCH_OUTPUT_CHARS = 2_000
 WRENCH_MAX_TOKENS = 24_000
 
@@ -857,6 +860,7 @@ WRENCH_RUN_SCHEMA = pa.schema([
     ("transcript", pa.string()),
     ("step_count", pa.int32()),
     ("token_count", pa.int32()),
+    ("reference_offered", pa.bool_()),
 ])
 
 WRENCH_STEP_SCHEMA = pa.schema([
@@ -865,6 +869,7 @@ WRENCH_STEP_SCHEMA = pa.schema([
     ("step_index", pa.int32()),
     ("model", pa.string()),
     ("text", pa.string()),
+    ("reference_offered", pa.bool_()),
 ])
 
 WRENCH_INDEX_COLUMNS = ("task_id", "model", "trajectory_path", "instruction")
@@ -927,7 +932,9 @@ def _wrench_rows(index, tasks, read_steps, tokenizer):
     Runs come in task order, then in index order within a task. A run's
     transcript is the task text, then every agent step; a step's text is
     the task text, then that step. The harness instructions in the first
-    user message are the same for every run and are left out.
+    user message are left out of the text. `reference_offered` records
+    whether that message let the agent read a reference solution, since
+    the section appears in some runs and not others.
 
     Args:
         index: Index rows with task_id, model, trajectory_path,
@@ -943,8 +950,10 @@ def _wrench_rows(index, tasks, read_steps, tokenizer):
     for task_id in tasks:
         for row in by_task.get(task_id, ()):
             task = f"[TASK]\n{row['instruction'].strip()}"
-            blocks = [_wrench_step(step)
-                      for step in read_steps(row["trajectory_path"])[1:]
+            trajectory = read_steps(row["trajectory_path"])
+            offered = WRENCH_REFERENCE_HEADING in (
+                trajectory[0].get("message") or "")
+            blocks = [_wrench_step(step) for step in trajectory[1:]
                       if step.get("source") == "agent"]
             transcript = "\n\n".join([task, *blocks])
             token_count = len(tokenizer.encode(
@@ -956,11 +965,13 @@ def _wrench_rows(index, tasks, read_steps, tokenizer):
                 "id": run_id, "task_id": task_id, "model": row["model"],
                 "mode": row["mode"], "transcript": transcript,
                 "step_count": len(blocks), "token_count": token_count,
+                "reference_offered": offered,
             })
             steps.extend({
                 "id": f"{run_id}/{index_}", "run_id": run_id,
                 "step_index": index_, "model": row["model"],
                 "text": f"{task}\n\n[STEP]\n{text}",
+                "reference_offered": offered,
             } for index_, text in enumerate(blocks, start=1))
     return runs, steps
 
@@ -1702,8 +1713,13 @@ CORPUS_COLUMNS = {
     "support_messages": tuple(MESSAGE_SCHEMA.names),
     "issue_runs": tuple(ISSUE_RUN_SCHEMA.names),
     "issue_messages": tuple(MESSAGE_SCHEMA.names),
-    "wrench_runs": tuple(WRENCH_RUN_SCHEMA.names),
-    "wrench_steps": tuple(WRENCH_STEP_SCHEMA.names),
+    # reference_offered is built from the sources but left out of the
+    # published corpora until they are next republished, so loading still
+    # matches the published corpus identity
+    "wrench_runs": tuple(name for name in WRENCH_RUN_SCHEMA.names
+                         if name != "reference_offered"),
+    "wrench_steps": tuple(name for name in WRENCH_STEP_SCHEMA.names
+                          if name != "reference_offered"),
     "sales_calls": tuple(SALES_CALL_SCHEMA.names),
     "contracts": tuple(CONTRACT_SCHEMA.names),
     "clause_types": tuple(CLAUSE_TYPE_SCHEMA.names),
