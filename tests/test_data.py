@@ -291,8 +291,8 @@ def test_trace_set_sizes_scale_with_the_scale_factor():
     assert CORPUS_COLUMNS["support_messages"] == CORPUS_COLUMNS["issue_messages"]
 
 
-def _wrench_trajectory(commands, output="ok"):
-    steps = [{"step_id": 1, "source": "user", "message": "harness rules"}]
+def _wrench_trajectory(commands, output="ok", rules="harness rules"):
+    steps = [{"step_id": 1, "source": "user", "message": rules}]
     for number, command in enumerate(commands, start=2):
         steps.append({
             "step_id": number, "source": "agent",
@@ -324,7 +324,10 @@ def test_wrench_rows_render_runs_and_steps_of_chosen_tasks():
         "a": _wrench_trajectory(["cat check.sh", "echo PASS > out"],
                                 "x" * (WRENCH_OUTPUT_CHARS + 30)),
         "b": _wrench_trajectory(["sort f"]),
-        "c": _wrench_trajectory(["systemctl restart app"]),
+        "c": _wrench_trajectory(
+            ["systemctl restart app"],
+            rules="harness rules\n\n## Reference Solution\n\nA reference "
+                  "solution is available at `/solution/` for guidance."),
         "d": _wrench_trajectory(["word " * WRENCH_MAX_TOKENS]),
     }
 
@@ -347,6 +350,13 @@ def test_wrench_rows_render_runs_and_steps_of_chosen_tasks():
     assert "echo PASS > out" in steps[1]["text"]
     assert "cat check.sh" not in steps[1]["text"]
     assert steps[1]["run_id"] == "wr00000" and steps[1]["step_index"] == 2
+    assert [run["reference_offered"] for run in runs] == [False, True, False]
+    assert [step["reference_offered"] for step in steps] == [
+        False, False, True, False]
+    assert "Reference Solution" not in runs[1]["transcript"]
+    # the published corpora predate the column, so loading leaves it out
+    assert "reference_offered" not in CORPUS_COLUMNS["wrench_runs"]
+    assert "reference_offered" not in CORPUS_COLUMNS["wrench_steps"]
 
 
 def test_wrench_tasks_are_seeded_and_scale():
