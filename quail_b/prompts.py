@@ -196,66 +196,69 @@ CUAD_MAP_NON_COMPETE = (
 # similar lengths. "Do not repeat an item." keeps a small model from
 # repeating one item until the limit.
 CUAD_MAP_OBLIGATIONS = (
-    "{0}\n\nList the main obligations in the contract, in clause order, "
-    "numbered, one line each: the party bound and what it must do, in your own "
-    "words. Do not repeat an item.")
+    "{0}\n\nList the 25 most important obligations in the contract, in clause "
+    "order, numbered, one line each: the party bound and what it must do, in "
+    "your own words. Do not repeat an item.")
 CUAD_MAP_PLAIN_TERMS = (
-    "{0}\n\nRewrite the contract's key terms in plain English: what each party "
-    "gives, gets, and must do, and how the contract can end.")
+    "{0}\n\nRewrite the contract's key terms in plain English, in at most 600 "
+    "words: what each party gives, gets, and must do, and how the contract "
+    "can end.")
 CUAD_MAP_DEFINITIONS = (
-    "{0}\n\nList the main defined terms in the contract with their definitions. "
-    "Do not repeat an item.")
+    "{0}\n\nList the 25 most important defined terms in the contract with "
+    "their definitions, one line each. Do not repeat an item.")
 # One aspect of the contract each, for CUAD-22's sixteen maps of one contract
 CUAD_MAP_PARTY_DUTIES = (
     "{0}\n\nDescribe each party to the contract: its role and its five most "
-    "important duties.")
+    "important duties. Do not repeat an item.")
 CUAD_MAP_SECTIONS = (
-    "{0}\n\nSummarize each section of the contract in two sentences.")
+    "{0}\n\nSummarize the 20 most important sections of the contract, one "
+    "sentence each. Do not repeat an item.")
 CUAD_MAP_DATES = (
-    "{0}\n\nList the main dates, deadlines, and notice periods the contract "
-    "sets, with what each applies to. Do not repeat an item.")
+    "{0}\n\nList the 15 most important dates, deadlines, and notice periods "
+    "the contract sets, with what each applies to. Do not repeat an item.")
 CUAD_MAP_PAYMENTS = (
-    "{0}\n\nList the main payment, fee, and price terms, with amounts and "
-    "conditions. Do not repeat an item.")
+    "{0}\n\nList the 15 most important payment, fee, and price terms, with "
+    "amounts and conditions. Do not repeat an item.")
 CUAD_MAP_TERMINATION = (
-    "{0}\n\nDescribe every way a party can terminate the contract: who may "
-    "terminate, the trigger, and the notice required. Do not repeat an item.")
-CUAD_MAP_LICENSING = (
-    "{0}\n\nList the main intellectual property, license, and ownership terms, "
-    "numbered, one or two sentences each. Do not repeat an item.")
-CUAD_MAP_CONFIDENTIALITY = (
-    "{0}\n\nDescribe every confidentiality and non-disclosure obligation: what "
-    "information it covers, who it binds, its exceptions, and how long it "
-    "lasts. Do not repeat an item.")
-CUAD_MAP_WARRANTIES = (
-    "{0}\n\nList the main warranties, representations, and disclaimers each "
-    "party makes. Do not repeat an item.")
-CUAD_MAP_INDEMNIFICATION = (
-    "{0}\n\nDescribe every liability limit and indemnification duty: who owes "
-    "it, what it covers, and any cap. Do not repeat an item.")
-CUAD_MAP_DISPUTES = (
-    "{0}\n\nDescribe the governing law, the venue, and every dispute resolution "
-    "step: what triggers each step, its deadlines, and who decides. Do not "
-    "repeat an item.")
-CUAD_MAP_ASSIGNMENT = (
-    "{0}\n\nExplain every assignment, transfer, and change of control term: who "
-    "may assign what, whose consent is needed, and what happens on a change of "
-    "control. Do not repeat an item.")
-CUAD_MAP_INSURANCE = (
-    "{0}\n\nDescribe every insurance, audit, and record-keeping requirement: "
-    "who must do what, the amounts or scope, and for how long. Do not repeat an "
+    "{0}\n\nDescribe at most 16 ways a party can terminate the contract: who "
+    "may terminate, the trigger, and the notice required. Do not repeat an "
     "item.")
+CUAD_MAP_LICENSING = (
+    "{0}\n\nList the main intellectual property, license, and ownership "
+    "terms, numbered, one or two sentences each. Do not repeat an item.")
+CUAD_MAP_CONFIDENTIALITY = (
+    "{0}\n\nDescribe the confidentiality and non-disclosure obligations in at "
+    "most 600 words: what information they cover, who they bind, their "
+    "exceptions, and how long they last. Do not repeat an item.")
+CUAD_MAP_WARRANTIES = (
+    "{0}\n\nList the 20 most important warranties, representations, and "
+    "disclaimers the parties make, one line each. Do not repeat an item.")
+CUAD_MAP_INDEMNIFICATION = (
+    "{0}\n\nDescribe at most 16 liability limits and indemnification duties: "
+    "who owes each, what it covers, and any cap. Do not repeat an item.")
+CUAD_MAP_DISPUTES = (
+    "{0}\n\nDescribe the governing law, the venue, and the dispute resolution "
+    "steps in at most 600 words: what triggers each step, its deadlines, and "
+    "who decides. Do not repeat an item.")
+CUAD_MAP_ASSIGNMENT = (
+    "{0}\n\nExplain the assignment, transfer, and change of control terms in "
+    "at most 600 words: who may assign what, whose consent is needed, and "
+    "what happens on a change of control. Do not repeat an item.")
+CUAD_MAP_INSURANCE = (
+    "{0}\n\nDescribe at most 16 insurance, audit, and record-keeping "
+    "requirements: who must do what, the amounts or scope, and for how long. "
+    "Do not repeat an item.")
 CUAD_MAP_RENEWAL = (
-    "{0}\n\nDescribe the term of the contract and every renewal and extension "
-    "term: when it starts and ends, how it renews, the notice needed, and how "
-    "either party can stop a renewal.")
+    "{0}\n\nDescribe the term of the contract and its renewal and extension "
+    "terms in at most 600 words: when it starts and ends, how it renews, the "
+    "notice needed, and how either party can stop a renewal.")
 CUAD_MAP_NOTICES = (
-    "{0}\n\nList the main notice requirements, with who must be notified, how, "
-    "and when. Do not repeat an item.")
+    "{0}\n\nList the main notice requirements, with who must be notified, "
+    "how, and when. Do not repeat an item.")
 # Long maps of agent trace snapshots, for AGENT-6
 AGENT_MAP_COMMANDS = (
-    "{0}\n\nList every command the agent ran, in order, with what each one "
-    "showed.")
+    "{0}\n\nList the 15 most important commands the agent ran, in order, one "
+    "line each, with what each one showed. Do not repeat an item.")
 AGENT_MAP_PLAN = (
     "{0}\n\nDescribe the agent's plan and every change to it, in order, with "
     "what prompted each change.")
