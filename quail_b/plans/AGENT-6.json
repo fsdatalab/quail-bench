@@ -198,7 +198,7 @@
                                 {
                                   "value": {
                                     "literal": {
-                                      "string": "{0}\n\nList every command the agent ran, in order, with what each one showed."
+                                      "string": "{0}\n\nList the 15 most important commands the agent ran, in order, one line each, with what each one showed. Do not repeat an item."
                                     }
                                   }
                                 },

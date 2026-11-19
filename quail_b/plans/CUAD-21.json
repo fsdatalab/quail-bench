@@ -91,7 +91,7 @@
                         {
                           "value": {
                             "literal": {
-                              "string": "{0}\n\nList the main defined terms in the contract with their definitions. Do not repeat an item."
+                              "string": "{0}\n\nList the 25 most important defined terms in the contract with their definitions, one line each. Do not repeat an item."
                             }
                           }
                         },
@@ -145,7 +145,7 @@
                             {
                               "value": {
                                 "literal": {
-                                  "string": "{0}\n\nRewrite the contract's key terms in plain English: what each party gives, gets, and must do, and how the contract can end."
+                                  "string": "{0}\n\nRewrite the contract's key terms in plain English, in at most 600 words: what each party gives, gets, and must do, and how the contract can end."
                                 }
                               }
                             },
@@ -198,7 +198,7 @@
                                 {
                                   "value": {
                                     "literal": {
-                                      "string": "{0}\n\nList the main obligations in the contract, in clause order, numbered, one line each: the party bound and what it must do, in your own words. Do not repeat an item."
+                                      "string": "{0}\n\nList the 25 most important obligations in the contract, in clause order, numbered, one line each: the party bound and what it must do, in your own words. Do not repeat an item."
                                     }
                                   }
                                 },

@@ -314,7 +314,7 @@
                             {
                               "value": {
                                 "literal": {
-                                  "string": "{0}\n\nDescribe the term of the contract and every renewal and extension term: when it starts and ends, how it renews, the notice needed, and how either party can stop a renewal."
+                                  "string": "{0}\n\nDescribe the term of the contract and its renewal and extension terms in at most 600 words: when it starts and ends, how it renews, the notice needed, and how either party can stop a renewal."
                                 }
                               }
                             },
@@ -380,7 +380,7 @@
                                 {
                                   "value": {
                                     "literal": {
-                                      "string": "{0}\n\nDescribe every insurance, audit, and record-keeping requirement: who must do what, the amounts or scope, and for how long. Do not repeat an item."
+                                      "string": "{0}\n\nDescribe at most 16 insurance, audit, and record-keeping requirements: who must do what, the amounts or scope, and for how long. Do not repeat an item."
                                     }
                                   }
                                 },
@@ -445,7 +445,7 @@
                                     {
                                       "value": {
                                         "literal": {
-                                          "string": "{0}\n\nExplain every assignment, transfer, and change of control term: who may assign what, whose consent is needed, and what happens on a change of control. Do not repeat an item."
+                                          "string": "{0}\n\nExplain the assignment, transfer, and change of control terms in at most 600 words: who may assign what, whose consent is needed, and what happens on a change of control. Do not repeat an item."
                                         }
                                       }
                                     },
@@ -509,7 +509,7 @@
                                         {
                                           "value": {
                                             "literal": {
-                                              "string": "{0}\n\nDescribe the governing law, the venue, and every dispute resolution step: what triggers each step, its deadlines, and who decides. Do not repeat an item."
+                                              "string": "{0}\n\nDescribe the governing law, the venue, and the dispute resolution steps in at most 600 words: what triggers each step, its deadlines, and who decides. Do not repeat an item."
                                             }
                                           }
                                         },
@@ -572,7 +572,7 @@
                                             {
                                               "value": {
                                                 "literal": {
-                                                  "string": "{0}\n\nDescribe every liability limit and indemnification duty: who owes it, what it covers, and any cap. Do not repeat an item."
+                                                  "string": "{0}\n\nDescribe at most 16 liability limits and indemnification duties: who owes each, what it covers, and any cap. Do not repeat an item."
                                                 }
                                               }
                                             },
@@ -634,7 +634,7 @@
                                                 {
                                                   "value": {
                                                     "literal": {
-                                                      "string": "{0}\n\nList the main warranties, representations, and disclaimers each party makes. Do not repeat an item."
+                                                      "string": "{0}\n\nList the 20 most important warranties, representations, and disclaimers the parties make, one line each. Do not repeat an item."
                                                     }
                                                   }
                                                 },
@@ -695,7 +695,7 @@
                                                     {
                                                       "value": {
                                                         "literal": {
-                                                          "string": "{0}\n\nDescribe every confidentiality and non-disclosure obligation: what information it covers, who it binds, its exceptions, and how long it lasts. Do not repeat an item."
+                                                          "string": "{0}\n\nDescribe the confidentiality and non-disclosure obligations in at most 600 words: what information they cover, who they bind, their exceptions, and how long they last. Do not repeat an item."
                                                         }
                                                       }
                                                     },
@@ -814,7 +814,7 @@
                                                             {
                                                               "value": {
                                                                 "literal": {
-                                                                  "string": "{0}\n\nDescribe each party to the contract: its role and its five most important duties."
+                                                                  "string": "{0}\n\nDescribe each party to the contract: its role and its five most important duties. Do not repeat an item."
                                                                 }
                                                               }
                                                             },
@@ -872,7 +872,7 @@
                                                                 {
                                                                   "value": {
                                                                     "literal": {
-                                                                      "string": "{0}\n\nDescribe every way a party can terminate the contract: who may terminate, the trigger, and the notice required. Do not repeat an item."
+                                                                      "string": "{0}\n\nDescribe at most 16 ways a party can terminate the contract: who may terminate, the trigger, and the notice required. Do not repeat an item."
                                                                     }
                                                                   }
                                                                 },
@@ -929,7 +929,7 @@
                                                                     {
                                                                       "value": {
                                                                         "literal": {
-                                                                          "string": "{0}\n\nList the main payment, fee, and price terms, with amounts and conditions. Do not repeat an item."
+                                                                          "string": "{0}\n\nList the 15 most important payment, fee, and price terms, with amounts and conditions. Do not repeat an item."
                                                                         }
                                                                       }
                                                                     },
@@ -985,7 +985,7 @@
                                                                         {
                                                                           "value": {
                                                                             "literal": {
-                                                                              "string": "{0}\n\nList the main dates, deadlines, and notice periods the contract sets, with what each applies to. Do not repeat an item."
+                                                                              "string": "{0}\n\nList the 15 most important dates, deadlines, and notice periods the contract sets, with what each applies to. Do not repeat an item."
                                                                             }
                                                                           }
                                                                         },
@@ -1040,7 +1040,7 @@
                                                                             {
                                                                               "value": {
                                                                                 "literal": {
-                                                                                  "string": "{0}\n\nSummarize each section of the contract in two sentences."
+                                                                                  "string": "{0}\n\nSummarize the 20 most important sections of the contract, one sentence each. Do not repeat an item."
                                                                                 }
                                                                               }
                                                                             },
@@ -1094,7 +1094,7 @@
                                                                                 {
                                                                                   "value": {
                                                                                     "literal": {
-                                                                                      "string": "{0}\n\nList the main defined terms in the contract with their definitions. Do not repeat an item."
+                                                                                      "string": "{0}\n\nList the 25 most important defined terms in the contract with their definitions, one line each. Do not repeat an item."
                                                                                     }
                                                                                   }
                                                                                 },
@@ -1147,7 +1147,7 @@
                                                                                     {
                                                                                       "value": {
                                                                                         "literal": {
-                                                                                          "string": "{0}\n\nList the main obligations in the contract, in clause order, numbered, one line each: the party bound and what it must do, in your own words. Do not repeat an item."
+                                                                                          "string": "{0}\n\nList the 25 most important obligations in the contract, in clause order, numbered, one line each: the party bound and what it must do, in your own words. Do not repeat an item."
                                                                                         }
                                                                                       }
                                                                                     },
